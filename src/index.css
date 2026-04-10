@@ -1,0 +1,101 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Noto+Sans+KR:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --font-sans: 'Plus Jakarta Sans', 'Noto Sans KR', sans-serif;
+  --font-logo: 'Cormorant Garamond', serif;
+  --bg-body: #0f0d0b;
+  --bg-sidebar: #14110f;
+  --bg-content: #181411;
+  --bg-panel: #201b17;
+  --bg-elevated: #29231e;
+  --line-soft: rgba(233, 221, 198, 0.09);
+  --text-strong: #f5efe4;
+  --text-soft: #ddd3c3;
+  --text-muted: #a89882;
+  --text-dim: #7b6f5d;
+  --accent: #d7bd86;
+  --accent-soft: #f0dfb2;
+  --accent-ink: #251c0f;
+  --danger: #ff5d6c;
+  color-scheme: dark;
+  font-family: var(--font-sans);
+  color: var(--text-strong);
+  background: var(--bg-body);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg-body: #f6f1e7;
+  --bg-sidebar: #fbf6ee;
+  --bg-content: #fffaf2;
+  --bg-panel: #fff9f1;
+  --bg-elevated: #f3eadb;
+  --line-soft: rgba(108, 81, 45, 0.14);
+  --text-strong: #2f2416;
+  --text-soft: #4f3d29;
+  --text-muted: #7d6a54;
+  --text-dim: #9a8c7a;
+  --accent: #b89252;
+  --accent-soft: #7a5d2b;
+  --accent-ink: #fff8ec;
+  --danger: #d24656;
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 86% 8%, rgba(215, 189, 134, 0.08), transparent 22%),
+    radial-gradient(circle at 18% 0%, rgba(110, 133, 93, 0.06), transparent 18%),
+    linear-gradient(180deg, #0d0b09 0%, #110f0d 48%, #15110e 100%);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-dim);
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
