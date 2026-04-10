@@ -13,7 +13,7 @@
 - 공개 피드를 수집해 시그널 형태로 정리하기
 - 모델, 도구, 상태, 실행 로그를 오케스트레이션 화면에서 확인하기
 
-아직 개발 중인 프로젝트이며, 보여주기식 화면이 아니라 실제 로컬 실행과 연결되는 구조를 목표로 계속 개선하고 있습니다.
+아직 개발 중인 프로젝트이며, 보여주기용 화면이 아니라 실제 로컬 실행과 연결되는 구조를 목표로 계속 개선하고 있습니다.
 
 ## 현재 구현된 기능
 
@@ -27,6 +27,8 @@
   - 파일 업로드
   - 폴더 생성
   - 텍스트 파일 미리보기 및 저장
+- 인사이트
+  - 채팅과 실행 결과 요약 보기
 - 시그널
   - 공개 피드 수집 구조
   - 카테고리별 필터
@@ -35,28 +37,44 @@
   - 스킬 목록 및 활성화 UI
 - 오케스트레이션
   - 모델, 도구, 메모리, 출력 흐름을 노드 기반으로 시각화하는 화면 구성
+- 활동
+  - 최근 실행과 저장 작업 기록 확인
 - 설정
-  - 에이전트/연결/API 키/환경설정 분리
+  - 에이전트, 연결, API 키, 환경설정 분리
 
-## 미리보기
+## 메뉴별 미리보기
 
 ### 채팅
 
-![채팅 미리보기](docs/screenshots/chat.png)
+![채팅](docs/screenshots/chat.png)
 
 ### 내 파일
 
-![내 파일 미리보기](docs/screenshots/files.png)
+![내 파일](docs/screenshots/files.png)
+
+### 인사이트
+
+![인사이트](docs/screenshots/insights.png)
 
 ### 시그널
 
-![시그널 미리보기](docs/screenshots/signals.png)
+![시그널](docs/screenshots/signals.png)
 
-## 실행 주소 안내
+### 스킬
 
-- 로컬에서 실행하면 콘솔에 접속 주소가 표시됩니다.
-- 프런트는 보통 `http://127.0.0.1:xxxx` 형태의 로컬 주소로 열립니다.
-- 브리지는 보통 `http://127.0.0.1:yyyy` 형태의 로컬 주소로 실행됩니다.
+![스킬](docs/screenshots/skills.png)
+
+### 오케스트레이션
+
+![오케스트레이션](docs/screenshots/orchestration.png)
+
+### 활동
+
+![활동](docs/screenshots/activity.png)
+
+### 설정
+
+![설정](docs/screenshots/settings.png)
 
 ## 실행 방법
 
@@ -80,8 +98,6 @@ npm install
 npm run bridge
 ```
 
-실행 후 콘솔에 표시된 로컬 브리지 주소를 사용합니다.
-
 ### 4. 프런트 실행
 
 개발 서버:
@@ -97,7 +113,7 @@ npm run build
 npm run preview
 ```
 
-실행 후 콘솔에 표시된 프런트 주소로 접속합니다.
+실행 후 콘솔이나 브라우저에 표시되는 로컬 주소로 접속하면 됩니다.
 
 ## 사용 기술
 
@@ -109,6 +125,7 @@ npm run preview
 - Codex CLI
 - Ollama
 - `@xyflow/react`
+- Playwright
 
 ## 검증 명령
 
