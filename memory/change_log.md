@@ -31,3 +31,17 @@
 - Restored a dedicated `0. 로컬 실행기` section in settings so Ollama and Codex are visible before the official API cards.
 - Added live local status cards showing readiness, current model labels, and bridge detail text.
 - Updated bridge health so failed Ollama checks surface the real error detail instead of always saying no model is available.
+
+### Flowchart orchestration pass
+
+- Reworked the orchestration board into a compact left-to-right flowchart layout on React Flow.
+- Re-enabled canvas pan and zoom while disabling node dragging so the flow stays aligned.
+- Tightened node sizes and regrouped trigger, hub, memory, branch, tools, signals, and outputs into a clearer path.
+- Added an inline agent switch row near the run form so runtime selection stays close to execution.
+- Updated orchestration running copy so Codex and Ollama runs explain that progress logs appear before the final one-shot answer.
+
+### Ollama default preference
+
+- Bumped persisted runtime storage to `artemis-runtime-state/v17`.
+- Migrated saved state so `agent-ollama` becomes active when the stored model provider is already `ollama`.
+- Kept `gemma4-E4B-uncensored-q4fast:latest` as the only expected Ollama model.

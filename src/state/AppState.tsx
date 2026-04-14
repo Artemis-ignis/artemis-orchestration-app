@@ -94,11 +94,11 @@ function buildPromptHistory(
 }
 
 const RUN_PROGRESS_LOG_STEPS = [
-  { delayMs: 4_000, message: '실행기가 요청을 확인하는 중입니다.' },
-  { delayMs: 12_000, message: '응답 초안을 준비하는 중입니다.' },
-  { delayMs: 25_000, message: '조금 더 걸리고 있습니다. 작업 내용을 정리하는 중입니다.' },
-  { delayMs: 45_000, message: '외부 실행기가 계속 처리 중입니다. 완료까지 조금만 더 기다려 주세요.' },
-  { delayMs: 75_000, message: '지연이 길어지고 있습니다. 타임아웃 전까지 계속 대기합니다.' },
+  { delayMs: 2_000, message: '실행기가 요청을 확인하는 중입니다.' },
+  { delayMs: 6_000, message: '응답 초안을 준비하는 중입니다.' },
+  { delayMs: 14_000, message: '최종 답변을 모으는 중입니다. 조금만 더 기다려 주세요.' },
+  { delayMs: 30_000, message: '지연이 길어지고 있습니다. 완료 전까지 계속 상태를 갱신합니다.' },
+  { delayMs: 60_000, message: '응답이 늦어지고 있습니다. 타임아웃 전까지 대기합니다.' },
 ]
 
 function shouldAttachSignalsContext(task: string) {
@@ -933,6 +933,12 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         }
 
         pushRunLog('info', `${agent.name} 실행기에 작업을 전달했습니다.`)
+        if (agent.provider === 'codex' || agent.provider === 'ollama') {
+          pushRunLog(
+            'info',
+            '이 실행기는 결과를 한 번에 반환합니다. 최종 답변 전까지는 진행 로그가 먼저 갱신됩니다.',
+          )
+        }
 
         const progressTimers = RUN_PROGRESS_LOG_STEPS.map(({ delayMs, message }) =>
           window.setTimeout(() => {

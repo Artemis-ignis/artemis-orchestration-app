@@ -2,8 +2,9 @@ import { OLLAMA_LOCAL_MODEL } from '../lib/agentCatalog'
 import { buildInitialAgents, createDefaultState } from './defaultState'
 import type { RuntimeState, ToolItem } from './types'
 
-const STORAGE_KEY = 'artemis-runtime-state/v16'
+const STORAGE_KEY = 'artemis-runtime-state/v17'
 const LEGACY_STORAGE_KEYS = [
+  'artemis-runtime-state/v16',
   'artemis-runtime-state/v15',
   'artemis-runtime-state/v14',
   'artemis-runtime-state/v13',
@@ -231,6 +232,22 @@ function normalizeState(candidate: unknown): RuntimeState {
 
   if (isLegacyOllamaModel(next.settings.ollamaModel)) {
     next.settings.ollamaModel = OLLAMA_LOCAL_MODEL
+  }
+
+  const ollamaAgentExists = next.agents.items.some((item) => item.id === 'agent-ollama')
+  const preferredActiveAgentId =
+    next.settings.modelProvider === 'ollama' && ollamaAgentExists
+      ? 'agent-ollama'
+      : next.agents.items[0]?.id ?? fallback.agents.activeAgentId
+
+  if (!next.agents.items.some((item) => item.id === next.agents.activeAgentId)) {
+    next.agents.activeAgentId = preferredActiveAgentId
+  } else if (
+    next.agents.activeAgentId === 'agent-codex' &&
+    next.settings.modelProvider === 'ollama' &&
+    ollamaAgentExists
+  ) {
+    next.agents.activeAgentId = 'agent-ollama'
   }
 
   return next

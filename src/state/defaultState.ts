@@ -70,7 +70,7 @@ export function createDefaultState(): RuntimeState {
       items: [],
     },
     agents: {
-      activeAgentId: initialAgents[0].id,
+      activeAgentId: initialAgents.find((agent) => agent.id === 'agent-ollama')?.id ?? initialAgents[0].id,
       items: initialAgents,
       runs: [],
     },
@@ -89,7 +89,7 @@ export function createDefaultState(): RuntimeState {
       language: '한국어',
       timezone: 'Asia/Seoul',
       locationSharing: false,
-      modelProvider: 'codex',
+      modelProvider: 'ollama',
       ollamaModel: OLLAMA_LOCAL_MODEL,
       codexModel: 'gpt-5.4',
       bridgeUrl: 'http://127.0.0.1:4174',

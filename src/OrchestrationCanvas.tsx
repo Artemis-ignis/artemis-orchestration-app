@@ -74,8 +74,8 @@ type FlowNodeData = {
   agentId?: string
 }
 
-const BOARD_WIDTH = 1120
-const BOARD_HEIGHT = 540
+const BOARD_WIDTH = 980
+const BOARD_HEIGHT = 500
 
 function normalizeModelLabel(value: string) {
   return value.trim().replace(/:latest$/i, '')
@@ -198,7 +198,7 @@ function createFlowModel({
     {
       id: 'trigger',
       type: 'orchestration',
-      position: { x: 72, y: 238 },
+      position: { x: 58, y: 214 },
       data: {
         title: '입력',
         badge: recentPrompt.trim() ? '입력됨' : statusBadge(triggerStatus),
@@ -214,7 +214,7 @@ function createFlowModel({
     {
       id: 'memory',
       type: 'orchestration',
-      position: { x: 448, y: 82 },
+      position: { x: 336, y: 72 },
       data: {
         title: '메모리',
         badge: messageCount > 0 ? `대화 ${messageCount}` : statusBadge(memoryStatus),
@@ -230,7 +230,7 @@ function createFlowModel({
     {
       id: 'hub',
       type: 'orchestration',
-      position: { x: 350, y: 194 },
+      position: { x: 300, y: 186 },
       data: {
         title: activeAgent?.name || '에이전트 선택',
         subtitle: activeAgent
@@ -250,7 +250,7 @@ function createFlowModel({
     {
       id: 'router',
       type: 'orchestration',
-      position: { x: 744, y: 238 },
+      position: { x: 598, y: 214 },
       data: {
         title: '분기',
         badge: route.badge,
@@ -265,7 +265,7 @@ function createFlowModel({
     {
       id: 'files',
       type: 'orchestration',
-      position: { x: 946, y: 96 },
+      position: { x: 814, y: 92 },
       data: {
         title: '파일',
         badge: changedFileCount > 0 ? `+${changedFileCount}` : `${filesCount}`,
@@ -281,7 +281,7 @@ function createFlowModel({
     {
       id: 'insights',
       type: 'orchestration',
-      position: { x: 946, y: 238 },
+      position: { x: 814, y: 214 },
       data: {
         title: '인사이트',
         badge: insightsCount > 0 ? `${insightsCount}` : statusBadge(insightsStatus),
@@ -297,7 +297,7 @@ function createFlowModel({
     {
       id: 'activity',
       type: 'orchestration',
-      position: { x: 946, y: 380 },
+      position: { x: 814, y: 336 },
       data: {
         title: '로그',
         badge: `${activityCount}`,
@@ -313,7 +313,7 @@ function createFlowModel({
     {
       id: 'model',
       type: 'orchestration',
-      position: { x: 216, y: 396 },
+      position: { x: 178, y: 354 },
       data: {
         title: '모델',
         badge: runtimeModel ? runtimeModel : statusBadge(modelStatus),
@@ -329,7 +329,7 @@ function createFlowModel({
     {
       id: 'signals',
       type: 'orchestration',
-      position: { x: 450, y: 396 },
+      position: { x: 400, y: 354 },
       data: {
         title: '시그널',
         badge: signalCount > 0 ? `${signalCount}` : statusBadge(signalStatus),
@@ -345,7 +345,7 @@ function createFlowModel({
     {
       id: 'tools',
       type: 'orchestration',
-      position: { x: 684, y: 396 },
+      position: { x: 622, y: 354 },
       data: {
         title: '도구',
         badge: activeTools.length > 0 ? `${activeTools.length}` : statusBadge(toolsStatus),
@@ -617,9 +617,9 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
 
     const fit = () =>
       flowInstance.fitView({
-        padding: 0.16,
-        minZoom: 0.74,
-        maxZoom: 1.2,
+        padding: 0.14,
+        minZoom: 0.72,
+        maxZoom: 1.18,
         duration: 240,
       })
 
@@ -642,12 +642,12 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
         edges={graph.edges}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.16, minZoom: 0.74, maxZoom: 1.2 }}
+        fitViewOptions={{ padding: 0.14, minZoom: 0.72, maxZoom: 1.18 }}
         minZoom={0.58}
         maxZoom={1.4}
-        nodesDraggable
+        nodesDraggable={false}
         nodesConnectable={false}
-        elementsSelectable
+        elementsSelectable={false}
         selectionOnDrag={false}
         panOnDrag
         panOnScroll

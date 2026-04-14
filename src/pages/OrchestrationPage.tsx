@@ -35,6 +35,14 @@ function formatElapsedSeconds(totalSeconds: number) {
   return seconds > 0 ? `${minutes}분 ${seconds}초` : `${minutes}분`
 }
 
+function runningHint(provider: string) {
+  if (provider === 'codex' || provider === 'ollama') {
+    return '현재 실행기는 최종 답변을 한 번에 반환합니다. 완료 전까지는 아래 진행 로그가 먼저 갱신됩니다.'
+  }
+
+  return '현재 공급자는 스트리밍으로 응답을 보내는 중입니다. 결과와 시도 로그가 순서대로 갱신됩니다.'
+}
+
 export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   const {
     activeAgent,
@@ -254,6 +262,19 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
               </span>
             </div>
 
+            <div className="orchestration-inline-dock__agentSwitch">
+              {state.agents.items.map((agent) => (
+                <button
+                  key={agent.id}
+                  className={`chip ${activeAgent?.id === agent.id ? 'is-active' : 'chip--soft'}`}
+                  onClick={() => setActiveAgent(agent.id)}
+                  type="button"
+                >
+                  {agent.name}
+                </button>
+              ))}
+            </div>
+
             <div className="orchestration-inline-dock__composer">
               <label className="field field--full orchestration-inline-dock__field">
                 <span>작업 지시</span>
@@ -394,10 +415,13 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                         <strong>{latestRunCurrentMessage}</strong>
                       </div>
                     ) : null}
+                    {latestRun.status === 'running' ? (
+                      <p className="orchestration-live-panel__hint">{runningHint(latestRun.provider)}</p>
+                    ) : null}
                     <div className="orchestration-live-panel__text">
                       {latestRun.output ||
                         (latestRun.status === 'running'
-                          ? latestRunCurrentMessage || '실행기가 응답을 준비하는 중입니다.'
+                          ? latestRunCurrentMessage || '실행기가 응답을 준비하는 중입니다. 아래 로그가 먼저 갱신됩니다.'
                           : '아직 결과가 없습니다.')}
                     </div>
                   </article>

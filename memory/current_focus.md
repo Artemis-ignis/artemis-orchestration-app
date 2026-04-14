@@ -32,3 +32,11 @@
 - Confirm the settings collapsible sections still read well on smaller widths.
 - Decide whether the chat model picker should default to the official router or keep the current agent.
 - Revisit orchestration spacing only if the interactive layout regresses again.
+
+## 2026-04-15 Follow-up
+
+- The orchestration board is back on a flowchart-style React Flow canvas instead of a fixed illustration.
+- The canvas supports pan and zoom again while keeping nodes locked in place for consistent alignment.
+- The saved runtime state now prefers `agent-ollama` whenever the stored model provider is already `ollama`.
+- Current browser verification shows the local runtime section rendering in settings and the Ollama agent available in orchestration.
+- The remaining UX risk is that Codex and Ollama still return final answers in one batch, so the live panel can only show progress logs before the final response arrives.
