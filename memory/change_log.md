@@ -25,3 +25,9 @@
 
 - Routing detail toggles now appear only when there was a real fallback or provider error.
 - Streaming meta now avoids showing noisy attempt counts unless fallback actually happened.
+
+### Local runtime visibility fix
+
+- Restored a dedicated `0. 로컬 실행기` section in settings so Ollama and Codex are visible before the official API cards.
+- Added live local status cards showing readiness, current model labels, and bridge detail text.
+- Updated bridge health so failed Ollama checks surface the real error detail instead of always saying no model is available.

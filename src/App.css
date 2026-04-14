@@ -12308,6 +12308,18 @@ select:focus-visible {
   align-items: stretch;
 }
 
+.provider-grid--local {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.provider-card--local {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  align-content: start;
+}
+
 .provider-card--official {
   display: grid;
   gap: 14px;
@@ -12364,10 +12376,41 @@ select:focus-visible {
   border-color: rgba(196, 142, 255, 0.18);
 }
 
+.provider-card__icon--ollama {
+  background: rgba(88, 166, 255, 0.12);
+  border-color: rgba(88, 166, 255, 0.2);
+}
+
+.provider-card__icon--codex {
+  background: rgba(120, 228, 180, 0.12);
+  border-color: rgba(120, 228, 180, 0.22);
+}
+
 .provider-card__summary {
   color: var(--text-soft);
   font-size: 0.9rem;
   line-height: 1.55;
+}
+
+.provider-card__surface {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.provider-card__surface strong {
+  color: var(--text-strong);
+  font-size: 0.82rem;
+}
+
+.provider-card__surface span {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  word-break: break-word;
 }
 
 .settings-providerFlags {
@@ -12805,6 +12848,7 @@ select:focus-visible {
 
 @media (max-width: 1180px) {
   .provider-grid--official,
+  .provider-grid--local,
   .settings-modelCatalog {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -12822,6 +12866,7 @@ select:focus-visible {
 
 @media (max-width: 720px) {
   .provider-grid--official,
+  .provider-grid--local,
   .settings-modeGrid,
   .settings-modelCatalog,
   .ai-routeBar {
@@ -13324,6 +13369,29 @@ select:focus-visible {
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 10px;
+}
+
+.orchestration-live-panel__statusLine {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(120, 168, 255, 0.08);
+  border: 1px solid rgba(120, 168, 255, 0.14);
+}
+
+.orchestration-live-panel__statusLine span {
+  color: var(--text-dim);
+  font-size: 0.76rem;
+}
+
+.orchestration-live-panel__statusLine strong {
+  color: var(--text-strong);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  font-weight: 600;
 }
 
 .orchestration-live-panel__text {

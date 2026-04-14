@@ -2,7 +2,9 @@ import { useEffect, useMemo, useReducer, useState, type PropsWithChildren } from
 import {
   executeModelPrompt,
   fetchBridgeHealth,
+  fetchSignalsFeed,
   fetchSkillCatalog,
+  type ExecuteResponse,
   type ExecuteWorkspaceContext,
   type BridgeHealth,
 } from '../lib/modelClient'
@@ -89,6 +91,29 @@ function buildPromptHistory(
       const text = message.text.trim()
       return text ? [{ role: 'master' as const, text }] : []
     })
+}
+
+const RUN_PROGRESS_LOG_STEPS = [
+  { delayMs: 4_000, message: '실행기가 요청을 확인하는 중입니다.' },
+  { delayMs: 12_000, message: '응답 초안을 준비하는 중입니다.' },
+  { delayMs: 25_000, message: '조금 더 걸리고 있습니다. 작업 내용을 정리하는 중입니다.' },
+  { delayMs: 45_000, message: '외부 실행기가 계속 처리 중입니다. 완료까지 조금만 더 기다려 주세요.' },
+  { delayMs: 75_000, message: '지연이 길어지고 있습니다. 타임아웃 전까지 계속 대기합니다.' },
+]
+
+function shouldAttachSignalsContext(task: string) {
+  return /(소식|뉴스|동향|브리핑|트렌드|업데이트|신호)/.test(task)
+}
+
+function buildSignalsContext(
+  items: Array<{
+    title: string
+    summary: string
+  }>,
+) {
+  return items
+    .map((item, index) => `${index + 1}. ${item.title}\n- 요약: ${item.summary}`)
+    .join('\n')
 }
 
 function buildOfficialRouterSystemPrompt({
@@ -808,6 +833,33 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
 
       try {
         const rootPath = await ensureWorkspaceRoot()
+        let taskPrompt = nextTask
+
+        if (shouldAttachSignalsContext(nextTask)) {
+          pushRunLog('info', '최신 신호를 확인하고 있습니다.')
+          try {
+            const signalFeed = await fetchSignalsFeed({
+              bridgeUrl: state.settings.bridgeUrl,
+            })
+            const contextItems = signalFeed.items.slice(0, 3)
+
+            if (contextItems.length > 0) {
+              taskPrompt = [
+                nextTask,
+                '',
+                '[참고 신호]',
+                buildSignalsContext(contextItems),
+                '',
+                '위 신호를 참고해 최신 핵심만 빠르게 정리해 주세요.',
+              ].join('\n')
+              pushRunLog('info', `최신 신호 ${contextItems.length}건을 참고 문맥으로 연결했습니다.`)
+            } else {
+              pushRunLog('info', '연결할 최신 신호가 없어 현재 요청만 그대로 실행합니다.')
+            }
+          } catch {
+            pushRunLog('info', '최신 신호를 불러오지 못해 현재 요청만 그대로 실행합니다.')
+          }
+        }
 
         if (agent.provider === 'official-router') {
           let finalEvent: AiStreamFinalEvent | null = null
@@ -818,7 +870,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
             state.settings.bridgeUrl,
             {
               sessionId: runId,
-              prompt: nextTask,
+              prompt: taskPrompt,
               messages: buildPromptHistory(activeThread.messages, 6),
               systemPrompt: agent.systemPrompt,
             },
@@ -882,17 +934,28 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
 
         pushRunLog('info', `${agent.name} 실행기에 작업을 전달했습니다.`)
 
-        const response = await executeModelPrompt({
-          bridgeUrl: state.settings.bridgeUrl,
-          prompt: nextTask,
-          messages: buildPromptHistory(activeThread.messages, 6),
-          settings: state.settings,
-          agent,
-          apiKeys: state.apiKeys,
-          enabledTools: state.tools.items.filter((item) => item.enabled),
-          rootPath,
-          cwdPath: workspaceCurrentPath,
-        })
+        const progressTimers = RUN_PROGRESS_LOG_STEPS.map(({ delayMs, message }) =>
+          window.setTimeout(() => {
+            pushRunLog('info', message)
+          }, delayMs),
+        )
+
+        let response: ExecuteResponse
+        try {
+          response = await executeModelPrompt({
+            bridgeUrl: state.settings.bridgeUrl,
+            prompt: taskPrompt,
+            messages: buildPromptHistory(activeThread.messages, 6),
+            settings: state.settings,
+            agent,
+            apiKeys: state.apiKeys,
+            enabledTools: state.tools.items.filter((item) => item.enabled),
+            rootPath,
+            cwdPath: workspaceCurrentPath,
+          })
+        } finally {
+          progressTimers.forEach((timer) => window.clearTimeout(timer))
+        }
 
         dispatch({
           type: 'COMPLETE_AGENT_RUN',

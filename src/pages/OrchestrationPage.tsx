@@ -12,7 +12,7 @@ import { Icon } from '../icons'
 import { OrchestrationCanvas } from '../OrchestrationCanvas'
 import { useArtemisApp } from '../state/context'
 
-function runStatusLabel(status?: string) {
+function displayRunStatusLabel(status?: string) {
   switch (status) {
     case 'running':
       return '실시간 생성 중'
@@ -23,6 +23,16 @@ function runStatusLabel(status?: string) {
     default:
       return '대기'
   }
+}
+
+function formatElapsedSeconds(totalSeconds: number) {
+  if (totalSeconds < 60) {
+    return `${totalSeconds}초`
+  }
+
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return seconds > 0 ? `${minutes}분 ${seconds}초` : `${minutes}분`
 }
 
 export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
@@ -43,6 +53,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   } = useArtemisApp()
   const [task, setTask] = useState('')
   const [aiProviders, setAiProviders] = useState<AiProviderState[]>([])
+  const [runClock, setRunClock] = useState(() => Date.now())
 
   const activeTools = state.tools.items.filter((item) => item.enabled)
   const latestMasterMessage = [...activeThread.messages]
@@ -60,6 +71,21 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     [activeAgentRuns],
   )
   const liveRunLogs = latestRun?.logs.slice(-6) ?? []
+  const latestRunCurrentMessage = liveRunLogs[liveRunLogs.length - 1]?.message ?? ''
+  const latestRunEndTime = latestRun
+    ? Date.parse(latestRun.finishedAt ?? latestRun.startedAt)
+    : runClock
+  const latestRunElapsedSeconds = latestRun
+    ? Math.max(
+        0,
+        Math.floor(
+          ((latestRun.status === 'running' ? runClock : latestRunEndTime) -
+            Date.parse(latestRun.startedAt)) /
+            1000,
+        ),
+      )
+    : 0
+  const latestRunElapsedLabel = latestRun ? formatElapsedSeconds(latestRunElapsedSeconds) : ''
   const latestChangedFiles = latestExecution?.workspace.changedFiles ?? []
   const readyProviderCount = bridgeHealth?.providers.filter((item) => item.ready).length ?? 0
   const ollamaReady =
@@ -111,6 +137,20 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     ],
     [],
   )
+
+  useEffect(() => {
+    if (latestRun?.status !== 'running') {
+      return undefined
+    }
+
+    const timer = window.setInterval(() => {
+      setRunClock(Date.now())
+    }, 1000)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [latestRun?.id, latestRun?.status])
 
   useEffect(() => {
     let active = true
@@ -322,7 +362,9 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                   }}
                   type="button"
                 >
-                  {activeAgent?.status === 'running' ? '실행 중...' : '오케스트레이션 실행'}
+                  {activeAgent?.status === 'running'
+                    ? `실행 중... ${latestRunElapsedLabel || ''}`.trim()
+                    : '오케스트레이션 실행'}
                 </button>
               </div>
             </div>
@@ -332,7 +374,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                 <div className="panel-card__header">
                   <h2>실시간 결과</h2>
                   <span className={`chip ${latestRun.status === 'running' ? 'is-active' : 'chip--soft'}`}>
-                    {runStatusLabel(latestRun.status)}
+                    {displayRunStatusLabel(latestRun.status)}
                   </span>
                 </div>
 
@@ -342,11 +384,20 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                       <span className="chip chip--soft">{executionProviderLabel(latestRun.provider)}</span>
                       <span className="chip chip--soft">{formatFriendlyModelName(latestRun.model)}</span>
                       <span className="chip chip--soft">{formatDate(latestRun.startedAt)}</span>
+                      {latestRunElapsedLabel ? (
+                        <span className="chip chip--soft">{latestRunElapsedLabel}</span>
+                      ) : null}
                     </div>
+                    {latestRun.status === 'running' && latestRunCurrentMessage ? (
+                      <div className="orchestration-live-panel__statusLine">
+                        <span>현재 단계</span>
+                        <strong>{latestRunCurrentMessage}</strong>
+                      </div>
+                    ) : null}
                     <div className="orchestration-live-panel__text">
                       {latestRun.output ||
                         (latestRun.status === 'running'
-                          ? '응답을 생성하는 중입니다. 아래 시도 로그가 먼저 갱신됩니다.'
+                          ? latestRunCurrentMessage || '실행기가 응답을 준비하는 중입니다.'
                           : '아직 결과가 없습니다.')}
                     </div>
                   </article>

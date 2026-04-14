@@ -75,6 +75,32 @@ function providerIconName(provider: AiProviderId): 'globe' | 'desktop' | 'spark'
   }
 }
 
+function localProviderLabel(provider: 'ollama' | 'codex') {
+  return provider === 'ollama' ? 'Ollama 로컬' : 'Codex CLI'
+}
+
+function localProviderIconName(provider: 'ollama' | 'codex'): 'spark' | 'agent' {
+  return provider === 'ollama' ? 'spark' : 'agent'
+}
+
+function localProviderSummary(provider: 'ollama' | 'codex', detail: string) {
+  if (provider === 'ollama') {
+    return detail.includes('사용할 수 있습니다.')
+      ? '내 PC의 작은 로컬 모델을 바로 채팅과 오케스트레이션에 붙입니다.'
+      : 'Ollama 앱, 모델 설치, 업데이트 상태를 먼저 확인해야 합니다.'
+  }
+
+  return detail.includes('Logged in')
+    ? '로컬 Codex CLI가 실제 파일 수정과 코드 작업을 처리합니다.'
+    : 'Codex CLI 로그인 또는 준비 상태를 다시 확인해야 합니다.'
+}
+
+function localProviderStatusLabel(provider: { available: boolean; ready: boolean }) {
+  if (provider.ready) return '준비 완료'
+  if (provider.available) return '부분 준비'
+  return '미연결'
+}
+
 function providerAutoSummary(provider: AiProviderId) {
   switch (provider) {
     case 'openrouter':
@@ -260,6 +286,19 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
   const readyOfficialProviders = aiProviders.filter(
     (item) => item.enabled && item.configured && (item.status === 'ready' || item.available_count > 0),
   ).length
+  const localProviders = useMemo(
+    () =>
+      ((bridgeHealth?.providers ?? []).filter(
+        (item) => item.provider === 'ollama' || item.provider === 'codex',
+      ) as Array<{
+        provider: 'ollama' | 'codex'
+        available: boolean
+        ready: boolean
+        models: string[]
+        detail: string
+      }>),
+    [bridgeHealth],
+  )
   const manualCandidates = useMemo(
     () =>
       [...aiModels]
@@ -412,6 +451,75 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
         </div>
         {aiError ? <div className="status-banner status-banner--error"><Icon name="warning" size={16} /><span>{aiError}</span></div> : null}
         {bridgeError ? <div className="status-banner status-banner--warning"><Icon name="warning" size={16} /><span>{bridgeError}</span></div> : null}
+      </section>
+
+      <section className="settings-card">
+        <DisclosureSection
+          className="settings-disclosure"
+          defaultOpen
+          summary="Ollama와 Codex의 실제 로컬 준비 상태를 먼저 확인합니다."
+          title="0. 로컬 실행기"
+        >
+          <div className="panel-card__header">
+            <p className="settings-card__lead">
+              로컬 실행기는 API 키 없이 바로 붙습니다. Ollama가 안 보이면 앱 실행, 모델 설치, 업데이트 상태부터 확인하면 됩니다.
+            </p>
+            <button className="ghost-button ghost-button--compact" onClick={() => void refreshBridgeHealth()} type="button">
+              로컬 상태 새로고침
+            </button>
+          </div>
+          <div className="provider-grid provider-grid--local">
+            {localProviders.map((provider) => {
+              const providerLabel = localProviderLabel(provider.provider)
+              const isOllama = provider.provider === 'ollama'
+              const modelSummary =
+                provider.models.length > 0
+                  ? provider.models.map((item) => formatFriendlyModelName(item)).join(', ')
+                  : isOllama
+                    ? '설치된 모델이 아직 없습니다.'
+                    : '사용 가능한 Codex 모델을 불러오지 못했습니다.'
+
+              return (
+                <article key={provider.provider} className="provider-card provider-card--local">
+                  <div className="provider-card__head">
+                    <div className="provider-card__identity">
+                      <span className={`provider-card__icon provider-card__icon--${provider.provider}`}>
+                        <Icon name={localProviderIconName(provider.provider)} size={16} />
+                      </span>
+                      <div>
+                        <h3>{providerLabel}</h3>
+                        <p className="settings-card__lead">{localProviderSummary(provider.provider, provider.detail)}</p>
+                      </div>
+                    </div>
+                    <span className={`chip ${provider.ready ? 'is-active' : 'chip--soft'}`}>
+                      {localProviderStatusLabel(provider)}
+                    </span>
+                  </div>
+                  <div className="settings-providerFlags chip-wrap">
+                    <span className={`chip ${provider.ready ? 'is-active' : 'chip--soft'}`}>
+                      {provider.ready ? '바로 사용 가능' : '확인 필요'}
+                    </span>
+                    <span className="chip chip--soft">{provider.models.length}개 모델</span>
+                  </div>
+                  <p className="provider-card__summary">{provider.detail}</p>
+                  <div className="provider-card__surface">
+                    <strong>현재 모델</strong>
+                    <span>{modelSummary}</span>
+                  </div>
+                  {isOllama && !provider.ready ? (
+                    <div className="status-banner status-banner--warning">
+                      <Icon name="warning" size={16} />
+                      <span>
+                        지금은 로컬 Ollama가 바로 응답하지 않습니다.
+                        <small className="status-banner__subtle">업데이트 직후라면 10~20초 뒤 다시 새로고침하면 정상으로 바뀔 수 있습니다.</small>
+                      </span>
+                    </div>
+                  ) : null}
+                </article>
+              )
+            })}
+          </div>
+        </DisclosureSection>
       </section>
 
       <section className="settings-card">

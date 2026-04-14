@@ -23,6 +23,9 @@
 - Official-router orchestration runs now require a ready official provider before the run button is enabled.
 - Settings `실행기 · 에이전트 · API` is split into collapsible sections.
 - Chat routing details are only shown when an actual fallback or provider error occurred.
+- Settings now exposes a dedicated `0. 로컬 실행기` section before the official API section.
+- The local section shows both `Ollama 로컬` and `Codex CLI` with live readiness and current model labels.
+- When Ollama is temporarily unavailable, the bridge now returns the real failure detail instead of a generic `모델이 없습니다` message.
 
 ## Next Checks
 

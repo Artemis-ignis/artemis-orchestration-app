@@ -1322,30 +1322,60 @@ async function runOllama({ prompt, messages, model, settings, agent, baseUrl, en
   }
 }
 
+function encodeUtf8Base64(value) {
+  return Buffer.from(value || '', 'utf8').toString('base64')
+}
+
+function inferCodexSandboxMode(prompt) {
+  return /(파일|코드|수정|편집|구현|추가|삭제|저장|빌드|테스트|린트|커밋|푸시|리팩터)/.test(
+    prompt || '',
+  )
+    ? 'workspace-write'
+    : 'read-only'
+}
+
 function buildCodexPrompt({ prompt, messages, settings, agent, enabledTools, workspaceRoot, workspaceCwd }) {
   const assistantName = agent?.name || settings?.agentName || 'Artemis'
-  const userName = settings?.userName || '마스터'
+  const userName = settings?.userName || 'Master'
   const model = agent?.model || settings?.codexModel || 'gpt-5.4'
-  const recent = messages
-    .slice(-8)
-    .map((item) => `${item.role === 'assistant' ? assistantName : userName}: ${item.text}`)
+  const recentPayload = messages.slice(-8).map((item) => ({
+    role: item.role === 'assistant' ? 'assistant' : 'user',
+    speaker: item.role === 'assistant' ? assistantName : userName,
+    text: item.text,
+  }))
+  const customInstructions = [
+    agent?.systemPrompt,
+    settings?.tone ? `Tone: ${settings.tone}` : '',
+    settings?.responseStyle ? `Response style: ${settings.responseStyle}` : '',
+    settings?.customInstructions ? `Extra instructions: ${settings.customInstructions}` : '',
+  ]
+    .filter(Boolean)
     .join('\n')
 
   return [
-    `시스템 에이전트: ${assistantName}`,
-    buildSystemPrompt({
-      settings,
-      agent,
-      enabledTools,
-      execution: { provider: 'codex', model },
-    }),
-    workspaceRoot ? `작업 루트 경로: ${workspaceRoot}` : '',
-    workspaceCwd ? `현재 작업 폴더 경로: ${workspaceCwd}` : '',
-    '파일이나 코드를 수정해야 하면 현재 작업 폴더 기준으로 실제 파일을 읽고 수정하세요.',
-    '불필요한 경로는 건드리지 말고, 수정했다면 어떤 파일을 바꿨는지 짧게 보고하세요.',
-    recent ? `최근 대화:\n${recent}` : '',
-    `새 요청:\n${prompt}`,
-    '반드시 한국어로 답하고, 결론부터 간결하게 정리하세요.',
+    `Assistant name: ${assistantName}`,
+    `User name: ${userName}`,
+    `Target model: ${model}`,
+    'Reply in Korean unless the decoded request explicitly asks for another language.',
+    'The actual request and recent messages are encoded as UTF-8 base64 to avoid Windows terminal corruption. Decode them before reasoning.',
+    'Use the decoded request as the source of truth.',
+    'For informational requests, answer directly and do not inspect the workspace.',
+    'If file edits are required, inspect and modify real files under the current working directory.',
+    'Only edit files when the decoded request clearly asks for code or file changes.',
+    'Do not claim file edits, commands, or verification you did not actually perform.',
+    'If the request is broad, do the most useful work you can instead of blocking on unnecessary follow-up questions.',
+    workspaceRoot ? `Workspace root: ${workspaceRoot}` : '',
+    workspaceCwd ? `Current working directory: ${workspaceCwd}` : '',
+    enabledTools.length > 0
+      ? `Enabled tools:\n${enabledTools
+          .slice(0, 6)
+          .map((item) => `- ${item.title}: ${item.description}`)
+          .join('\n')}`
+      : '',
+    customInstructions ? `Custom instructions UTF8_BASE64: ${encodeUtf8Base64(customInstructions)}` : '',
+    `Recent messages UTF8_BASE64(JSON): ${encodeUtf8Base64(JSON.stringify(recentPayload))}`,
+    `User request UTF8_BASE64: ${encodeUtf8Base64(prompt)}`,
+    'Start with the direct answer, then add only the details that matter.',
   ]
     .filter(Boolean)
     .join('\n\n')
@@ -1355,6 +1385,7 @@ async function runCodex({ prompt, messages, settings, agent, cwd, workspaceRoot,
   const tempDir = await mkdtemp(path.join(os.tmpdir(), 'artemis-codex-'))
   const outputPath = path.join(tempDir, 'last-message.txt')
   const model = agent?.model || settings?.codexModel || 'gpt-5.4'
+  const sandboxMode = inferCodexSandboxMode(prompt)
   const fullPrompt = buildCodexPrompt({
     prompt,
     messages,
@@ -1371,7 +1402,7 @@ async function runCodex({ prompt, messages, settings, agent, cwd, workspaceRoot,
       '--skip-git-repo-check',
       '--full-auto',
       '-s',
-      'workspace-write',
+      sandboxMode,
       '-C',
       cwd,
       '-o',
@@ -1579,6 +1610,10 @@ async function getHealth() {
   const ollamaModels =
     ollamaModelsResult.status === 'fulfilled' ? ollamaModelsResult.value : []
   const ollamaModel = selectPreferredOllamaModel(ollamaModels)
+  const ollamaErrorDetail =
+    ollamaModelsResult.status === 'rejected' && ollamaModelsResult.reason instanceof Error
+      ? ollamaModelsResult.reason.message
+      : null
   const codex =
     codexStatusResult.status === 'fulfilled'
       ? codexStatusResult.value
@@ -1593,7 +1628,9 @@ async function getHealth() {
         available: Boolean(ollamaModel),
         ready: Boolean(ollamaModel),
         models: ollamaModel ? [ollamaModel] : [],
-        detail: ollamaModel ? 'Ollama ' + ollamaModel + ' 모델을 사용할 수 있습니다.' : '사용 가능한 Ollama 모델이 없습니다.',
+        detail: ollamaModel
+          ? 'Ollama ' + ollamaModel + ' 모델을 사용할 수 있습니다.'
+          : ollamaErrorDetail || '사용 가능한 Ollama 모델이 없습니다.',
       },
       {
         provider: 'codex',
