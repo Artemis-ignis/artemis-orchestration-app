@@ -36,7 +36,8 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   const latestRun = activeAgentRuns[0]
   const latestChangedFiles = latestExecution?.workspace.changedFiles ?? []
   const readyProviderCount = bridgeHealth?.providers.filter((item) => item.ready).length ?? 0
-  const hasReadyProvider = readyProviderCount > 0
+  const ollamaReady = bridgeHealth?.providers.find((item) => item.provider === 'ollama')?.ready ?? false
+  const hasReadyProvider = Boolean(readyProviderCount || ollamaReady)
   const hasWorkspaceConnection = Boolean(workspaceAbsolutePath)
   const subscribedSignalCount = state.signals.items.filter((item) => item.subscribed).length
   const subscribedSignalTitles = state.signals.items

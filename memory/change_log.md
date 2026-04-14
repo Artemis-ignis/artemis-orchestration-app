@@ -24,3 +24,8 @@
 - 문서용 오케스트레이션 스크린샷 최신화
 - `4174` 브리지 재기동으로 Ollama 상태 복구
 - 브리지 헬스 기준으로 Ollama `gemma4-E4B-uncensored-q4fast:latest` 준비 상태 확인
+### Compact hub module pass
+
+- Replaced large orchestration cards with smaller hub-and-module nodes.
+- Hid subtitles on side modules so the graph reads like a real orchestration board.
+- Refreshed `docs/screenshots/orchestration.png` with the latest compact layout.

@@ -4384,121 +4384,66 @@ select:focus-visible {
 }
 
 .flow-graph__edgeLabel {
-  position: absolute;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(18, 20, 25, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--text-dim);
-  font-size: 0.7rem;
-  line-height: 1.1;
-  pointer-events: none;
-}
-
-.flow-graph__edgeLabel.is-running {
-  color: rgba(160, 240, 194, 0.96);
-  border-color: rgba(102, 230, 170, 0.36);
-}
-
-.flow-graph__edgeLabel.is-blocked {
-  color: rgba(255, 207, 168, 0.96);
-  border-color: rgba(255, 171, 107, 0.32);
-}
-
-.flow-graph__edgeLabel--memory {
-  top: 22%;
-  left: 37.5%;
-}
-
-.flow-graph__edgeLabel--model {
-  top: 62%;
-  left: 24%;
-}
-
-.flow-graph__edgeLabel--signals {
-  top: 62%;
-  left: 43.5%;
-}
-
-.flow-graph__edgeLabel--tools {
-  top: 62%;
-  left: 61%;
-}
-
-.flow-graph__edgeLabel--files {
-  top: 18%;
-  right: 18%;
-}
-
-.flow-graph__edgeLabel--insights {
-  top: 39%;
-  right: 18%;
-}
-
-.flow-graph__edgeLabel--activity {
-  top: 60%;
-  right: 18%;
+  display: none;
 }
 
 .flow-graph__anchor {
   position: absolute;
   min-width: 0;
-  width: clamp(172px, 16vw, 228px);
+  width: clamp(142px, 12vw, 172px);
 }
 
 .flow-graph__anchor--trigger {
-  top: 34%;
-  left: 3%;
+  top: 38%;
+  left: 4%;
+  width: clamp(190px, 16vw, 230px);
 }
 
 .flow-graph__anchor--memory {
-  top: 8%;
-  left: 29%;
+  top: 10%;
+  left: 35%;
 }
 
 .flow-graph__anchor--agent {
-  top: 25%;
-  left: 28%;
-  width: clamp(256px, 24vw, 320px);
+  top: 27%;
+  left: 31%;
+  width: clamp(286px, 27vw, 350px);
 }
 
 .flow-graph__anchor--router {
-  top: 30%;
-  left: 60%;
-  width: clamp(176px, 15vw, 210px);
+  top: 36%;
+  left: 63%;
+  width: clamp(180px, 15vw, 214px);
 }
 
 .flow-graph__anchor--files {
   top: 12%;
-  right: 2.5%;
+  right: 4%;
 }
 
 .flow-graph__anchor--insights {
-  top: 33%;
-  right: 2.5%;
+  top: 36%;
+  right: 1%;
 }
 
 .flow-graph__anchor--activity {
-  top: 54%;
-  right: 2.5%;
+  top: 60%;
+  right: 4%;
 }
 
 .flow-graph__anchor--model {
   top: 72%;
-  left: 16%;
+  left: 19%;
 }
 
 .flow-graph__anchor--signals {
   top: 72%;
-  left: 35%;
+  left: 40%;
 }
 
 .flow-graph__anchor--tools {
   top: 72%;
-  left: 54%;
+  left: 61%;
 }
 
 .flow-graph__node {
@@ -4507,10 +4452,10 @@ select:focus-visible {
   color: var(--text-strong);
   text-align: left;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(29, 31, 38, 0.96);
+  background: rgba(24, 28, 42, 0.96);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.04) inset,
-    0 16px 34px rgba(0, 0, 0, 0.22);
+    0 14px 28px rgba(0, 0, 0, 0.2);
   transition:
     transform 140ms ease,
     border-color 140ms ease,
@@ -4518,69 +4463,64 @@ select:focus-visible {
     background 140ms ease;
 }
 
-.flow-graph__node--main {
-  border-radius: 24px;
-  padding: 16px 18px;
-  min-height: 146px;
+.flow-graph__node--hub {
+  border-radius: 28px;
+  padding: 18px 20px;
+  min-height: 132px;
 }
 
-.flow-graph__node--support,
-.flow-graph__node--output {
+.flow-graph__node--main {
   border-radius: 22px;
   padding: 14px 16px;
-  min-height: 114px;
+  min-height: 102px;
+}
+
+.flow-graph__node--mini {
+  border-radius: 18px;
+  padding: 10px 12px;
+  min-height: 78px;
 }
 
 .flow-graph__node--trigger {
-  background: rgba(34, 58, 105, 0.98);
-  border-color: rgba(139, 177, 255, 0.65);
+  background: linear-gradient(180deg, rgba(48, 92, 196, 0.98), rgba(41, 74, 159, 0.98));
+  border-color: rgba(150, 191, 255, 0.68);
   box-shadow:
-    0 0 0 2px rgba(139, 177, 255, 0.18),
-    0 20px 36px rgba(12, 18, 34, 0.38);
+    0 0 0 1px rgba(141, 188, 255, 0.16),
+    0 18px 34px rgba(10, 18, 39, 0.34);
 }
 
 .flow-graph__node--agent {
-  background: rgba(38, 40, 48, 0.98);
-  border-color: rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, rgba(44, 74, 158, 0.98), rgba(34, 52, 115, 0.98));
+  border-color: rgba(163, 197, 255, 0.42);
+  box-shadow:
+    0 0 0 1px rgba(125, 170, 255, 0.12),
+    0 22px 48px rgba(8, 14, 31, 0.34);
 }
 
-.flow-graph__node--router {
-  background: rgba(34, 38, 49, 0.98);
-  border-color: rgba(255, 255, 255, 0.16);
-}
-
-.flow-graph__node--output {
-  background: rgba(35, 38, 45, 0.97);
-}
-
-.flow-graph__node--model {
-  background: rgba(28, 33, 49, 0.98);
-}
-
-.flow-graph__node--memory {
-  background: rgba(37, 39, 49, 0.98);
-}
-
+.flow-graph__node--router,
+.flow-graph__node--output,
+.flow-graph__node--model,
+.flow-graph__node--memory,
 .flow-graph__node--skill {
-  background: rgba(31, 36, 46, 0.98);
+  background: rgba(28, 35, 66, 0.94);
 }
 
 .flow-graph__node.is-running {
   border-color: rgba(102, 230, 170, 0.72);
   box-shadow:
     0 0 0 1px rgba(102, 230, 170, 0.16),
-    0 18px 40px rgba(34, 74, 57, 0.28);
+    0 18px 34px rgba(24, 61, 48, 0.24);
 }
 
 .flow-graph__node.is-blocked {
-  border-color: rgba(255, 171, 107, 0.7);
+  border-color: rgba(255, 171, 107, 0.72);
   box-shadow:
     0 0 0 1px rgba(255, 171, 107, 0.16),
-    0 18px 40px rgba(66, 38, 25, 0.28);
+    0 18px 34px rgba(63, 38, 22, 0.24);
 }
 
 .flow-graph__node.is-done {
-  border-color: rgba(138, 191, 255, 0.3);
+  border-color: rgba(156, 203, 255, 0.34);
 }
 
 .flow-graph__node:is(button) {
@@ -4589,10 +4529,10 @@ select:focus-visible {
 
 .flow-graph__node:is(button):hover {
   transform: translateY(-1px);
-  border-color: rgba(139, 177, 255, 0.42);
+  border-color: rgba(161, 200, 255, 0.46);
   box-shadow:
     0 0 0 1px rgba(139, 177, 255, 0.14),
-    0 18px 36px rgba(0, 0, 0, 0.26);
+    0 18px 34px rgba(0, 0, 0, 0.24);
 }
 
 .flow-graph__node:is(button):focus-visible {
@@ -4600,166 +4540,131 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
-.flow-graph__label {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--text-dim);
-  font-size: 0.7rem;
-  line-height: 1.2;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.flow-graph__nodeTop {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.flow-graph__head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
   gap: 10px;
-  margin-bottom: 12px;
 }
 
 .flow-graph__iconWrap {
-  width: 42px;
-  height: 42px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.96);
-}
-
-.flow-graph__badge {
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.98);
   flex: 0 0 auto;
-  padding: 5px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-dim);
-  font-size: 0.72rem;
-  line-height: 1.1;
 }
 
-.flow-graph__copy strong {
+.flow-graph__node--hub .flow-graph__iconWrap {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+}
+
+.flow-graph__node--main .flow-graph__iconWrap {
+  width: 30px;
+  height: 30px;
+}
+
+.flow-graph__titleBlock {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.flow-graph__titleBlock strong {
   display: block;
   color: var(--text-strong);
-  font-size: 1rem;
-  line-height: 1.35;
-}
-
-.flow-graph__copy p {
-  margin-top: 6px;
-  color: var(--text-dim);
-  font-size: 0.84rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-.flow-graph__details {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.flow-graph__detailChip {
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-dim);
-  font-size: 0.72rem;
+  font-size: 0.94rem;
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.flow-graph__ports {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  margin-top: 8px;
+.flow-graph__titleBlock span {
+  display: block;
   color: var(--text-dim);
   font-size: 0.72rem;
-  line-height: 1.2;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+.flow-graph__node--hub .flow-graph__titleBlock strong {
+  font-size: 1.08rem;
+}
+
+.flow-graph__node--hub .flow-graph__titleBlock span {
+  font-size: 0.78rem;
+}
+
+.flow-graph__badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  font-size: 0.64rem;
+  line-height: 1.1;
+}
+
+.flow-graph__statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(174, 189, 214, 0.72);
+  box-shadow: 0 0 0 2px rgba(174, 189, 214, 0.12);
+}
+
+.flow-graph__statusDot.is-running {
+  background: rgba(102, 230, 170, 0.96);
+  box-shadow: 0 0 0 2px rgba(102, 230, 170, 0.18);
+}
+
+.flow-graph__statusDot.is-blocked {
+  background: rgba(255, 171, 107, 0.96);
+  box-shadow: 0 0 0 2px rgba(255, 171, 107, 0.18);
+}
+
+.flow-graph__statusDot.is-done {
+  background: rgba(152, 191, 255, 0.98);
+  box-shadow: 0 0 0 2px rgba(152, 191, 255, 0.18);
+}
+
+.flow-graph__label,
+.flow-graph__nodeTop,
+.flow-graph__copy,
+.flow-graph__details,
+.flow-graph__ports,
 .flow-graph__timeline {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.flow-graph__timelineStep {
-  min-width: 0;
-  padding: 12px 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.flow-graph__timelineStep small {
-  display: block;
-  color: var(--text-dim);
-  font-size: 0.72rem;
-  line-height: 1.2;
-}
-
-.flow-graph__timelineStep strong {
-  display: block;
-  margin-top: 8px;
-  color: var(--text-strong);
-  font-size: 0.92rem;
-  line-height: 1.35;
-}
-
-.flow-graph__timelineStep p {
-  margin-top: 6px;
-  color: var(--text-dim);
-  font-size: 0.8rem;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-}
-
-.flow-graph__timelineStep.is-running {
-  border-color: rgba(102, 230, 170, 0.36);
-  background: rgba(46, 80, 62, 0.22);
-}
-
-.flow-graph__timelineStep.is-blocked {
-  border-color: rgba(255, 171, 107, 0.4);
-  background: rgba(76, 48, 31, 0.24);
-}
-
-.flow-graph__timelineStep.is-done {
-  border-color: rgba(138, 191, 255, 0.28);
+  display: none;
 }
 
 @media (max-width: 1280px) {
   .flow-graph__canvas {
-    min-height: 600px;
-  }
-
-  .flow-graph__edgeLabel--files,
-  .flow-graph__edgeLabel--insights,
-  .flow-graph__edgeLabel--activity {
-    right: 19%;
+    min-height: 540px;
   }
 
   .flow-graph__anchor--trigger {
-    left: 2%;
+    left: 3%;
   }
 
   .flow-graph__anchor--agent {
-    left: 27%;
+    left: 30%;
   }
 
   .flow-graph__anchor--router {
-    left: 59%;
+    left: 62%;
   }
 
   .flow-graph__anchor--files,
@@ -4861,18 +4766,18 @@ select:focus-visible {
 }
 
 .flow-graph__canvas {
-  min-height: 620px;
-  border-radius: 30px;
-  border: 1px solid rgba(143, 177, 255, 0.18);
+  min-height: 500px;
+  border-radius: 28px;
+  border: 1px solid rgba(143, 177, 255, 0.16);
   background:
-    radial-gradient(circle at 50% 52%, rgba(73, 112, 219, 0.2), transparent 22%),
-    radial-gradient(circle at 22% 36%, rgba(71, 120, 255, 0.11), transparent 24%),
-    radial-gradient(circle at 86% 28%, rgba(98, 151, 255, 0.1), transparent 20%),
-    radial-gradient(circle at 50% 92%, rgba(77, 126, 222, 0.08), transparent 24%),
+    radial-gradient(circle at 50% 52%, rgba(73, 112, 219, 0.15), transparent 20%),
+    radial-gradient(circle at 22% 36%, rgba(71, 120, 255, 0.08), transparent 22%),
+    radial-gradient(circle at 86% 28%, rgba(98, 151, 255, 0.08), transparent 18%),
+    radial-gradient(circle at 50% 92%, rgba(77, 126, 222, 0.05), transparent 22%),
     linear-gradient(180deg, #0f1831 0%, #0d1630 38%, #0b1428 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 36px 80px rgba(5, 10, 24, 0.42);
+    0 26px 56px rgba(5, 10, 24, 0.36);
   isolation: isolate;
 }
 
@@ -4894,11 +4799,11 @@ select:focus-visible {
 }
 
 .flow-graph__nebula {
-  width: 320px;
-  height: 220px;
+  width: 260px;
+  height: 180px;
   border-radius: 50%;
-  filter: blur(28px);
-  opacity: 0.55;
+  filter: blur(24px);
+  opacity: 0.42;
   z-index: 0;
   animation: flowNebula 12s ease-in-out infinite;
 }
@@ -4917,16 +4822,15 @@ select:focus-visible {
 }
 
 .flow-graph__stardust {
-  left: 240px;
-  width: 720px;
-  height: 132px;
-  opacity: 0.85;
+  left: 288px;
+  width: 560px;
+  height: 96px;
+  opacity: 0.42;
   z-index: 0;
   background:
-    radial-gradient(circle, rgba(244, 248, 255, 0.92) 0 1.1px, transparent 1.2px) 0 0 / 24px 24px,
-    radial-gradient(circle, rgba(181, 214, 255, 0.62) 0 0.9px, transparent 1px) 12px 10px / 28px 28px,
-    radial-gradient(circle, rgba(145, 200, 255, 0.42) 0 0.8px, transparent 0.9px) 4px 4px / 18px 18px;
-  animation: starDrift 16s linear infinite;
+    radial-gradient(circle, rgba(244, 248, 255, 0.78) 0 1px, transparent 1.1px) 0 0 / 26px 26px,
+    radial-gradient(circle, rgba(181, 214, 255, 0.48) 0 0.8px, transparent 0.9px) 12px 10px / 30px 30px;
+  animation: starDrift 18s linear infinite;
 }
 
 .flow-graph__stardust--top {
@@ -4935,16 +4839,16 @@ select:focus-visible {
 
 .flow-graph__stardust--bottom {
   top: 360px;
-  opacity: 0.6;
+  opacity: 0.42;
   animation-direction: reverse;
-  animation-duration: 20s;
+  animation-duration: 22s;
 }
 
 .flow-graph__coreGlow {
-  top: 132px;
-  left: 286px;
-  width: 360px;
-  height: 260px;
+  top: 146px;
+  left: 324px;
+  width: 300px;
+  height: 210px;
   z-index: 0;
   border-radius: 42px;
   background:
@@ -4954,71 +4858,71 @@ select:focus-visible {
 }
 
 .flow-graph__surface {
-  padding: 26px 24px 24px;
+  padding: 22px 20px 20px;
   z-index: 1;
 }
 
 .flow-graph__anchor {
-  width: 188px;
+  width: 146px;
   z-index: 2;
 }
 
 .flow-graph__anchor--trigger {
-  top: 190px;
-  left: 24px;
-  width: 228px;
+  top: 196px;
+  left: 34px;
+  width: 164px;
 }
 
 .flow-graph__anchor--memory {
-  top: 28px;
-  left: 276px;
-  width: 204px;
+  top: 42px;
+  left: 318px;
+  width: 150px;
 }
 
 .flow-graph__anchor--agent {
-  top: 144px;
-  left: 292px;
-  width: 332px;
+  top: 156px;
+  left: 308px;
+  width: 308px;
   z-index: 3;
 }
 
 .flow-graph__anchor--router {
-  top: 180px;
-  left: 676px;
-  width: 208px;
+  top: 194px;
+  left: 692px;
+  width: 150px;
 }
 
 .flow-graph__anchor--files {
-  top: 30px;
-  left: 876px;
-  width: 176px;
+  top: 44px;
+  left: 902px;
+  width: 146px;
 }
 
 .flow-graph__anchor--insights {
   top: 194px;
-  left: 876px;
-  width: 176px;
+  left: 902px;
+  width: 146px;
 }
 
 .flow-graph__anchor--activity {
-  top: 360px;
-  left: 876px;
-  width: 176px;
+  top: 346px;
+  left: 902px;
+  width: 146px;
 }
 
 .flow-graph__anchor--model {
-  top: 386px;
-  left: 236px;
+  top: 344px;
+  left: 252px;
 }
 
 .flow-graph__anchor--signals {
-  top: 386px;
-  left: 448px;
+  top: 344px;
+  left: 466px;
 }
 
 .flow-graph__anchor--tools {
-  top: 386px;
-  left: 660px;
+  top: 344px;
+  left: 680px;
 }
 
 .flow-graph__node {
@@ -5031,19 +4935,20 @@ select:focus-visible {
 
 .flow-graph__node--main {
   min-height: 0;
-  padding: 16px 16px 18px;
-  border-radius: 24px;
+  padding: 12px 13px;
+  border-radius: 18px;
 }
 
-.flow-graph__node--support,
-.flow-graph__node--output {
+.flow-graph__node--mini {
   min-height: 0;
-  padding: 11px 12px;
-  border-radius: 20px;
+  padding: 10px 11px;
+  border-radius: 16px;
 }
 
-.flow-graph__node--output {
-  padding: 10px 12px;
+.flow-graph__node--hub {
+  min-height: 0;
+  padding: 14px 16px;
+  border-radius: 24px;
 }
 
 .flow-graph__label {
@@ -5056,9 +4961,9 @@ select:focus-visible {
 }
 
 .flow-graph__iconWrap {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
@@ -5070,8 +4975,8 @@ select:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 8px;
-  font-size: 0.68rem;
+  padding: 3px 6px;
+  font-size: 0.58rem;
   color: rgba(225, 235, 255, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(7, 11, 21, 0.42);
@@ -5079,65 +4984,61 @@ select:focus-visible {
 }
 
 .flow-graph__statusDot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 999px;
   background: rgba(174, 190, 220, 0.72);
-  box-shadow: 0 0 0 3px rgba(174, 190, 220, 0.08);
+  box-shadow: 0 0 0 2px rgba(174, 190, 220, 0.08);
 }
 
 .flow-graph__statusDot.is-ready {
   background: rgba(160, 200, 255, 0.86);
-  box-shadow: 0 0 0 4px rgba(124, 176, 255, 0.12);
+  box-shadow: 0 0 0 3px rgba(124, 176, 255, 0.12);
 }
 
 .flow-graph__statusDot.is-running {
   background: rgba(104, 232, 179, 0.96);
-  box-shadow: 0 0 0 4px rgba(104, 232, 179, 0.16);
+  box-shadow: 0 0 0 3px rgba(104, 232, 179, 0.16);
 }
 
 .flow-graph__statusDot.is-done {
   background: rgba(119, 193, 255, 0.94);
-  box-shadow: 0 0 0 4px rgba(119, 193, 255, 0.14);
+  box-shadow: 0 0 0 3px rgba(119, 193, 255, 0.14);
 }
 
 .flow-graph__statusDot.is-blocked {
   background: rgba(255, 182, 116, 0.96);
-  box-shadow: 0 0 0 4px rgba(255, 182, 116, 0.14);
+  box-shadow: 0 0 0 3px rgba(255, 182, 116, 0.14);
 }
 
-.flow-graph__copy strong {
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: 0.98rem;
-  line-height: 1.2;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+.flow-graph__head {
+  align-items: center;
+  gap: 8px;
 }
 
-.flow-graph__node--support .flow-graph__copy strong,
-.flow-graph__node--output .flow-graph__copy strong {
-  font-size: 0.94rem;
-  -webkit-line-clamp: 1;
+.flow-graph__titleBlock strong {
+  font-size: 0.84rem;
+  letter-spacing: -0.02em;
 }
 
-.flow-graph__copy p {
-  display: -webkit-box;
-  overflow: hidden;
-  margin-top: 4px;
-  color: rgba(211, 223, 249, 0.74);
-  font-size: 0.79rem;
-  line-height: 1.36;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+.flow-graph__titleBlock span {
+  display: none;
 }
 
-.flow-graph__node--support .flow-graph__copy p,
-.flow-graph__node--output .flow-graph__copy p {
-  font-size: 0.73rem;
-  line-height: 1.3;
-  -webkit-line-clamp: 2;
+.flow-graph__node--hub .flow-graph__titleBlock strong {
+  font-size: 1rem;
+}
+
+.flow-graph__node--hub .flow-graph__titleBlock span {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+}
+
+.flow-graph__node--hub .flow-graph__iconWrap {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
 }
 
 .flow-graph__details {
@@ -5241,7 +5142,8 @@ select:focus-visible {
 }
 
 .flow-link {
-  filter: drop-shadow(0 0 6px rgba(130, 177, 255, 0.18));
+  stroke-width: 2.4;
+  filter: drop-shadow(0 0 4px rgba(130, 177, 255, 0.16));
 }
 
 .flow-link--main {
@@ -5306,10 +5208,6 @@ select:focus-visible {
 
 .flow-graph__node.is-done {
   border-color: rgba(132, 196, 255, 0.44);
-}
-
-.flow-graph__node--agent .flow-graph__copy strong {
-  font-size: 1.08rem;
 }
 
 @keyframes flowPulse {

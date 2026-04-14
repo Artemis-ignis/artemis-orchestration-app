@@ -20,3 +20,9 @@
 - `memory/current_focus.md`
 - `memory/open_questions.md`
 - `docs/screenshots/orchestration.png`
+
+## Latest update
+
+- Orchestration now uses compact hub modules instead of large card blocks.
+- Only the center hub keeps a subtitle; side modules render as short node labels.
+- Ollama health on `4174` is confirmed with `gemma4-E4B-uncensored-q4fast:latest`.
