@@ -75,7 +75,7 @@ export function createDefaultState(): RuntimeState {
       runs: [],
     },
     settings: {
-      activeTab: 'profile',
+      activeTab: 'models',
       agentName: '아르테미스',
       tone: '차분하고 실무적인 개인 비서',
       responseStyle: '결론부터 간결하게',

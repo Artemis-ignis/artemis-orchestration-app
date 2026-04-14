@@ -659,8 +659,8 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
         <div className={`chat-surface__body ${isIdleState ? 'chat-surface__body--idle' : ''}`}>
           {isIdleState ? (
             <div className="chat-empty-state">
-              <h2>바로 질문해 주세요.</h2>
-              <p>필요한 작업을 한 문장으로 적으면 바로 이어서 답합니다.</p>
+              <h2>바로 시작하세요.</h2>
+              <p>작업을 한 문장으로 적으면 바로 이어서 답합니다.</p>
               <div className="chat-empty-state__actions chat-empty-state__actions--compact chip-wrap">
                 {chatPromptCards.map((item) => (
                   <button

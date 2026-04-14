@@ -2537,8 +2537,9 @@ select:focus-visible {
 
 .page--chat-modern .chat-surface__body--idle {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding-top: 54px;
 }
 
 .page--chat-modern .chat-empty-state {
@@ -2550,6 +2551,10 @@ select:focus-visible {
   align-items: center;
   text-align: center;
   gap: 10px;
+}
+
+.page--chat-modern .chat-surface__body--idle .chat-composer--embedded {
+  margin-top: 18px;
 }
 
 .page--chat-modern .chat-empty-state h2 {
@@ -3328,7 +3333,9 @@ select:focus-visible {
   font-size: 0.86rem;
   font-weight: 500;
   line-height: 1.45;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar__footerLinks {
@@ -12511,6 +12518,8 @@ select:focus-visible {
 }
 
 .page--chat-modern .chat-empty-chip span {
+  display: inline;
+  color: var(--text-strong);
   font-size: 0.84rem;
   font-weight: 600;
 }

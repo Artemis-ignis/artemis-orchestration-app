@@ -9,6 +9,20 @@
 - NVIDIA Build
 - Gemini Developer API
 
+## 주요 화면
+
+### 채팅
+
+![Artemis 채팅 화면](docs/screenshots/chat.png)
+
+### 설정
+
+![Artemis 설정 화면](docs/screenshots/settings.png)
+
+### 오케스트레이션
+
+![Artemis 오케스트레이션 화면](docs/screenshots/orchestration.png)
+
 ## 이 기능이 하는 일
 
 설정 화면에서 공급자별 API 키를 저장하면, 아르테미스가 아래 순서로 동작합니다.

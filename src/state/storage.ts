@@ -144,11 +144,11 @@ function normalizeState(candidate: unknown): RuntimeState {
       ...fallback.settings,
       ...(settings ?? {}),
       activeTab:
-        settings?.activeTab === 'profile' ||
-        settings?.activeTab === 'models' ||
         settings?.activeTab === 'preferences'
-          ? settings.activeTab
-          : fallback.settings.activeTab,
+          ? 'preferences'
+          : settings?.activeTab === 'profile' || settings?.activeTab === 'models'
+            ? 'models'
+            : fallback.settings.activeTab,
     },
     apiKeys: [],
   }

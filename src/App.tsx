@@ -84,6 +84,32 @@ function getPageFromHash(): PageId {
   return resolvePage(raw)
 }
 
+function summarizeWorkspaceLocation(workspaceCurrentPath?: string, workspaceAbsolutePath?: string) {
+  const resolved = workspaceCurrentPath || workspaceAbsolutePath
+
+  if (!resolved) {
+    return {
+      label: '작업 루트 미연결',
+      title: '작업 루트 미연결',
+    }
+  }
+
+  if (!workspaceCurrentPath || workspaceCurrentPath === workspaceAbsolutePath) {
+    return {
+      label: '루트 작업 폴더',
+      title: resolved,
+    }
+  }
+
+  const segments = resolved.split(/[\\/]/).filter(Boolean)
+  const leaf = segments.at(-1) || resolved
+
+  return {
+    label: leaf,
+    title: resolved,
+  }
+}
+
 function isEditableTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) {
     return false
@@ -100,7 +126,7 @@ export default function App() {
     useArtemisApp()
 
   const readyProviderCount = bridgeHealth?.providers.filter((item) => item.ready).length ?? 0
-  const workspaceLocationLabel = workspaceCurrentPath || workspaceAbsolutePath || '작업 루트 미연결'
+  const workspaceLocation = summarizeWorkspaceLocation(workspaceCurrentPath, workspaceAbsolutePath)
   const currentPageLabel =
     navigationItems.find((item) => item.id === page)?.label ??
     (page === 'guide' ? '가이드' : 'Artemis')
@@ -309,7 +335,7 @@ export default function App() {
               <span>
                 {readyProviderCount > 0 ? `${readyProviderCount}개 실행기 준비됨` : '실행기 상태 확인 필요'}
               </span>
-              <strong>{workspaceLocationLabel}</strong>
+              <strong title={workspaceLocation.title}>{workspaceLocation.label}</strong>
             </div>
           </div>
         </aside>
