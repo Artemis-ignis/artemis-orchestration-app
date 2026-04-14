@@ -512,6 +512,7 @@ function GraphCard({
   onSelectAgent: (agentId: string) => void
 }) {
   const interactive = Boolean(node.page || node.agentId)
+  const iconSize = node.variant === 'main' ? 16 : 14
   const classes = [
     'flow-graph__node',
     `flow-graph__node--${node.tone}`,
@@ -546,7 +547,7 @@ function GraphCard({
       <small className="flow-graph__label">{node.label}</small>
       <div className="flow-graph__nodeTop">
         <span className="flow-graph__iconWrap" aria-hidden="true">
-          <Icon name={node.icon} size={18} />
+          <Icon name={node.icon} size={iconSize} />
         </span>
         <span className="flow-graph__badge">
           <span className={`flow-graph__statusDot is-${node.state}`} />
