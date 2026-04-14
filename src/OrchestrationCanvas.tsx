@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Background,
   Controls,
@@ -9,6 +9,7 @@ import {
   type Edge,
   type Node,
   type NodeProps,
+  type ReactFlowInstance,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import type { PageId } from './crewData'
@@ -47,23 +48,33 @@ type OrchestrationCanvasProps = {
   onSelectAgent: (agentId: string) => void
 }
 
-type NodeTone = 'trigger' | 'hub' | 'support' | 'output'
-type NodeVariant = 'hub' | 'mini'
 type StepStatus = 'idle' | 'ready' | 'running' | 'done' | 'blocked'
+type NodeTone = 'trigger' | 'hub' | 'support' | 'output'
+type NodeKind =
+  | 'trigger'
+  | 'memory'
+  | 'hub'
+  | 'router'
+  | 'files'
+  | 'insights'
+  | 'activity'
+  | 'model'
+  | 'signals'
+  | 'tools'
 
 type FlowNodeData = {
   title: string
   subtitle?: string
   badge: string
-  tone: NodeTone
-  variant: NodeVariant
-  state: StepStatus
   icon: IconName
+  tone: NodeTone
+  status: StepStatus
+  kind: NodeKind
   page?: PageId
   agentId?: string
 }
 
-const BOARD_WIDTH = 1180
+const BOARD_WIDTH = 1120
 const BOARD_HEIGHT = 540
 
 function normalizeModelLabel(value: string) {
@@ -80,7 +91,7 @@ function providerLabel(value: string) {
     return getAgentProviderLabel(value)
   }
 
-  return value || '연결 대기'
+  return value || '연결 안 됨'
 }
 
 function statusBadge(status: StepStatus) {
@@ -90,7 +101,7 @@ function statusBadge(status: StepStatus) {
     case 'done':
       return '완료'
     case 'blocked':
-      return '차단'
+      return '막힘'
     case 'ready':
       return '준비'
     default:
@@ -112,26 +123,26 @@ function routeSummary({
   requiresApiKey: boolean
 }) {
   if (bridgeError) {
-    return { status: 'blocked' as const, badge: '브리지', text: '브리지 오류' }
+    return { status: 'blocked' as const, badge: '브리지' }
   }
 
   if (workspaceError) {
-    return { status: 'blocked' as const, badge: '폴더', text: '작업 폴더 오류' }
+    return { status: 'blocked' as const, badge: '폴더' }
   }
 
   if (requiresApiKey) {
-    return { status: 'blocked' as const, badge: 'API', text: 'API 키 연결 필요' }
+    return { status: 'blocked' as const, badge: 'API' }
   }
 
   if (latestRun?.status === 'running') {
-    return { status: 'running' as const, badge: '실행', text: '결과를 파일 · 인사이트 · 로그로 나눕니다.' }
+    return { status: 'running' as const, badge: '실행' }
   }
 
   if (latestExecution) {
-    return { status: 'done' as const, badge: '반영', text: '결과가 파일 · 인사이트 · 로그에 반영됩니다.' }
+    return { status: 'done' as const, badge: '반영' }
   }
 
-  return { status: 'ready' as const, badge: '준비', text: '결과를 파일 · 인사이트 · 로그로 나눕니다.' }
+  return { status: 'ready' as const, badge: '준비' }
 }
 
 function createFlowModel({
@@ -155,7 +166,6 @@ function createFlowModel({
   const latestRun = runs[0]
   const activeTools = tools.filter((item) => item.enabled)
   const changedFileCount = latestExecution?.workspace.changedFiles.length ?? 0
-  const latestLogCount = latestRun?.logs.length ?? 0
   const runtimeModel = normalizeModelLabel(latestExecution?.model || activeAgent?.model || '')
   const route = routeSummary({
     latestRun,
@@ -167,7 +177,6 @@ function createFlowModel({
 
   const triggerStatus: StepStatus =
     recentPrompt.trim() || latestRun?.task ? (latestRun?.status === 'running' ? 'running' : 'done') : 'idle'
-
   const hubStatus: StepStatus = activeAgent
     ? activeAgent.status === 'success'
       ? 'done'
@@ -177,178 +186,177 @@ function createFlowModel({
           ? 'running'
           : 'ready'
     : 'blocked'
-
   const modelStatus: StepStatus = runtimeModel ? 'done' : activeAgent ? 'ready' : 'blocked'
-  const memoryStatus: StepStatus = messageCount > 0 || insightsCount > 0 ? 'ready' : 'idle'
+  const memoryStatus: StepStatus = messageCount > 0 ? 'ready' : 'idle'
   const signalStatus: StepStatus = signalCount > 0 ? 'ready' : 'idle'
   const toolsStatus: StepStatus = activeTools.length > 0 ? 'ready' : 'idle'
   const filesStatus: StepStatus = changedFileCount > 0 ? 'done' : filesCount > 0 ? 'ready' : 'idle'
   const insightsStatus: StepStatus = insightsCount > 0 ? 'done' : 'idle'
-  const activityStatus: StepStatus = activityCount > 0 || latestLogCount > 0 ? 'done' : 'idle'
+  const activityStatus: StepStatus = activityCount > 0 ? 'done' : 'idle'
 
   const nodes: Array<Node<FlowNodeData>> = [
     {
       id: 'trigger',
       type: 'orchestration',
-      position: { x: 58, y: 226 },
-      draggable: false,
-      selectable: false,
+      position: { x: 72, y: 238 },
       data: {
         title: '입력',
         badge: recentPrompt.trim() ? '입력됨' : statusBadge(triggerStatus),
-        tone: 'trigger',
-        variant: 'mini',
-        state: triggerStatus,
         icon: 'spark',
+        tone: 'trigger',
+        status: triggerStatus,
+        kind: 'trigger',
         page: 'chat',
       },
+      draggable: true,
+      selectable: false,
     },
     {
       id: 'memory',
       type: 'orchestration',
-      position: { x: 392, y: 76 },
-      draggable: false,
-      selectable: false,
+      position: { x: 448, y: 82 },
       data: {
         title: '메모리',
-        badge: messageCount > 0 ? '대화' : statusBadge(memoryStatus),
-        tone: 'support',
-        variant: 'mini',
-        state: memoryStatus,
+        badge: messageCount > 0 ? `대화 ${messageCount}` : statusBadge(memoryStatus),
         icon: 'memory',
+        tone: 'support',
+        status: memoryStatus,
+        kind: 'memory',
         page: 'insights',
       },
+      draggable: true,
+      selectable: false,
     },
     {
       id: 'hub',
       type: 'orchestration',
-      position: { x: 332, y: 176 },
-      draggable: false,
-      selectable: false,
+      position: { x: 350, y: 194 },
       data: {
         title: activeAgent?.name || '에이전트 선택',
         subtitle: activeAgent
           ? `${providerLabel(activeAgent.provider)} · ${normalizeModelLabel(activeAgent.model)}`
           : '설정에서 실행기를 고릅니다.',
         badge: statusBadge(hubStatus),
-        tone: 'hub',
-        variant: 'hub',
-        state: hubStatus,
         icon: 'agent',
+        tone: 'hub',
+        status: hubStatus,
+        kind: 'hub',
         page: activeAgent ? undefined : 'settings',
         agentId: activeAgent?.id,
       },
+      draggable: true,
+      selectable: false,
     },
     {
       id: 'router',
       type: 'orchestration',
-      position: { x: 734, y: 226 },
-      draggable: false,
-      selectable: false,
+      position: { x: 744, y: 238 },
       data: {
         title: '분기',
         badge: route.badge,
-        tone: 'support',
-        variant: 'mini',
-        state: route.status,
         icon: 'route',
+        tone: 'support',
+        status: route.status,
+        kind: 'router',
       },
+      draggable: true,
+      selectable: false,
     },
     {
       id: 'files',
       type: 'orchestration',
-      position: { x: 952, y: 96 },
-      draggable: false,
-      selectable: false,
+      position: { x: 946, y: 96 },
       data: {
         title: '파일',
         badge: changedFileCount > 0 ? `+${changedFileCount}` : `${filesCount}`,
-        tone: 'output',
-        variant: 'mini',
-        state: filesStatus,
         icon: 'folder',
+        tone: 'output',
+        status: filesStatus,
+        kind: 'files',
         page: 'files',
       },
+      draggable: true,
+      selectable: false,
     },
     {
       id: 'insights',
       type: 'orchestration',
-      position: { x: 952, y: 226 },
-      draggable: false,
-      selectable: false,
+      position: { x: 946, y: 238 },
       data: {
         title: '인사이트',
         badge: insightsCount > 0 ? `${insightsCount}` : statusBadge(insightsStatus),
-        tone: 'output',
-        variant: 'mini',
-        state: insightsStatus,
         icon: 'insights',
+        tone: 'output',
+        status: insightsStatus,
+        kind: 'insights',
         page: 'insights',
       },
+      draggable: true,
+      selectable: false,
     },
     {
       id: 'activity',
       type: 'orchestration',
-      position: { x: 952, y: 356 },
-      draggable: false,
-      selectable: false,
+      position: { x: 946, y: 380 },
       data: {
         title: '로그',
-        badge: latestLogCount > 0 ? `${latestLogCount}` : `${activityCount}`,
-        tone: 'output',
-        variant: 'mini',
-        state: activityStatus,
+        badge: `${activityCount}`,
         icon: 'activity',
+        tone: 'output',
+        status: activityStatus,
+        kind: 'activity',
         page: 'activity',
       },
+      draggable: true,
+      selectable: false,
     },
     {
       id: 'model',
       type: 'orchestration',
-      position: { x: 210, y: 386 },
-      draggable: false,
-      selectable: false,
+      position: { x: 216, y: 396 },
       data: {
         title: '모델',
-        badge: runtimeModel ? '연결' : statusBadge(modelStatus),
-        tone: 'support',
-        variant: 'mini',
-        state: modelStatus,
+        badge: runtimeModel ? runtimeModel : statusBadge(modelStatus),
         icon: 'chat',
+        tone: 'support',
+        status: modelStatus,
+        kind: 'model',
         page: 'settings',
       },
+      draggable: true,
+      selectable: false,
     },
     {
       id: 'signals',
       type: 'orchestration',
-      position: { x: 432, y: 386 },
-      draggable: false,
-      selectable: false,
+      position: { x: 450, y: 396 },
       data: {
         title: '시그널',
         badge: signalCount > 0 ? `${signalCount}` : statusBadge(signalStatus),
-        tone: 'support',
-        variant: 'mini',
-        state: signalStatus,
         icon: 'signals',
+        tone: 'support',
+        status: signalStatus,
+        kind: 'signals',
         page: 'signals',
       },
+      draggable: true,
+      selectable: false,
     },
     {
       id: 'tools',
       type: 'orchestration',
-      position: { x: 654, y: 386 },
-      draggable: false,
-      selectable: false,
+      position: { x: 684, y: 396 },
       data: {
         title: '도구',
         badge: activeTools.length > 0 ? `${activeTools.length}` : statusBadge(toolsStatus),
-        tone: 'support',
-        variant: 'mini',
-        state: toolsStatus,
         icon: 'tools',
+        tone: 'support',
+        status: toolsStatus,
+        kind: 'tools',
         page: 'tools',
       },
+      draggable: true,
+      selectable: false,
     },
   ]
 
@@ -356,9 +364,9 @@ function createFlowModel({
     {
       id: 'trigger-hub',
       source: 'trigger',
-      sourceHandle: 'right-source',
+      sourceHandle: 'out-right',
       target: 'hub',
-      targetHandle: 'left-target',
+      targetHandle: 'in-left',
       type: 'smoothstep',
       animated: triggerStatus === 'running',
       markerEnd: { type: MarkerType.ArrowClosed },
@@ -367,9 +375,9 @@ function createFlowModel({
     {
       id: 'memory-hub',
       source: 'memory',
-      sourceHandle: 'bottom-source',
+      sourceHandle: 'out-bottom',
       target: 'hub',
-      targetHandle: 'top-target',
+      targetHandle: 'in-top',
       type: 'smoothstep',
       markerEnd: { type: MarkerType.ArrowClosed },
       className: `orchestration-flow__edge orchestration-flow__edge--support is-${memoryStatus}`,
@@ -377,9 +385,9 @@ function createFlowModel({
     {
       id: 'model-hub',
       source: 'model',
-      sourceHandle: 'top-source',
+      sourceHandle: 'out-top',
       target: 'hub',
-      targetHandle: 'bottom-left-target',
+      targetHandle: 'in-bottom-left',
       type: 'smoothstep',
       markerEnd: { type: MarkerType.ArrowClosed },
       className: `orchestration-flow__edge orchestration-flow__edge--support is-${modelStatus}`,
@@ -387,9 +395,9 @@ function createFlowModel({
     {
       id: 'signals-hub',
       source: 'signals',
-      sourceHandle: 'top-source',
+      sourceHandle: 'out-top',
       target: 'hub',
-      targetHandle: 'bottom-target',
+      targetHandle: 'in-bottom',
       type: 'smoothstep',
       markerEnd: { type: MarkerType.ArrowClosed },
       className: `orchestration-flow__edge orchestration-flow__edge--support is-${signalStatus}`,
@@ -397,9 +405,9 @@ function createFlowModel({
     {
       id: 'tools-hub',
       source: 'tools',
-      sourceHandle: 'top-source',
+      sourceHandle: 'out-top',
       target: 'hub',
-      targetHandle: 'bottom-right-target',
+      targetHandle: 'in-bottom-right',
       type: 'smoothstep',
       markerEnd: { type: MarkerType.ArrowClosed },
       className: `orchestration-flow__edge orchestration-flow__edge--support is-${toolsStatus}`,
@@ -407,9 +415,9 @@ function createFlowModel({
     {
       id: 'hub-router',
       source: 'hub',
-      sourceHandle: 'right-source',
+      sourceHandle: 'out-right',
       target: 'router',
-      targetHandle: 'left-target',
+      targetHandle: 'in-left',
       type: 'smoothstep',
       animated: route.status === 'running',
       markerEnd: { type: MarkerType.ArrowClosed },
@@ -418,9 +426,9 @@ function createFlowModel({
     {
       id: 'router-files',
       source: 'router',
-      sourceHandle: 'right-top-source',
+      sourceHandle: 'out-right-top',
       target: 'files',
-      targetHandle: 'left-target',
+      targetHandle: 'in-left',
       type: 'smoothstep',
       markerEnd: { type: MarkerType.ArrowClosed },
       className: `orchestration-flow__edge is-${filesStatus}`,
@@ -428,9 +436,9 @@ function createFlowModel({
     {
       id: 'router-insights',
       source: 'router',
-      sourceHandle: 'right-source',
+      sourceHandle: 'out-right',
       target: 'insights',
-      targetHandle: 'left-target',
+      targetHandle: 'in-left',
       type: 'smoothstep',
       markerEnd: { type: MarkerType.ArrowClosed },
       className: `orchestration-flow__edge is-${insightsStatus}`,
@@ -438,9 +446,9 @@ function createFlowModel({
     {
       id: 'router-activity',
       source: 'router',
-      sourceHandle: 'right-bottom-source',
+      sourceHandle: 'out-right-bottom',
       target: 'activity',
-      targetHandle: 'left-target',
+      targetHandle: 'in-left',
       type: 'smoothstep',
       markerEnd: { type: MarkerType.ArrowClosed },
       className: `orchestration-flow__edge is-${activityStatus}`,
@@ -451,88 +459,97 @@ function createFlowModel({
 }
 
 function OrchestrationFlowNode({ data }: NodeProps<Node<FlowNodeData>>) {
-  const iconSize = data.variant === 'hub' ? 15 : 12
+  const isHub = data.kind === 'hub'
 
   return (
     <div
       className={[
         'orchestration-flow-node',
-        `orchestration-flow-node--${data.variant}`,
+        isHub ? 'orchestration-flow-node--hub' : 'orchestration-flow-node--mini',
         `orchestration-flow-node--${data.tone}`,
-        `is-${data.state}`,
+        `is-${data.status}`,
       ].join(' ')}
     >
-      <Handle className="orchestration-flow-node__handle" position={Position.Left} type="target" id="left-target" />
-      <Handle className="orchestration-flow-node__handle" position={Position.Top} type="target" id="top-target" />
-      <Handle
-        className="orchestration-flow-node__handle"
-        position={Position.Bottom}
-        type="target"
-        id="bottom-left-target"
-        style={{ left: '28%' }}
-      />
-      <Handle
-        className="orchestration-flow-node__handle"
-        position={Position.Bottom}
-        type="target"
-        id="bottom-target"
-        style={{ left: '50%' }}
-      />
-      <Handle
-        className="orchestration-flow-node__handle"
-        position={Position.Bottom}
-        type="target"
-        id="bottom-right-target"
-        style={{ left: '72%' }}
-      />
+      {data.kind !== 'trigger' ? (
+        <Handle className="orchestration-flow-node__handle" position={Position.Left} type="target" id="in-left" />
+      ) : null}
+      {data.kind === 'hub' ? (
+        <>
+          <Handle className="orchestration-flow-node__handle" position={Position.Top} type="target" id="in-top" />
+          <Handle
+            className="orchestration-flow-node__handle"
+            position={Position.Bottom}
+            type="target"
+            id="in-bottom-left"
+            style={{ left: '30%' }}
+          />
+          <Handle
+            className="orchestration-flow-node__handle"
+            position={Position.Bottom}
+            type="target"
+            id="in-bottom"
+            style={{ left: '50%' }}
+          />
+          <Handle
+            className="orchestration-flow-node__handle"
+            position={Position.Bottom}
+            type="target"
+            id="in-bottom-right"
+            style={{ left: '70%' }}
+          />
+        </>
+      ) : null}
 
       <div className="orchestration-flow-node__head">
         <span className="orchestration-flow-node__icon" aria-hidden="true">
-          <Icon name={data.icon} size={iconSize} />
+          <Icon name={data.icon} size={isHub ? 13 : 11} />
         </span>
-        <div className="orchestration-flow-node__copy">
-          <strong>{data.title}</strong>
-          {data.subtitle ? <span>{data.subtitle}</span> : null}
-        </div>
+        <strong>{data.title}</strong>
         <span className="orchestration-flow-node__badge">
-          <i className={`orchestration-flow-node__dot is-${data.state}`} />
+          <i className={`orchestration-flow-node__dot is-${data.status}`} />
           {data.badge}
         </span>
       </div>
 
-      <Handle
-        className="orchestration-flow-node__handle"
-        position={Position.Right}
-        type="source"
-        id="right-top-source"
-        style={{ top: '28%' }}
-      />
-      <Handle
-        className="orchestration-flow-node__handle"
-        position={Position.Right}
-        type="source"
-        id="right-source"
-        style={{ top: '50%' }}
-      />
-      <Handle
-        className="orchestration-flow-node__handle"
-        position={Position.Right}
-        type="source"
-        id="right-bottom-source"
-        style={{ top: '72%' }}
-      />
-      <Handle
-        className="orchestration-flow-node__handle"
-        position={Position.Bottom}
-        type="source"
-        id="bottom-source"
-      />
-      <Handle
-        className="orchestration-flow-node__handle"
-        position={Position.Top}
-        type="source"
-        id="top-source"
-      />
+      {data.subtitle ? <p className="orchestration-flow-node__subtitle">{data.subtitle}</p> : null}
+
+      {data.kind === 'memory' ? (
+        <Handle className="orchestration-flow-node__handle" position={Position.Bottom} type="source" id="out-bottom" />
+      ) : null}
+
+      {data.kind === 'model' || data.kind === 'signals' || data.kind === 'tools' ? (
+        <Handle className="orchestration-flow-node__handle" position={Position.Top} type="source" id="out-top" />
+      ) : null}
+
+      {data.kind === 'trigger' || data.kind === 'hub' ? (
+        <Handle className="orchestration-flow-node__handle" position={Position.Right} type="source" id="out-right" />
+      ) : null}
+
+      {data.kind === 'router' ? (
+        <>
+          <Handle
+            className="orchestration-flow-node__handle"
+            position={Position.Right}
+            type="source"
+            id="out-right-top"
+            style={{ top: '26%' }}
+          />
+          <Handle
+            className="orchestration-flow-node__handle"
+            position={Position.Right}
+            type="source"
+            id="out-right"
+            style={{ top: '50%' }}
+          />
+          <Handle
+            className="orchestration-flow-node__handle"
+            position={Position.Right}
+            type="source"
+            id="out-right-bottom"
+            style={{ top: '74%' }}
+          />
+        </>
+      ) : null}
     </div>
   )
 }
@@ -557,6 +574,7 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
     onNavigate,
     onSelectAgent,
   } = props
+  const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null)
 
   const graph = useMemo(
     () =>
@@ -592,38 +610,64 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
     ],
   )
 
+  useEffect(() => {
+    if (!flowInstance) {
+      return
+    }
+
+    const fit = () =>
+      flowInstance.fitView({
+        padding: 0.16,
+        minZoom: 0.74,
+        maxZoom: 1.2,
+        duration: 240,
+      })
+
+    const firstFrame = window.requestAnimationFrame(fit)
+    const secondPass = window.setTimeout(fit, 180)
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame)
+      window.clearTimeout(secondPass)
+    }
+  }, [flowInstance, activeAgent?.id, latestExecution?.receivedAt, bridgeError, workspaceError, requiresApiKey])
+
   return (
     <div className="orchestration-canvas orchestration-canvas--flow">
       <div className="orchestration-canvas__hud">
-        <span>드래그 이동</span>
-        <span>휠 확대</span>
+        <span>드래그로 이동 · 휠로 확대</span>
       </div>
       <ReactFlow
-        fitView
-        fitViewOptions={{ padding: 0.18, minZoom: 0.74 }}
-        minZoom={0.58}
-        maxZoom={1.5}
         nodes={graph.nodes}
         edges={graph.edges}
         nodeTypes={nodeTypes}
-        nodesDraggable={false}
+        fitView
+        fitViewOptions={{ padding: 0.16, minZoom: 0.74, maxZoom: 1.2 }}
+        minZoom={0.58}
+        maxZoom={1.4}
+        nodesDraggable
         nodesConnectable={false}
-        elementsSelectable={false}
+        elementsSelectable
+        selectionOnDrag={false}
         panOnDrag
-        panOnScroll={false}
+        panOnScroll
         zoomOnScroll
         zoomOnPinch
         zoomOnDoubleClick={false}
         translateExtent={[
-          [-120, -80],
-          [BOARD_WIDTH + 120, BOARD_HEIGHT + 120],
+          [-240, -180],
+          [BOARD_WIDTH + 240, BOARD_HEIGHT + 180],
         ]}
+        onInit={setFlowInstance}
         onNodeClick={(_, node) => {
-          if (node.data.agentId) {
-            onSelectAgent(node.data.agentId)
+          const flowNode = node as Node<FlowNodeData>
+
+          if (flowNode.data.agentId) {
+            onSelectAgent(flowNode.data.agentId)
           }
-          if (node.data.page) {
-            onNavigate(node.data.page)
+
+          if (flowNode.data.page) {
+            onNavigate(flowNode.data.page)
           }
         }}
         defaultEdgeOptions={{
@@ -634,9 +678,9 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
       >
         <Background
           className="orchestration-flow__background"
-          color="rgba(218, 229, 255, 0.14)"
+          color="rgba(218, 229, 255, 0.12)"
           gap={30}
-          size={1.1}
+          size={1}
         />
         <Controls className="orchestration-flow__controls" position="bottom-right" showInteractive={false} />
       </ReactFlow>

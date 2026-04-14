@@ -8,8 +8,10 @@ import {
 } from '../lib/modelClient'
 import {
   streamAiChat,
+  type AiStreamAttemptEvent,
   type AiRoutingMessageMeta,
   type AiStreamFinalEvent,
+  type AiStreamMetaEvent,
 } from '../lib/aiRoutingClient'
 import {
   createWorkspaceFolderRequest,
@@ -104,6 +106,21 @@ function buildOfficialRouterSystemPrompt({
   ]
     .filter(Boolean)
     .join('\n')
+}
+
+function describeRoutingMeta(meta: AiStreamMetaEvent) {
+  return `${meta.routing_mode} · 무료 후보 ${meta.candidate_count}개 확인`
+}
+
+function describeRoutingAttempt(attempt: AiStreamAttemptEvent) {
+  const label = attempt.display_name || attempt.model
+  return `${attempt.attempt_index}차 시도 · ${attempt.provider} · ${label}`
+}
+
+function describeRoutingAttemptFailure(attempt: AiStreamAttemptEvent) {
+  const label = attempt.display_name || attempt.model
+  const reason = attempt.fallback_reason || attempt.error_message || '다음 후보로 전환'
+  return `${attempt.attempt_index}차 실패 · ${attempt.provider} · ${label} · ${reason}`
 }
 
 function loadWorkspacePrefs() {
@@ -757,12 +774,30 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       dispatch({ type: 'START_AGENT_RUN', run })
       setBridgeError(null)
 
+      const pushRunLog = (level: 'info' | 'success' | 'error', message: string) => {
+        dispatch({
+          type: 'APPEND_AGENT_RUN_LOG',
+          runId,
+          log: {
+            id: createId('log'),
+            createdAt: nowIso(),
+            level,
+            message,
+          },
+        })
+      }
+
+      const updateRunRoute = (provider: string, model: string) => {
+        dispatch({ type: 'UPDATE_AGENT_RUN_ROUTE', runId, provider, model })
+      }
+
       try {
         const rootPath = await ensureWorkspaceRoot()
 
         if (agent.provider === 'official-router') {
           let finalEvent: AiStreamFinalEvent | null = null
           let streamError: string | null = null
+          let streamedText = ''
 
           await streamAiChat(
             state.settings.bridgeUrl,
@@ -773,6 +808,20 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
               systemPrompt: agent.systemPrompt,
             },
             {
+              onMeta: (meta) => {
+                pushRunLog('info', describeRoutingMeta(meta))
+              },
+              onAttempt: (attempt) => {
+                updateRunRoute(attempt.provider, attempt.model)
+                pushRunLog('info', describeRoutingAttempt(attempt))
+              },
+              onAttemptFailed: (attempt) => {
+                pushRunLog('error', describeRoutingAttemptFailure(attempt))
+              },
+              onToken: (token) => {
+                streamedText += token
+                dispatch({ type: 'APPEND_AGENT_RUN_OUTPUT', runId, chunk: token })
+              },
               onFinal: (payload) => {
                 finalEvent = payload
               },
@@ -797,7 +846,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
             runId,
             agentId,
             task: nextTask,
-            assistantText: finalPayload.text,
+            assistantText: finalPayload.text || streamedText.trim(),
             provider: finalPayload.provider,
             model: finalPayload.model,
           })
@@ -815,6 +864,8 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           })
           return
         }
+
+        pushRunLog('info', `${agent.name} 실행기에 작업을 전달했습니다.`)
 
         const response = await executeModelPrompt({
           bridgeUrl: state.settings.bridgeUrl,

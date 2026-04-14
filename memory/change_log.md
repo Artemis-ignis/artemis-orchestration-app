@@ -35,3 +35,9 @@
 - Replaced the fixed orchestration SVG/card layout with a real `@xyflow/react` canvas.
 - Verified the viewport transform changes on drag and zoom in a headless browser run.
 - Reduced per-node copy so the graph reads as compact modules instead of heavy content cards.
+
+### Live orchestration result pass
+
+- Added a live result panel below the orchestration composer to surface route logs and streamed output while a run is in progress.
+- Kept partial output visible on failures instead of overwriting the run output with a generic error string.
+- Updated the documentation screenshot to the latest interactive orchestration capture.

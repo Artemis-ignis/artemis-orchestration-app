@@ -11,6 +11,19 @@ import { Icon } from '../icons'
 import { OrchestrationCanvas } from '../OrchestrationCanvas'
 import { useArtemisApp } from '../state/context'
 
+function runStatusLabel(status?: string) {
+  switch (status) {
+    case 'running':
+      return '실시간 생성 중'
+    case 'success':
+      return '응답 완료'
+    case 'error':
+      return '실행 오류'
+    default:
+      return '대기'
+  }
+}
+
 export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   const {
     activeAgent,
@@ -34,9 +47,11 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     .reverse()
     .find((message) => message.role === 'master')
   const latestRun = activeAgentRuns[0]
+  const liveRunLogs = latestRun?.logs.slice(-6) ?? []
   const latestChangedFiles = latestExecution?.workspace.changedFiles ?? []
   const readyProviderCount = bridgeHealth?.providers.filter((item) => item.ready).length ?? 0
-  const ollamaReady = bridgeHealth?.providers.find((item) => item.provider === 'ollama')?.ready ?? false
+  const ollamaReady =
+    bridgeHealth?.providers.find((item) => item.provider === 'ollama')?.ready ?? false
   const hasReadyProvider = Boolean(readyProviderCount || ollamaReady)
   const hasWorkspaceConnection = Boolean(workspaceAbsolutePath)
   const subscribedSignalCount = state.signals.items.filter((item) => item.subscribed).length
@@ -62,16 +77,16 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   const taskTemplates = useMemo(
     () => [
       {
-        label: '신호 브리핑',
-        value: '오늘 시그널을 요약해서 한국어 브리핑 문서로 정리해줘.',
+        label: '소식 브리핑',
+        value: 'AI 관련 소식을 요약해서 핵심 브리핑으로 정리해줘.',
       },
       {
         label: '다음 작업',
-        value: '최근 산출물과 변경 파일을 바탕으로 다음 작업 순서를 정리해줘.',
+        value: '최근 실행 결과를 바탕으로 다음 작업 순서를 정리해줘.',
       },
       {
         label: '자동화 설계',
-        value: '현재 활성 스킬과 파일을 기준으로 자동화 가능한 작업 흐름을 제안해줘.',
+        value: '현재 활성 도구와 파일을 기준으로 자동화 흐름을 제안해줘.',
       },
     ],
     [],
@@ -80,7 +95,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   return (
     <section className="page">
       <PageIntro
-        description="입력, 에이전트, 연결된 모델과 결과 경로를 한 화면에서 추적하고 바로 실행합니다."
+        description="입력에서 결과까지 어떤 경로로 흘러가는지 먼저 보고, 같은 화면에서 바로 실행합니다."
         icon="agent"
         title="오케스트레이션"
       />
@@ -90,7 +105,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
           <div>
             <h2>실행 흐름 개요</h2>
             <p className="settings-card__lead">
-              입력이 어디로 흘러가고, 어떤 모델과 도구를 거쳐 결과로 정리되는지 먼저 보여줍니다.
+              입력이 어디로 흐르고, 어떤 모델과 도구를 거쳐 결과로 정리되는지 먼저 보여줍니다.
             </p>
           </div>
           <div className="orchestration-summary-bar">
@@ -154,7 +169,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                 <span>작업 지시</span>
                 <textarea
                   onChange={(event) => setTask(event.target.value)}
-                  placeholder="예: 오늘 시그널을 요약해서 브리핑 문서로 정리해줘."
+                  placeholder="예: AI 관련 소식을 요약해서 브리핑 문서로 정리해줘."
                   rows={3}
                   value={task}
                 />
@@ -261,6 +276,54 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                 </button>
               </div>
             </div>
+
+            {latestRun ? (
+              <section className="orchestration-live-panel">
+                <div className="panel-card__header">
+                  <h2>실시간 결과</h2>
+                  <span className={`chip ${latestRun.status === 'running' ? 'is-active' : 'chip--soft'}`}>
+                    {runStatusLabel(latestRun.status)}
+                  </span>
+                </div>
+
+                <div className="orchestration-live-panel__grid">
+                  <article className="orchestration-live-panel__output">
+                    <div className="orchestration-live-panel__meta">
+                      <span className="chip chip--soft">{executionProviderLabel(latestRun.provider)}</span>
+                      <span className="chip chip--soft">{formatFriendlyModelName(latestRun.model)}</span>
+                      <span className="chip chip--soft">{formatDate(latestRun.startedAt)}</span>
+                    </div>
+                    <div className="orchestration-live-panel__text">
+                      {latestRun.output ||
+                        (latestRun.status === 'running'
+                          ? '응답을 생성하는 중입니다. 아래 시도 로그가 먼저 갱신됩니다.'
+                          : '아직 결과가 없습니다.')}
+                    </div>
+                  </article>
+
+                  <aside className="orchestration-live-panel__logs">
+                    <div className="orchestration-live-panel__logsHeader">
+                      <strong>시도 로그</strong>
+                      <span>{liveRunLogs.length}개</span>
+                    </div>
+                    {liveRunLogs.length > 0 ? (
+                      <div className="orchestration-live-panel__logList">
+                        {liveRunLogs.map((log) => (
+                          <div key={log.id} className={`run-log run-log--${log.level}`}>
+                            <span>{formatDate(log.createdAt)}</span>
+                            <p>{log.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="orchestration-live-panel__empty">
+                        실행을 시작하면 여기에서 후보 선택과 진행 상태를 바로 볼 수 있습니다.
+                      </p>
+                    )}
+                  </aside>
+                </div>
+              </section>
+            ) : null}
           </section>
         </div>
       </section>
@@ -268,7 +331,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       <DisclosureSection
         className="disclosure--soft"
         summary="에이전트 선택, 최근 실행, 변경 파일, 실행 로그"
-        title="세부 정보"
+        title="더 보기"
       >
         <div className="orchestration-detail-grid">
           <section className="panel-card">
@@ -339,7 +402,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
               </>
             ) : (
               <EmptyState
-                description="채팅이나 오케스트레이션을 한 번 실행하면 실제 폴더와 변경 파일이 여기에 쌓입니다."
+                description="채팅이나 오케스트레이션을 한 번 실행하면 실제 폴더와 변경 파일 정보가 여기에 쌓입니다."
                 title="아직 실제 실행 기록이 없습니다"
               />
             )}

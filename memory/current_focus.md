@@ -32,3 +32,9 @@
 - Replaced the fixed orchestration illustration with a real React Flow canvas.
 - Verified drag-to-pan and wheel-to-zoom behavior in a headless browser run.
 - Tightened mini-node copy so the board reads like a tool graph instead of stacked cards.
+
+## Latest update 3
+
+- Orchestration now exposes a live result panel under the composer so runs no longer look stuck on `실행 중...` with no context.
+- Verified the canvas viewport transform changes after drag so the board is actually pannable.
+- Refreshed `docs/screenshots/orchestration.png` from the latest interactive orchestration capture.

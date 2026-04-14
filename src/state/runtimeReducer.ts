@@ -4,6 +4,7 @@ import type {
   AgentItem,
   AgentPresetId,
   AgentRun,
+  AgentRunLog,
   ApiKeyItem,
   ApiKeyTargetPresetId,
   ChatMessage,
@@ -62,6 +63,9 @@ export type Action =
   | { type: 'UPDATE_AGENT'; agentId: string; patch: Partial<AgentItem> }
   | { type: 'DELETE_AGENT'; agentId: string }
   | { type: 'START_AGENT_RUN'; run: AgentRun }
+  | { type: 'UPDATE_AGENT_RUN_ROUTE'; runId: string; provider: string; model: string }
+  | { type: 'APPEND_AGENT_RUN_OUTPUT'; runId: string; chunk: string }
+  | { type: 'APPEND_AGENT_RUN_LOG'; runId: string; log: AgentRunLog }
   | {
       type: 'COMPLETE_AGENT_RUN'
       runId: string
@@ -558,6 +562,55 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
         },
       }
 
+    case 'UPDATE_AGENT_RUN_ROUTE':
+      return {
+        ...state,
+        agents: {
+          ...state.agents,
+          runs: state.agents.runs.map((run) =>
+            run.id === action.runId
+              ? {
+                  ...run,
+                  provider: action.provider,
+                  model: action.model,
+                }
+              : run,
+          ),
+        },
+      }
+
+    case 'APPEND_AGENT_RUN_OUTPUT':
+      return {
+        ...state,
+        agents: {
+          ...state.agents,
+          runs: state.agents.runs.map((run) =>
+            run.id === action.runId
+              ? {
+                  ...run,
+                  output: `${run.output}${action.chunk}`,
+                }
+              : run,
+          ),
+        },
+      }
+
+    case 'APPEND_AGENT_RUN_LOG':
+      return {
+        ...state,
+        agents: {
+          ...state.agents,
+          runs: state.agents.runs.map((run) =>
+            run.id === action.runId
+              ? {
+                  ...run,
+                  logs: [...run.logs, action.log].slice(-16),
+                }
+              : run,
+          ),
+        },
+      }
+
     case 'COMPLETE_AGENT_RUN': {
       const createdAt = nowIso()
       return {
@@ -619,7 +672,7 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
                   ...run,
                   status: 'error',
                   finishedAt: createdAt,
-                  output: action.error,
+                  output: run.output || action.error,
                   logs: [
                     ...run.logs,
                     {
