@@ -43,6 +43,21 @@ function runningHint(provider: string) {
   return '현재 공급자는 스트리밍으로 응답을 보내는 중입니다. 결과와 시도 로그가 순서대로 갱신됩니다.'
 }
 
+function summarizeWorkspaceLabel(workspaceCurrentPath?: string, workspaceAbsolutePath?: string) {
+  const resolved = workspaceCurrentPath || workspaceAbsolutePath
+
+  if (!resolved) {
+    return '연결 필요'
+  }
+
+  if (!workspaceCurrentPath || workspaceCurrentPath === workspaceAbsolutePath) {
+    return '루트 작업 폴더'
+  }
+
+  const segments = workspaceCurrentPath.split(/[\\/]/).filter(Boolean)
+  return segments.at(-1) || '현재 작업 폴더'
+}
+
 export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   const {
     activeAgent,
@@ -117,6 +132,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   const requiresApiKey =
     (activeAgent?.provider === 'openai-compatible' || activeAgent?.provider === 'anthropic') &&
     !state.apiKeys.some((item) => item.id === activeAgent.apiKeyId)
+  const workspaceLabel = summarizeWorkspaceLabel(workspaceCurrentPath, workspaceAbsolutePath)
 
   const canRunTask =
     Boolean(activeAgent) &&
@@ -216,7 +232,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
               실행기 {readyProviderCount}개
             </span>
             <span className={`chip ${hasWorkspaceConnection ? 'is-active' : 'chip--soft'}`}>
-              작업 폴더 {workspaceCurrentPath || '루트'}
+              작업 폴더 {workspaceLabel}
             </span>
           </div>
         </div>
@@ -255,7 +271,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
 
             <div className="orchestration-inline-dock__meta">
               <span className="chip chip--soft">
-                작업 폴더 {workspaceCurrentPath || workspaceAbsolutePath || '연결 필요'}
+                작업 폴더 {workspaceLabel}
               </span>
               <span className="chip chip--soft">
                 최근 입력 {latestMasterMessage ? '있음' : '없음'}

@@ -45,3 +45,8 @@
 - Bumped persisted runtime storage to `artemis-runtime-state/v17`.
 - Migrated saved state so `agent-ollama` becomes active when the stored model provider is already `ollama`.
 - Kept `gemma4-E4B-uncensored-q4fast:latest` as the only expected Ollama model.
+
+### Public screenshot path leak fix
+
+- Replaced visible orchestration path chips with a safe workspace label helper so the run dock no longer exposes absolute local paths.
+- Regenerated the tracked `docs/screenshots/*.png` set from the demo workspace after the orchestration label change.

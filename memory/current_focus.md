@@ -26,12 +26,14 @@
 - Settings now exposes a dedicated `0. 로컬 실행기` section before the official API section.
 - The local section shows both `Ollama 로컬` and `Codex CLI` with live readiness and current model labels.
 - When Ollama is temporarily unavailable, the bridge now returns the real failure detail instead of a generic `모델이 없습니다` message.
+- Orchestration no longer renders absolute workspace paths in the visible run dock; public-facing screenshots should show only safe labels such as `루트 작업 폴더`.
 
 ## Next Checks
 
 - Confirm the settings collapsible sections still read well on smaller widths.
 - Decide whether the chat model picker should default to the official router or keep the current agent.
 - Revisit orchestration spacing only if the interactive layout regresses again.
+- Keep public screenshots regenerated from the demo workspace whenever orchestration UI labels change.
 
 ## 2026-04-15 Follow-up
 
