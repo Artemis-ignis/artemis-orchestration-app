@@ -9,6 +9,17 @@
 - NVIDIA Build
 - Gemini Developer API
 
+## Hermes-style Codex 운영 구조
+
+이 저장소는 Hermes가 기본 내장된 환경이 아니며, 대신 Codex 안에서 바로 쓸 수 있는 로컬 운영 구조를 함께 둡니다.
+
+- 진입 문서: [HERMES_CODEX.md](HERMES_CODEX.md)
+- 세션 진입 파일: [AGENTS.md](AGENTS.md)
+- 역할 정의: [`codex/roles/`](codex/roles)
+- 재사용 스킬: [`codex/skills/`](codex/skills)
+- 워크플로우 계약: [`codex/workflow/contract.md`](codex/workflow/contract.md)
+- 외부 메모: [`memory/`](memory)
+
 ## 주요 화면
 
 ### 채팅

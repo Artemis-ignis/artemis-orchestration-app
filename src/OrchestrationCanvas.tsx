@@ -355,7 +355,7 @@ function buildGraph({
     subtitle: route.text,
     badge: route.badge,
     tone: 'router',
-    icon: 'settings',
+    icon: 'route',
     variant: 'main',
     label: '판정',
     state: route.status,
@@ -522,7 +522,14 @@ function GraphCard({
     .filter(Boolean)
     .join(' ')
 
-  const visibleDetails = node.variant === 'main' ? node.details?.slice(0, 1) ?? [] : []
+  const visibleDetails =
+    node.variant === 'main'
+      ? node.id === 'agent'
+        ? node.details?.slice(0, 2) ?? []
+        : node.details?.slice(0, 1) ?? []
+      : node.variant === 'output'
+        ? []
+        : node.details?.slice(0, 1) ?? []
 
   const handleClick = () => {
     if (node.agentId) {
@@ -541,7 +548,10 @@ function GraphCard({
         <span className="flow-graph__iconWrap" aria-hidden="true">
           <Icon name={node.icon} size={18} />
         </span>
-        <span className="flow-graph__badge">{node.badge || statusBadge(node.state)}</span>
+        <span className="flow-graph__badge">
+          <span className={`flow-graph__statusDot is-${node.state}`} />
+          {node.badge || statusBadge(node.state)}
+        </span>
       </div>
       <div className="flow-graph__copy">
         <strong>{node.title}</strong>
@@ -635,17 +645,45 @@ export function OrchestrationCanvas({
       <div className="orchestration-canvas__body orchestration-canvas__body--graph">
         <section className="flow-graph" aria-label="오케스트레이션 실행 흐름">
           <div className="flow-graph__canvas">
+            <div className="flow-graph__nebula flow-graph__nebula--left" aria-hidden="true" />
+            <div className="flow-graph__nebula flow-graph__nebula--right" aria-hidden="true" />
+            <div className="flow-graph__stardust flow-graph__stardust--top" aria-hidden="true" />
+            <div className="flow-graph__stardust flow-graph__stardust--bottom" aria-hidden="true" />
+            <div className="flow-graph__coreGlow" aria-hidden="true" />
             <svg
               className="flow-graph__links"
               preserveAspectRatio="none"
               viewBox="0 0 1200 540"
               aria-hidden="true"
             >
+              <defs>
+                <marker
+                  id="flow-arrow-main"
+                  markerWidth="10"
+                  markerHeight="10"
+                  refX="8"
+                  refY="5"
+                  orient="auto"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" fill="rgba(158, 205, 255, 0.96)" />
+                </marker>
+                <marker
+                  id="flow-arrow-support"
+                  markerWidth="10"
+                  markerHeight="10"
+                  refX="8"
+                  refY="5"
+                  orient="auto"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" fill="rgba(171, 187, 214, 0.64)" />
+                </marker>
+              </defs>
               {graph.edges.map((edge) => (
                 <path
                   key={edge.id}
                   className={`flow-link flow-link--${edge.kind} is-${edge.status}`}
                   d={edge.path}
+                  markerEnd={`url(#${edge.kind === 'main' ? 'flow-arrow-main' : 'flow-arrow-support'})`}
                 />
               ))}
             </svg>

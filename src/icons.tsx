@@ -38,6 +38,7 @@ export type IconName =
   | 'download'
   | 'user'
   | 'memory'
+  | 'route'
   | 'warning'
   | 'check'
 
@@ -293,6 +294,17 @@ export function Icon({
           <>
             <path d="M8 5v2M12 5v2M16 5v2M8 17v2M12 17v2M16 17v2M5 8h2M5 12h2M5 16h2M17 8h2M17 12h2M17 16h2" {...common} />
             <rect x="7.5" y="7.5" width="9" height="9" rx="2" {...common} />
+          </>
+        )
+      case 'route':
+        return (
+          <>
+            <circle cx="7" cy="6.5" r="1.3" fill="currentColor" />
+            <circle cx="17" cy="12" r="1.3" fill="currentColor" />
+            <circle cx="7" cy="17.5" r="1.3" fill="currentColor" />
+            <path d="M8.5 6.5H12a4 4 0 0 1 4 4v1.5" {...common} />
+            <path d="M8.5 17.5H12a4 4 0 0 0 4-4V12" {...common} />
+            <path d="M8.5 12H17" {...common} />
           </>
         )
       case 'warning':

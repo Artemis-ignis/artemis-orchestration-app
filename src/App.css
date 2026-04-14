@@ -4861,60 +4861,149 @@ select:focus-visible {
 }
 
 .flow-graph__canvas {
-  min-height: 560px;
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  min-height: 620px;
+  border-radius: 30px;
+  border: 1px solid rgba(143, 177, 255, 0.18);
   background:
-    radial-gradient(circle at top right, rgba(93, 118, 192, 0.12), transparent 32%),
-    radial-gradient(circle at bottom left, rgba(87, 126, 220, 0.07), transparent 26%),
-    #141821;
+    radial-gradient(circle at 50% 52%, rgba(73, 112, 219, 0.2), transparent 22%),
+    radial-gradient(circle at 22% 36%, rgba(71, 120, 255, 0.11), transparent 24%),
+    radial-gradient(circle at 86% 28%, rgba(98, 151, 255, 0.1), transparent 20%),
+    radial-gradient(circle at 50% 92%, rgba(77, 126, 222, 0.08), transparent 24%),
+    linear-gradient(180deg, #0f1831 0%, #0d1630 38%, #0b1428 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 36px 80px rgba(5, 10, 24, 0.42);
+  isolation: isolate;
+}
+
+.flow-graph__canvas::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, transparent 0%, transparent 50%, rgba(4, 8, 18, 0.3) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.flow-graph__nebula,
+.flow-graph__stardust,
+.flow-graph__coreGlow {
+  position: absolute;
+  pointer-events: none;
+}
+
+.flow-graph__nebula {
+  width: 320px;
+  height: 220px;
+  border-radius: 50%;
+  filter: blur(28px);
+  opacity: 0.55;
+  z-index: 0;
+  animation: flowNebula 12s ease-in-out infinite;
+}
+
+.flow-graph__nebula--left {
+  top: 110px;
+  left: -20px;
+  background: radial-gradient(circle, rgba(65, 121, 255, 0.42), rgba(65, 121, 255, 0));
+}
+
+.flow-graph__nebula--right {
+  top: 120px;
+  right: 18px;
+  background: radial-gradient(circle, rgba(102, 160, 255, 0.3), rgba(102, 160, 255, 0));
+  animation-delay: -5s;
+}
+
+.flow-graph__stardust {
+  left: 240px;
+  width: 720px;
+  height: 132px;
+  opacity: 0.85;
+  z-index: 0;
+  background:
+    radial-gradient(circle, rgba(244, 248, 255, 0.92) 0 1.1px, transparent 1.2px) 0 0 / 24px 24px,
+    radial-gradient(circle, rgba(181, 214, 255, 0.62) 0 0.9px, transparent 1px) 12px 10px / 28px 28px,
+    radial-gradient(circle, rgba(145, 200, 255, 0.42) 0 0.8px, transparent 0.9px) 4px 4px / 18px 18px;
+  animation: starDrift 16s linear infinite;
+}
+
+.flow-graph__stardust--top {
+  top: 148px;
+}
+
+.flow-graph__stardust--bottom {
+  top: 360px;
+  opacity: 0.6;
+  animation-direction: reverse;
+  animation-duration: 20s;
+}
+
+.flow-graph__coreGlow {
+  top: 132px;
+  left: 286px;
+  width: 360px;
+  height: 260px;
+  z-index: 0;
+  border-radius: 42px;
+  background:
+    radial-gradient(circle at center, rgba(104, 167, 255, 0.26), rgba(65, 116, 255, 0.08) 46%, transparent 70%);
+  filter: blur(20px);
+  animation: coreBreathe 5.4s ease-in-out infinite;
 }
 
 .flow-graph__surface {
   padding: 26px 24px 24px;
+  z-index: 1;
 }
 
 .flow-graph__anchor {
-  width: 184px;
+  width: 188px;
+  z-index: 2;
 }
 
 .flow-graph__anchor--trigger {
   top: 190px;
   left: 24px;
-  width: 220px;
+  width: 228px;
 }
 
 .flow-graph__anchor--memory {
   top: 28px;
   left: 276px;
-  width: 192px;
+  width: 204px;
 }
 
 .flow-graph__anchor--agent {
-  top: 146px;
-  left: 300px;
-  width: 300px;
+  top: 144px;
+  left: 292px;
+  width: 332px;
+  z-index: 3;
 }
 
 .flow-graph__anchor--router {
-  top: 178px;
-  left: 684px;
-  width: 196px;
+  top: 180px;
+  left: 676px;
+  width: 208px;
 }
 
 .flow-graph__anchor--files {
-  top: 28px;
-  left: 912px;
+  top: 30px;
+  left: 876px;
+  width: 176px;
 }
 
 .flow-graph__anchor--insights {
   top: 194px;
-  left: 912px;
+  left: 876px;
+  width: 176px;
 }
 
 .flow-graph__anchor--activity {
   top: 360px;
-  left: 912px;
+  left: 876px;
+  width: 176px;
 }
 
 .flow-graph__anchor--model {
@@ -4933,23 +5022,28 @@ select:focus-visible {
 }
 
 .flow-graph__node {
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(186, 208, 255, 0.14);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.03) inset,
-    0 12px 28px rgba(0, 0, 0, 0.2);
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 18px 42px rgba(4, 10, 24, 0.34);
+  backdrop-filter: blur(18px);
 }
 
 .flow-graph__node--main {
   min-height: 0;
-  padding: 14px 15px;
-  border-radius: 22px;
+  padding: 18px 18px 20px;
+  border-radius: 28px;
 }
 
 .flow-graph__node--support,
 .flow-graph__node--output {
   min-height: 0;
-  padding: 10px 12px;
-  border-radius: 18px;
+  padding: 12px 14px;
+  border-radius: 22px;
+}
+
+.flow-graph__node--output {
+  padding: 11px 13px;
 }
 
 .flow-graph__label {
@@ -4958,32 +5052,73 @@ select:focus-visible {
 
 .flow-graph__nodeTop {
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .flow-graph__iconWrap {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+    rgba(9, 14, 28, 0.64);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .flow-graph__badge {
-  padding: 5px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
   font-size: 0.72rem;
+  color: rgba(225, 235, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(7, 11, 21, 0.42);
+  backdrop-filter: blur(10px);
+}
+
+.flow-graph__statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(174, 190, 220, 0.72);
+  box-shadow: 0 0 0 4px rgba(174, 190, 220, 0.08);
+}
+
+.flow-graph__statusDot.is-ready {
+  background: rgba(160, 200, 255, 0.86);
+  box-shadow: 0 0 0 4px rgba(124, 176, 255, 0.12);
+}
+
+.flow-graph__statusDot.is-running {
+  background: rgba(104, 232, 179, 0.96);
+  box-shadow: 0 0 0 4px rgba(104, 232, 179, 0.16);
+}
+
+.flow-graph__statusDot.is-done {
+  background: rgba(119, 193, 255, 0.94);
+  box-shadow: 0 0 0 4px rgba(119, 193, 255, 0.14);
+}
+
+.flow-graph__statusDot.is-blocked {
+  background: rgba(255, 182, 116, 0.96);
+  box-shadow: 0 0 0 4px rgba(255, 182, 116, 0.14);
 }
 
 .flow-graph__copy strong {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 1.02rem;
-  line-height: 1.24;
+  font-size: 1.04rem;
+  line-height: 1.2;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .flow-graph__node--support .flow-graph__copy strong,
 .flow-graph__node--output .flow-graph__copy strong {
-  font-size: 0.94rem;
+  font-size: 1rem;
   -webkit-line-clamp: 1;
 }
 
@@ -4991,54 +5126,64 @@ select:focus-visible {
   display: -webkit-box;
   overflow: hidden;
   margin-top: 5px;
-  color: var(--text-dim);
-  font-size: 0.8rem;
-  line-height: 1.4;
+  color: rgba(211, 223, 249, 0.74);
+  font-size: 0.82rem;
+  line-height: 1.42;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
 }
 
 .flow-graph__node--support .flow-graph__copy p,
 .flow-graph__node--output .flow-graph__copy p {
-  font-size: 0.75rem;
-  line-height: 1.32;
-  -webkit-line-clamp: 1;
+  font-size: 0.76rem;
+  line-height: 1.34;
+  -webkit-line-clamp: 2;
 }
 
 .flow-graph__details {
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .flow-graph__detailChip {
-  padding: 4px 8px;
+  padding: 5px 9px;
   font-size: 0.72rem;
-  background: rgba(255, 255, 255, 0.045);
+  color: rgba(230, 238, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.flow-graph__node--output .flow-graph__detailChip {
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 0.69rem;
 }
 
 .flow-graph__node--support .flow-graph__nodeTop,
 .flow-graph__node--output .flow-graph__nodeTop {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .flow-graph__node--support .flow-graph__iconWrap,
 .flow-graph__node--output .flow-graph__iconWrap {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
 }
 
 .flow-graph__node--support .flow-graph__badge,
 .flow-graph__node--output .flow-graph__badge {
-  padding: 4px 7px;
+  padding: 4px 8px;
   font-size: 0.68rem;
 }
 
 .flow-graph__edgeLabel {
-  padding: 3px 7px;
+  padding: 4px 8px;
   font-size: 0.66rem;
-  background: rgba(15, 18, 23, 0.9);
-  border-color: rgba(255, 255, 255, 0.08);
+  color: rgba(214, 226, 249, 0.72);
+  background: rgba(8, 12, 24, 0.72);
+  border-color: rgba(164, 188, 255, 0.12);
+  backdrop-filter: blur(8px);
 }
 
 .flow-graph__edgeLabel--memory {
@@ -5063,9 +5208,13 @@ select:focus-visible {
 
 .orchestration-inline-dock--compact {
   gap: 10px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.014);
+  padding: 14px 15px;
+  border-radius: 22px;
+  border: 1px solid rgba(159, 184, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
+    rgba(7, 11, 21, 0.34);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .orchestration-inline-dock__meta {
@@ -5091,6 +5240,137 @@ select:focus-visible {
   gap: 10px;
 }
 
+.flow-link {
+  filter: drop-shadow(0 0 6px rgba(130, 177, 255, 0.18));
+}
+
+.flow-link--main {
+  animation: flowPulse 4.6s ease-in-out infinite;
+}
+
+.flow-link--support {
+  animation: flowDashDrift 9s linear infinite;
+}
+
+.flow-graph__anchor--agent::before {
+  content: '';
+  position: absolute;
+  inset: -18px -18px -14px;
+  z-index: -1;
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at center, rgba(124, 176, 255, 0.28), rgba(77, 122, 255, 0.08) 45%, transparent 72%);
+  filter: blur(14px);
+  animation: coreBreathe 5.4s ease-in-out infinite;
+}
+
+.flow-graph__node--trigger {
+  background:
+    linear-gradient(180deg, rgba(54, 95, 198, 0.98), rgba(26, 57, 132, 0.98));
+  border-color: rgba(150, 194, 255, 0.7);
+  box-shadow:
+    0 0 0 1px rgba(150, 194, 255, 0.16),
+    0 24px 48px rgba(12, 24, 54, 0.38);
+}
+
+.flow-graph__node--agent {
+  background:
+    linear-gradient(180deg, rgba(44, 71, 146, 0.94), rgba(18, 35, 84, 0.96));
+  border-color: rgba(178, 208, 255, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 26px 52px rgba(6, 18, 47, 0.46);
+}
+
+.flow-graph__node--router {
+  background:
+    linear-gradient(180deg, rgba(45, 57, 104, 0.94), rgba(21, 29, 58, 0.96));
+  border-color: rgba(168, 191, 255, 0.22);
+}
+
+.flow-graph__node--output,
+.flow-graph__node--memory,
+.flow-graph__node--model,
+.flow-graph__node--skill {
+  background:
+    linear-gradient(180deg, rgba(28, 41, 86, 0.84), rgba(13, 22, 44, 0.92));
+}
+
+.flow-graph__node.is-running {
+  border-color: rgba(102, 230, 170, 0.82);
+  box-shadow:
+    0 0 0 1px rgba(102, 230, 170, 0.2),
+    0 0 24px rgba(67, 199, 152, 0.12),
+    0 18px 40px rgba(34, 74, 57, 0.26);
+}
+
+.flow-graph__node.is-done {
+  border-color: rgba(132, 196, 255, 0.44);
+}
+
+.flow-graph__node--agent .flow-graph__copy strong {
+  font-size: 1.18rem;
+}
+
+@keyframes flowPulse {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes flowDashDrift {
+  0% {
+    stroke-dashoffset: 0;
+  }
+
+  100% {
+    stroke-dashoffset: -36;
+  }
+}
+
+@keyframes starDrift {
+  0% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(6px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes coreBreathe {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.98);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes flowNebula {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(10px, -8px, 0) scale(1.04);
+  }
+}
+
 .orchestration-template-list--inline {
   gap: 8px;
 }
@@ -5101,13 +5381,16 @@ select:focus-visible {
   line-height: 1;
 }
 
-@media (max-width: 1320px) {
+@media (max-width: 1180px) {
   .flow-graph__canvas {
     min-height: auto;
   }
 
   .flow-graph__links,
-  .flow-graph__edgeLabel {
+  .flow-graph__edgeLabel,
+  .flow-graph__nebula,
+  .flow-graph__stardust,
+  .flow-graph__coreGlow {
     display: none;
   }
 
@@ -5125,20 +5408,30 @@ select:focus-visible {
   }
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 980px) {
   .orchestration-inline-dock__composer,
   .flow-graph__surface {
     grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 900px) {
   .orchestration-stage__header--compact {
     align-items: flex-start;
   }
 
   .orchestration-stage__canvasShell {
     padding: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-link,
+  .flow-graph__nebula,
+  .flow-graph__stardust,
+  .flow-graph__coreGlow,
+  .flow-graph__anchor--agent::before {
+    animation: none !important;
   }
 }
 
