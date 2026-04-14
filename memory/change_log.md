@@ -50,3 +50,9 @@
 
 - Replaced visible orchestration path chips with a safe workspace label helper so the run dock no longer exposes absolute local paths.
 - Regenerated the tracked `docs/screenshots/*.png` set from the demo workspace after the orchestration label change.
+
+### Orchestration label readability fix
+
+- Shortened the orchestration node vocabulary to concise flowchart labels such as `병렬 허브`, `Ollama`, and `분기`.
+- Added a final CSS override at the end of `src/App.css` so node titles and subtitles wrap instead of collapsing into `메...` or `입...`.
+- Simplified orchestration workspace chips to `작업 폴더 연결됨` instead of repeating path-like wording.

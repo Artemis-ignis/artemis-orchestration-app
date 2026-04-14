@@ -59,7 +59,15 @@ const context = await browser.newContext({
 })
 
 await context.addInitScript((workspaceRoot) => {
-  window.localStorage.removeItem('artemis-runtime-state/v13')
+  for (const key of [
+    'artemis-runtime-state/v17',
+    'artemis-runtime-state/v16',
+    'artemis-runtime-state/v15',
+    'artemis-runtime-state/v14',
+    'artemis-runtime-state/v13',
+  ]) {
+    window.localStorage.removeItem(key)
+  }
   window.localStorage.setItem(
     'artemis-workspace/v1',
     JSON.stringify({
