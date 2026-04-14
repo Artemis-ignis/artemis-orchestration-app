@@ -32,7 +32,6 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
     revealWorkspacePath,
     saveWorkspaceFile,
     uploadWorkspaceFiles,
-    workspaceAbsolutePath,
     workspaceCurrentPath,
     workspaceEntries,
     workspaceError,
@@ -73,10 +72,6 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
     () => new Map(latestChangedFiles.map((item) => [item.relativePath, item.changeType])),
     [latestChangedFiles],
   )
-
-  useEffect(() => {
-    setRootInput(workspaceRootPath)
-  }, [workspaceRootPath])
 
   const hiddenSystemEntryCount = workspaceSummary.systemEntryCount
 
@@ -175,7 +170,6 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
   )
 
   const currentFolderLabel = workspaceCurrentPath || '루트'
-  const currentFolderPath = workspaceAbsolutePath || workspaceRootPath
   const shownFolderCount = workspaceSummary.folderCount
   const shownFileCount = workspaceSummary.fileCount
   const shownTotalBytes = workspaceSummary.totalBytes
@@ -220,12 +214,12 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
         <div className="files-shell__summaryHead">
           <div>
             <strong>연결된 작업 루트</strong>
-            <p>{workspaceRootPath || '작업 루트를 아직 불러오지 못했습니다.'}</p>
+            <p>{workspaceRootPath ? '루트 작업 폴더가 연결되어 있습니다.' : '작업 루트를 아직 불러오지 못했습니다.'}</p>
             <div className="files-shell__paths">
               <small className="mono">현재 폴더: {currentFolderLabel}</small>
               {workspaceCurrentPath ? (
                 <small className="mono">
-                  실제 경로: {currentFolderPath || '작업 폴더를 아직 불러오지 못했습니다.'}
+                  이 폴더 기준으로 채팅과 오케스트레이션이 실행됩니다.
                 </small>
               ) : null}
             </div>
@@ -244,7 +238,7 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
             className="ghost-button"
             onClick={() =>
               openChatWithWorkspace(
-                `현재 작업 폴더는 "${currentFolderLabel}" 입니다.\n경로: ${currentFolderPath}\n이 경로를 기준으로 파일을 읽고 필요한 수정 작업을 진행해줘.`,
+                `현재 작업 폴더는 "${currentFolderLabel}" 입니다.\n이 폴더 기준으로 파일을 읽고 필요한 수정 작업을 진행해줘.`,
               )
             }
             type="button"
@@ -278,7 +272,7 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
 
       <div className="status-banner status-banner--info">
         <Icon name="warning" size={16} />
-        <span>여기서 연결한 작업 루트와 현재 폴더가 채팅과 오케스트레이션 실행 경로로 그대로 전달됩니다.</span>
+        <span>여기서 고른 루트와 현재 폴더 기준이 채팅과 오케스트레이션 실행에 전달됩니다.</span>
       </div>
 
       {workspaceEntries.length > 0 ? (
@@ -323,8 +317,8 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
             )}
           </div>
           <div className="files-shell__paths">
-            <small className="mono">작업 루트: {latestExecution.workspace.rootPath}</small>
-            <small className="mono">실행 경로: {latestExecution.workspace.cwdPath}</small>
+            <small className="mono">작업 루트: 루트 작업 폴더</small>
+            <small className="mono">실행 경로: {latestExecutionFolderLabel}</small>
           </div>
           <div className="files-shell__summaryActions">
             <button
@@ -385,10 +379,19 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
         <label className="inline-input files-connect__input">
           <input
             onChange={(event) => setRootInput(event.target.value)}
-            placeholder="작업 루트 경로를 입력하세요. 예: C:\\Projects\\Artemis"
+            placeholder="작업 루트 경로를 입력하세요."
             value={rootInput}
           />
         </label>
+        {workspaceRootPath ? (
+          <button
+            className="ghost-button"
+            onClick={() => setRootInput(workspaceRootPath)}
+            type="button"
+          >
+            현재 루트 불러오기
+          </button>
+        ) : null}
         <button className="outline-button" disabled={!rootInput.trim()} type="submit">
           경로 연결
         </button>
@@ -607,7 +610,7 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
                     className="ghost-button"
                     onClick={() =>
                       openChatWithWorkspace(
-                        `대상 파일: ${selectedFileMeta.path}\n절대 경로: ${workspaceRootPath}\\${selectedFileMeta.path.replaceAll('/', '\\')}\n이 파일을 읽고 필요한 수정 사항을 적용해줘.`,
+                        `대상 파일: ${selectedFileMeta.path}\n이 파일을 읽고 필요한 수정 사항을 적용해줘.`,
                       )
                     }
                     type="button"

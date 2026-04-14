@@ -19,7 +19,7 @@ const pages = [
   { id: 'insights', file: 'insights.png', waitForText: '인사이트' },
   { id: 'signals', file: 'signals.png', waitForText: '시그널', prepare: 'signals' },
   { id: 'tools', file: 'skills.png', waitForText: '스킬' },
-  { id: 'agents', file: 'orchestration.png', waitForText: '오케스트레이션' },
+  { id: 'agents', file: 'orchestration.png', waitForText: '오케스트레이션', prepare: 'agents' },
   { id: 'activity', file: 'activity.png', waitForText: '활동' },
   { id: 'settings', file: 'settings.png', waitForText: '설정' },
 ]
@@ -95,6 +95,13 @@ for (const item of pages) {
     } catch {
       await page.waitForTimeout(6000)
     }
+  }
+
+  if (item.prepare === 'agents') {
+    const textarea = page.locator('.orchestration-inline-dock textarea')
+    await textarea.waitFor({ timeout: 12000 })
+    await textarea.fill('AI 관련 소식을 요약해서 브리핑 문서로 정리해줘.')
+    await page.waitForTimeout(800)
   }
 
   await page.locator('.crew-shell').screenshot({

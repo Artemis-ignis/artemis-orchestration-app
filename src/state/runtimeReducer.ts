@@ -544,7 +544,6 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
         ...state,
         agents: {
           ...state.agents,
-          activeAgentId: action.run.agentId,
           items: state.agents.items.map((agent) =>
             agent.id === action.run.agentId
               ? { ...agent, status: 'running', lastRunAt: action.run.startedAt }

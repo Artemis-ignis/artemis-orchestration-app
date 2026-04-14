@@ -14,7 +14,6 @@ import {
 import '@xyflow/react/dist/style.css'
 import type { PageId } from './crewData'
 import { Icon, type IconName } from './icons'
-import { getAgentProviderLabel } from './lib/agentCatalog'
 import type { ExecuteWorkspaceContext } from './lib/modelClient'
 import type { AgentItem, AgentRun, ToolItem } from './state/types'
 
@@ -43,25 +42,26 @@ type OrchestrationCanvasProps = {
   workspaceError: string | null
   requiresApiKey: boolean
   onNavigate: (page: PageId) => void
-  onSelectAgent: (agentId: string) => void
 }
 
 type StepStatus = 'idle' | 'ready' | 'running' | 'done' | 'blocked'
-type NodeTone = 'trigger' | 'hub' | 'worker' | 'support' | 'output' | 'merge'
+type NodeTone = 'trigger' | 'hub' | 'worker' | 'support' | 'output' | 'merge' | 'standby'
 type NodeKind =
   | 'trigger'
-  | 'memory'
   | 'hub'
   | 'worker'
   | 'merge'
+  | 'memory'
+  | 'signals'
+  | 'tools'
   | 'files'
   | 'insights'
   | 'activity'
-  | 'signals'
-  | 'tools'
+  | 'standby'
 
 type FlowNodeData = {
   title: string
+  fullTitle?: string
   subtitle?: string
   badge: string
   icon: IconName
@@ -69,11 +69,10 @@ type FlowNodeData = {
   status: StepStatus
   kind: NodeKind
   page?: PageId
-  agentId?: string
 }
 
-const BOARD_WIDTH = 1180
-const BOARD_HEIGHT = 560
+const BOARD_WIDTH = 1320
+const BOARD_HEIGHT = 760
 
 function normalizeModelLabel(value: string) {
   return value.trim().replace(/:latest$/i, '')
@@ -83,7 +82,7 @@ function compactModelLabel(value: string) {
   const normalized = normalizeModelLabel(value)
 
   if (!normalized) {
-    return '모델'
+    return '모델 없음'
   }
 
   if (/gemma4-e4b-uncensored-q4fast/i.test(normalized)) {
@@ -94,107 +93,63 @@ function compactModelLabel(value: string) {
     return 'GPT-5.4'
   }
 
-  if (/openrouter\/free/i.test(normalized)) {
-    return '무료 라우터'
+  if (/auto-best-free/i.test(normalized)) {
+    return '공식 무료'
   }
 
-  return normalized.length > 26 ? `${normalized.slice(0, 26)}…` : normalized
+  if (/auto-code-free/i.test(normalized)) {
+    return '코딩 무료'
+  }
+
+  if (/auto-fast-free/i.test(normalized)) {
+    return '빠른 무료'
+  }
+
+  if (/gemini/i.test(normalized)) {
+    return 'Gemini'
+  }
+
+  if (/claude/i.test(normalized)) {
+    return 'Claude'
+  }
+
+  if (/openrouter/i.test(normalized)) {
+    return 'OpenRouter'
+  }
+
+  const tail = normalized.split(/[/:]/).filter(Boolean).at(-1) ?? normalized
+  return tail.length > 12 ? `${tail.slice(0, 12)}…` : tail
 }
 
 function providerLabel(value: string) {
-  if (
-    value === 'ollama' ||
-    value === 'codex' ||
-    value === 'openai-compatible' ||
-    value === 'anthropic'
-  ) {
-    return getAgentProviderLabel(value)
+  switch (value) {
+    case 'ollama':
+      return 'Ollama'
+    case 'codex':
+      return 'Codex CLI'
+    case 'official-router':
+      return '공식 라우터'
+    case 'openai-compatible':
+      return 'OpenAI 호환'
+    case 'anthropic':
+      return 'Anthropic'
+    default:
+      return value || '대기'
   }
-
-  return value || '연결 대기'
-}
-
-function workerDisplayTitle(agent: AgentItem) {
-  if (agent.provider === 'ollama') {
-    return 'Ollama'
-  }
-
-  if (agent.provider === 'codex') {
-    return 'Codex'
-  }
-
-  if (agent.provider === 'official-router') {
-    return '무료 라우터'
-  }
-
-  return providerLabel(agent.provider)
 }
 
 function statusBadge(status: StepStatus) {
   switch (status) {
     case 'running':
-      return '진행'
+      return '작업중'
     case 'done':
       return '완료'
     case 'blocked':
-      return '오류'
+      return '막힘'
     case 'ready':
       return '준비'
     default:
       return '대기'
-  }
-}
-
-function routeSummary({
-  sessionRuns,
-  latestExecution,
-  bridgeError,
-  workspaceError,
-  requiresApiKey,
-}: {
-  sessionRuns: AgentRun[]
-  latestExecution: LatestExecution | null
-  bridgeError: string | null
-  workspaceError: string | null
-  requiresApiKey: boolean
-}) {
-  if (bridgeError) {
-    return { status: 'blocked' as const, badge: '브리지' }
-  }
-
-  if (workspaceError) {
-    return { status: 'blocked' as const, badge: '폴더' }
-  }
-
-  if (requiresApiKey) {
-    return { status: 'blocked' as const, badge: 'API' }
-  }
-
-  if (sessionRuns.some((run) => run.status === 'running')) {
-    return { status: 'running' as const, badge: '수집 중' }
-  }
-
-  if (latestExecution || sessionRuns.some((run) => run.status === 'success')) {
-    return { status: 'done' as const, badge: '반영' }
-  }
-
-  if (sessionRuns.some((run) => run.status === 'error')) {
-    return { status: 'blocked' as const, badge: '재시도' }
-  }
-
-  return { status: 'ready' as const, badge: '대기' }
-}
-
-function workerYPositions(count: number) {
-  switch (count) {
-    case 1:
-      return [220]
-    case 2:
-      return [170, 270]
-    case 3:
-      return [120, 220, 320]
-    default:
-      return [90, 180, 270, 360]
   }
 }
 
@@ -215,6 +170,56 @@ function latestRunMap(sessionRuns: AgentRun[]) {
   return map
 }
 
+function routeSummary({
+  sessionRuns,
+  bridgeError,
+  workspaceError,
+  requiresApiKey,
+}: {
+  sessionRuns: AgentRun[]
+  bridgeError: string | null
+  workspaceError: string | null
+  requiresApiKey: boolean
+}) {
+  if (bridgeError) {
+    return { status: 'blocked' as const, badge: '브리지' }
+  }
+
+  if (workspaceError) {
+    return { status: 'blocked' as const, badge: '폴더' }
+  }
+
+  if (requiresApiKey) {
+    return { status: 'blocked' as const, badge: 'API 키' }
+  }
+
+  if (sessionRuns.some((run) => run.status === 'running')) {
+    return { status: 'running' as const, badge: '병렬 실행' }
+  }
+
+  if (sessionRuns.some((run) => run.status === 'success')) {
+    return { status: 'done' as const, badge: '최근 완료' }
+  }
+
+  if (sessionRuns.some((run) => run.status === 'error')) {
+    return { status: 'blocked' as const, badge: '재시도' }
+  }
+
+  return { status: 'ready' as const, badge: '준비' }
+}
+
+function createParallelWorkerPositions(count: number) {
+  const safeCount = Math.max(1, count)
+  const gap = safeCount === 1 ? 0 : 188
+  const totalWidth = gap * (safeCount - 1)
+  const startX = Math.round(642 - totalWidth / 2)
+
+  return Array.from({ length: safeCount }, (_, index) => ({
+    x: startX + index * gap,
+    y: 434,
+  }))
+}
+
 function createFlowModel({
   selectedAgents,
   sessionRuns,
@@ -230,66 +235,34 @@ function createFlowModel({
   bridgeError,
   workspaceError,
   requiresApiKey,
-}: Omit<OrchestrationCanvasProps, 'onNavigate' | 'onSelectAgent'>) {
+}: Omit<OrchestrationCanvasProps, 'onNavigate'>) {
   const activeTools = tools.filter((item) => item.enabled)
-  const changedFileCount = latestExecution?.workspace.changedFiles.length ?? 0
-  const hasDraft = Boolean(taskDraft.trim())
-  const hasSession = sessionRuns.length > 0
   const latestRunsByAgent = latestRunMap(sessionRuns)
+  const hasDraft = Boolean(taskDraft.trim())
+  const hasRecentPrompt = Boolean(recentPrompt.trim())
+  const hasSession = sessionRuns.length > 0
+  const sessionRunning = sessionRuns.some((run) => run.status === 'running')
+  const shouldExpandFlow = hasDraft || sessionRunning
   const route = routeSummary({
     sessionRuns,
-    latestExecution,
     bridgeError,
     workspaceError,
     requiresApiKey,
   })
-
-  const triggerStatus: StepStatus = hasSession
-    ? sessionRuns.some((run) => run.status === 'running')
-      ? 'running'
-      : 'done'
-    : hasDraft || recentPrompt.trim()
-      ? 'ready'
-      : 'idle'
-
-  const hubStatus: StepStatus = bridgeError || workspaceError || requiresApiKey
-    ? 'blocked'
-    : sessionRuns.some((run) => run.status === 'running')
-      ? 'running'
-      : sessionRuns.some((run) => run.status === 'success')
-        ? 'done'
-        : selectedAgents.length > 0
-          ? 'ready'
-          : 'blocked'
-
-  const memoryStatus: StepStatus = messageCount > 0 ? (hasSession ? 'done' : 'ready') : 'idle'
-  const signalStatus: StepStatus =
-    signalCount > 0 ? (hasSession ? 'ready' : 'idle') : hasSession ? 'idle' : 'idle'
-  const toolsStatus: StepStatus =
-    activeTools.length > 0 ? (hasSession ? 'ready' : 'idle') : hasSession ? 'idle' : 'idle'
-  const mergeStatus: StepStatus = route.status
-  const filesStatus: StepStatus = changedFileCount > 0 ? 'done' : hasSession ? 'ready' : 'idle'
-  const insightsStatus: StepStatus = insightsCount > 0 ? 'done' : hasSession ? 'ready' : 'idle'
-  const activityStatus: StepStatus = activityCount > 0 ? 'done' : hasSession ? 'ready' : 'idle'
-
-  const workerAgents = selectedAgents.length > 0 ? selectedAgents.slice(0, 4) : []
-  const workerYs = workerYPositions(Math.max(workerAgents.length, 1))
-  const showSupportNodes = hasSession
-  const showMergeNode = hasSession
-  const showOutputNodes = hasSession
+  const changedFileCount = hasSession ? latestExecution?.workspace.changedFiles.length ?? 0 : 0
 
   const nodes: Array<Node<FlowNodeData>> = [
     {
       id: 'trigger',
       type: 'orchestration',
-      position: { x: 58, y: 214 },
+      position: { x: 96, y: 300 },
       data: {
         title: '입력',
-        subtitle: hasDraft ? '실행 대기 중' : recentPrompt.trim() ? '최근 질문 반영' : undefined,
-        badge: hasDraft ? '대기' : statusBadge(triggerStatus),
+        subtitle: hasDraft ? '지시 준비' : hasRecentPrompt ? '최근 입력' : '대기',
+        badge: hasDraft ? '입력됨' : hasRecentPrompt ? '최근 있음' : '대기',
         icon: 'spark',
         tone: 'trigger',
-        status: triggerStatus,
+        status: hasDraft ? 'ready' : hasRecentPrompt ? 'ready' : 'idle',
         kind: 'trigger',
         page: 'chat',
       },
@@ -299,17 +272,16 @@ function createFlowModel({
     {
       id: 'hub',
       type: 'orchestration',
-      position: { x: 248, y: 172 },
+      position: { x: 470, y: 248 },
       data: {
         title: '병렬 허브',
-        subtitle:
-          workerAgents.length > 0
-            ? `${workerAgents.length}개 모델 동시 실행`
-            : '모델을 하나 이상 선택해 주세요',
-        badge: workerAgents.length > 0 ? `${workerAgents.length}개` : statusBadge(hubStatus),
+        subtitle: shouldExpandFlow
+          ? `${Math.max(selectedAgents.length, 1)}개 모델 배치`
+          : '실행하면 병렬 모델 생성',
+        badge: shouldExpandFlow ? route.badge : '준비',
         icon: 'agent',
         tone: 'hub',
-        status: hubStatus,
+        status: route.status,
         kind: 'hub',
       },
       draggable: true,
@@ -325,23 +297,57 @@ function createFlowModel({
       target: 'hub',
       targetHandle: 'in-left',
       type: 'smoothstep',
-      animated: triggerStatus === 'running',
+      animated: hasDraft,
       markerEnd: { type: MarkerType.ArrowClosed },
-      className: `orchestration-flow__edge is-${triggerStatus === 'running' ? 'running' : 'ready'}`,
+      className: `orchestration-flow__edge is-${hasDraft ? 'running' : 'ready'}`,
     },
   ]
 
-  if (showSupportNodes) {
+  if (!shouldExpandFlow) {
+    nodes.push({
+      id: 'standby',
+      type: 'orchestration',
+      position: { x: 930, y: 300 },
+      data: {
+        title: '출력',
+        subtitle: selectedAgents.length > 0 ? '실행 후 결과 생성' : '모델을 먼저 고르세요',
+        badge: selectedAgents.length > 0 ? `${selectedAgents.length}개 준비` : '선택 필요',
+        icon: 'route',
+        tone: 'standby',
+        status: selectedAgents.length > 0 ? 'ready' : 'blocked',
+        kind: 'standby',
+        page: selectedAgents.length > 0 ? 'chat' : 'settings',
+      },
+      draggable: true,
+      selectable: false,
+    })
+
+    edges.push({
+      id: 'hub-standby',
+      source: 'hub',
+      sourceHandle: 'out-right',
+      target: 'standby',
+      targetHandle: 'in-left',
+      type: 'smoothstep',
+      markerEnd: { type: MarkerType.ArrowClosed },
+      className: `orchestration-flow__edge is-${selectedAgents.length > 0 ? 'ready' : 'blocked'}`,
+    })
+
+    return { nodes, edges }
+  }
+
+  if (sessionRunning && messageCount > 0) {
     nodes.push({
       id: 'memory',
       type: 'orchestration',
-      position: { x: 286, y: 54 },
+      position: { x: 520, y: 96 },
       data: {
         title: '메모리',
-        badge: messageCount > 0 ? `대화 ${messageCount}` : statusBadge(memoryStatus),
+        subtitle: '문맥',
+        badge: `${messageCount}개`,
         icon: 'memory',
         tone: 'support',
-        status: memoryStatus,
+        status: 'ready',
         kind: 'memory',
         page: 'insights',
       },
@@ -357,19 +363,159 @@ function createFlowModel({
       targetHandle: 'in-top',
       type: 'smoothstep',
       markerEnd: { type: MarkerType.ArrowClosed },
-      className: `orchestration-flow__edge orchestration-flow__edge--support is-${memoryStatus}`,
+      className: 'orchestration-flow__edge orchestration-flow__edge--support is-ready',
+    })
+  }
+
+  const workerAgents = selectedAgents.slice(0, 6)
+  const workerPositions = createParallelWorkerPositions(workerAgents.length)
+
+  if (workerAgents.length === 0) {
+    nodes.push({
+      id: 'worker-empty',
+      type: 'orchestration',
+      position: { x: 530, y: 450 },
+      data: {
+        title: '모델 없음',
+        subtitle: '설정에서 추가',
+        badge: '설정 필요',
+        icon: 'chat',
+        tone: 'worker',
+        status: 'blocked',
+        kind: 'worker',
+        page: 'settings',
+      },
+      draggable: true,
+      selectable: false,
     })
 
+    edges.push({
+      id: 'hub-worker-empty',
+      source: 'hub',
+      sourceHandle: 'out-bottom',
+      target: 'worker-empty',
+      targetHandle: 'in-top',
+      type: 'smoothstep',
+      markerEnd: { type: MarkerType.ArrowClosed },
+      className: 'orchestration-flow__edge is-blocked',
+    })
+  } else {
+    workerAgents.forEach((agent, index) => {
+      const workerId = `worker-${agent.id}`
+      const run = latestRunsByAgent.get(agent.id)
+      const status: StepStatus =
+        run?.status === 'running'
+          ? 'running'
+          : run?.status === 'success'
+            ? 'done'
+            : run?.status === 'error'
+              ? 'blocked'
+              : hasDraft
+                ? 'ready'
+                : 'idle'
+
+      nodes.push({
+        id: workerId,
+        type: 'orchestration',
+        position: workerPositions[index],
+        data: {
+          title: compactModelLabel(agent.model || agent.name),
+          fullTitle: agent.name,
+          subtitle: providerLabel(agent.provider),
+          badge: statusBadge(status),
+          icon: 'chat',
+          tone: 'worker',
+          status,
+          kind: 'worker',
+          page: 'settings',
+        },
+        draggable: true,
+        selectable: false,
+      })
+
+      edges.push({
+        id: `hub-${workerId}`,
+        source: 'hub',
+        sourceHandle: 'out-bottom',
+        target: workerId,
+        targetHandle: 'in-top',
+        type: 'smoothstep',
+        animated: status === 'running',
+        markerEnd: { type: MarkerType.ArrowClosed },
+        className: `orchestration-flow__edge is-${status}`,
+      })
+    })
+  }
+
+  nodes.push({
+    id: 'merge',
+    type: 'orchestration',
+    position: { x: 930, y: 314 },
+    data: {
+      title: '분기',
+      subtitle: sessionRunning ? '결과 취합' : '대기',
+      badge: route.badge,
+      icon: 'route',
+      tone: 'merge',
+      status: route.status,
+      kind: 'merge',
+    },
+    draggable: true,
+    selectable: false,
+  })
+
+  if (workerAgents.length > 0) {
+    workerAgents.forEach((agent) => {
+      const workerId = `worker-${agent.id}`
+      const run = latestRunsByAgent.get(agent.id)
+      const status: StepStatus =
+        run?.status === 'running'
+          ? 'running'
+          : run?.status === 'success'
+            ? 'done'
+            : run?.status === 'error'
+              ? 'blocked'
+              : hasDraft
+                ? 'ready'
+                : 'idle'
+
+      edges.push({
+        id: `${workerId}-merge`,
+        source: workerId,
+        sourceHandle: 'out-right',
+        target: 'merge',
+        targetHandle: 'in-left',
+        type: 'smoothstep',
+        animated: status === 'running',
+        markerEnd: { type: MarkerType.ArrowClosed },
+        className: `orchestration-flow__edge is-${status}`,
+      })
+    })
+  } else {
+    edges.push({
+      id: 'worker-empty-merge',
+      source: 'worker-empty',
+      sourceHandle: 'out-right',
+      target: 'merge',
+      targetHandle: 'in-left',
+      type: 'smoothstep',
+      markerEnd: { type: MarkerType.ArrowClosed },
+      className: 'orchestration-flow__edge is-blocked',
+    })
+  }
+
+  if (sessionRunning && signalCount > 0) {
     nodes.push({
       id: 'signals',
       type: 'orchestration',
-      position: { x: 250, y: 352 },
+      position: { x: 314, y: 618 },
       data: {
         title: '시그널',
-        badge: signalCount > 0 ? `${signalCount}개` : statusBadge(signalStatus),
+        subtitle: '입력',
+        badge: `${signalCount}개`,
         icon: 'signals',
         tone: 'support',
-        status: signalStatus,
+        status: 'ready',
         kind: 'signals',
         page: 'signals',
       },
@@ -385,19 +531,22 @@ function createFlowModel({
       targetHandle: 'in-bottom-left',
       type: 'smoothstep',
       markerEnd: { type: MarkerType.ArrowClosed },
-      className: `orchestration-flow__edge orchestration-flow__edge--support is-${signalStatus}`,
+      className: 'orchestration-flow__edge orchestration-flow__edge--support is-ready',
     })
+  }
 
+  if (sessionRunning && activeTools.length > 0) {
     nodes.push({
       id: 'tools',
       type: 'orchestration',
-      position: { x: 404, y: 352 },
+      position: { x: 666, y: 618 },
       data: {
         title: '도구',
-        badge: activeTools.length > 0 ? `${activeTools.length}개` : statusBadge(toolsStatus),
+        subtitle: '실행',
+        badge: `${activeTools.length}개`,
         icon: 'tools',
         tone: 'support',
-        status: toolsStatus,
+        status: 'ready',
         kind: 'tools',
         page: 'tools',
       },
@@ -413,130 +562,23 @@ function createFlowModel({
       targetHandle: 'in-bottom-right',
       type: 'smoothstep',
       markerEnd: { type: MarkerType.ArrowClosed },
-      className: `orchestration-flow__edge orchestration-flow__edge--support is-${toolsStatus}`,
+      className: 'orchestration-flow__edge orchestration-flow__edge--support is-ready',
     })
   }
 
-  if (workerAgents.length === 0) {
-    nodes.push({
-      id: 'worker-empty',
-      type: 'orchestration',
-      position: { x: 522, y: 214 },
-      data: {
-        title: '모델 선택',
-        subtitle: '실행할 모델을 고르세요',
-        badge: '필수',
-        icon: 'chat',
-        tone: 'worker',
-        status: 'blocked',
-        kind: 'worker',
-        page: 'settings',
-      },
-      draggable: true,
-      selectable: false,
-    })
-
-    edges.push({
-      id: 'hub-worker-empty',
-      source: 'hub',
-      sourceHandle: 'out-right',
-      target: 'worker-empty',
-      targetHandle: 'in-left',
-      type: 'smoothstep',
-      markerEnd: { type: MarkerType.ArrowClosed },
-      className: 'orchestration-flow__edge is-blocked',
-    })
-  } else {
-    workerAgents.forEach((agent, index) => {
-      const run = latestRunsByAgent.get(agent.id)
-      const status: StepStatus =
-        run?.status === 'running'
-          ? 'running'
-          : run?.status === 'success'
-            ? 'done'
-            : run?.status === 'error'
-              ? 'blocked'
-              : 'ready'
-
-      const workerId = `worker-${agent.id}`
-
-      nodes.push({
-        id: workerId,
-        type: 'orchestration',
-        position: { x: 536, y: workerYs[index] },
-        data: {
-          title: workerDisplayTitle(agent),
-          subtitle: compactModelLabel(agent.model),
-          badge: statusBadge(status),
-          icon: 'agent',
-          tone: 'worker',
-          status,
-          kind: 'worker',
-          agentId: agent.id,
-        },
-        draggable: true,
-        selectable: false,
-      })
-
-      edges.push({
-        id: `hub-${workerId}`,
-        source: 'hub',
-        sourceHandle: 'out-right',
-        target: workerId,
-        targetHandle: 'in-left',
-        type: 'smoothstep',
-        animated: status === 'running',
-        markerEnd: { type: MarkerType.ArrowClosed },
-        className: `orchestration-flow__edge is-${status}`,
-      })
-
-      if (showMergeNode) {
-        edges.push({
-          id: `${workerId}-merge`,
-          source: workerId,
-          sourceHandle: 'out-right',
-          target: 'merge',
-          targetHandle: 'in-left',
-          type: 'smoothstep',
-          animated: status === 'running',
-          markerEnd: { type: MarkerType.ArrowClosed },
-          className: `orchestration-flow__edge is-${status}`,
-        })
-      }
-    })
-  }
-
-  if (showMergeNode) {
-    nodes.push({
-      id: 'merge',
-      type: 'orchestration',
-      position: { x: 782, y: 214 },
-      data: {
-        title: '분기',
-        subtitle: sessionRuns.some((run) => run.status === 'running') ? '결과 집계 중' : '결과 분배',
-        badge: route.badge,
-        icon: 'route',
-        tone: 'merge',
-        status: mergeStatus,
-        kind: 'merge',
-      },
-      draggable: true,
-      selectable: false,
-    })
-  }
-
-  if (showOutputNodes) {
+  if (sessionRunning) {
     nodes.push(
       {
         id: 'files',
         type: 'orchestration',
-        position: { x: 980, y: 112 },
+        position: { x: 1134, y: 154 },
         data: {
           title: '파일',
+          subtitle: '산출물',
           badge: changedFileCount > 0 ? `+${changedFileCount}` : `${filesCount}`,
           icon: 'folder',
           tone: 'output',
-          status: filesStatus,
+          status: changedFileCount > 0 ? 'done' : 'ready',
           kind: 'files',
           page: 'files',
         },
@@ -546,13 +588,14 @@ function createFlowModel({
       {
         id: 'insights',
         type: 'orchestration',
-        position: { x: 980, y: 214 },
+        position: { x: 1134, y: 314 },
         data: {
           title: '인사이트',
-          badge: insightsCount > 0 ? `${insightsCount}` : statusBadge(insightsStatus),
+          subtitle: '요약',
+          badge: insightsCount > 0 ? `${insightsCount}` : '대기',
           icon: 'insights',
           tone: 'output',
-          status: insightsStatus,
+          status: insightsCount > 0 ? 'done' : 'ready',
           kind: 'insights',
           page: 'insights',
         },
@@ -562,13 +605,14 @@ function createFlowModel({
       {
         id: 'activity',
         type: 'orchestration',
-        position: { x: 980, y: 316 },
+        position: { x: 1134, y: 474 },
         data: {
           title: '로그',
+          subtitle: '기록',
           badge: `${activityCount}`,
           icon: 'activity',
           tone: 'output',
-          status: activityStatus,
+          status: activityCount > 0 ? 'done' : 'ready',
           kind: 'activity',
           page: 'activity',
         },
@@ -577,40 +621,66 @@ function createFlowModel({
       },
     )
 
-    if (showMergeNode) {
-      edges.push(
-        {
-          id: 'merge-files',
-          source: 'merge',
-          sourceHandle: 'out-right',
-          target: 'files',
-          targetHandle: 'in-left',
-          type: 'smoothstep',
-          markerEnd: { type: MarkerType.ArrowClosed },
-          className: `orchestration-flow__edge is-${filesStatus}`,
-        },
-        {
-          id: 'merge-insights',
-          source: 'merge',
-          sourceHandle: 'out-right',
-          target: 'insights',
-          targetHandle: 'in-left',
-          type: 'smoothstep',
-          markerEnd: { type: MarkerType.ArrowClosed },
-          className: `orchestration-flow__edge is-${insightsStatus}`,
-        },
-        {
-          id: 'merge-activity',
-          source: 'merge',
-          sourceHandle: 'out-right',
-          target: 'activity',
-          targetHandle: 'in-left',
-          type: 'smoothstep',
-          markerEnd: { type: MarkerType.ArrowClosed },
-          className: `orchestration-flow__edge is-${activityStatus}`,
-        },
-      )
-    }
+    edges.push(
+      {
+        id: 'merge-files',
+        source: 'merge',
+        sourceHandle: 'out-right-top',
+        target: 'files',
+        targetHandle: 'in-left',
+        type: 'smoothstep',
+        markerEnd: { type: MarkerType.ArrowClosed },
+        className: `orchestration-flow__edge is-${changedFileCount > 0 ? 'done' : 'ready'}`,
+      },
+      {
+        id: 'merge-insights',
+        source: 'merge',
+        sourceHandle: 'out-right',
+        target: 'insights',
+        targetHandle: 'in-left',
+        type: 'smoothstep',
+        markerEnd: { type: MarkerType.ArrowClosed },
+        className: `orchestration-flow__edge is-${insightsCount > 0 ? 'done' : 'ready'}`,
+      },
+      {
+        id: 'merge-activity',
+        source: 'merge',
+        sourceHandle: 'out-right-bottom',
+        target: 'activity',
+        targetHandle: 'in-left',
+        type: 'smoothstep',
+        markerEnd: { type: MarkerType.ArrowClosed },
+        className: `orchestration-flow__edge is-${activityCount > 0 ? 'done' : 'ready'}`,
+      },
+    )
+  } else {
+    nodes.push({
+      id: 'result-ready',
+      type: 'orchestration',
+      position: { x: 1134, y: 314 },
+      data: {
+        title: '출력',
+        subtitle: '실행 후 생성',
+        badge: '대기',
+        icon: 'route',
+        tone: 'output',
+        status: 'idle',
+        kind: 'standby',
+      },
+      draggable: true,
+      selectable: false,
+    })
+
+    edges.push({
+      id: 'merge-result-ready',
+      source: 'merge',
+      sourceHandle: 'out-right',
+      target: 'result-ready',
+      targetHandle: 'in-left',
+      type: 'smoothstep',
+      markerEnd: { type: MarkerType.ArrowClosed },
+      className: 'orchestration-flow__edge is-ready',
+    })
   }
 
   return { nodes, edges }
@@ -618,22 +688,28 @@ function createFlowModel({
 
 function OrchestrationFlowNode({ data }: NodeProps<Node<FlowNodeData>>) {
   const isHub = data.kind === 'hub'
-  const isWorker = data.kind === 'worker'
-  const isMerge = data.kind === 'merge'
+  const isMini =
+    data.kind === 'memory' ||
+    data.kind === 'signals' ||
+    data.kind === 'tools' ||
+    data.kind === 'files' ||
+    data.kind === 'insights' ||
+    data.kind === 'activity'
+  const isCompact = isMini || data.kind === 'trigger' || data.kind === 'merge' || data.kind === 'standby'
+
+  const nodeClasses = [
+    'orchestration-flow-node',
+    `orchestration-flow-node--${data.tone}`,
+    `is-${data.status}`,
+    isHub ? 'orchestration-flow-node--hub' : '',
+    isMini ? 'orchestration-flow-node--mini' : '',
+    isCompact ? 'orchestration-flow-node--compact' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
-    <div
-      className={[
-        'orchestration-flow-node',
-        isHub ? 'orchestration-flow-node--hub' : '',
-        isWorker ? 'orchestration-flow-node--worker' : '',
-        isMerge ? 'orchestration-flow-node--merge' : '',
-        `orchestration-flow-node--${data.tone}`,
-        `is-${data.status}`,
-      ]
-        .filter(Boolean)
-        .join(' ')}
-    >
+    <div className={nodeClasses} title={data.fullTitle ?? data.title}>
       {data.kind !== 'trigger' ? (
         <Handle className="orchestration-flow-node__handle" position={Position.Left} type="target" id="in-left" />
       ) : null}
@@ -646,31 +722,62 @@ function OrchestrationFlowNode({ data }: NodeProps<Node<FlowNodeData>>) {
             position={Position.Bottom}
             type="target"
             id="in-bottom-left"
-            style={{ left: '35%' }}
+            style={{ left: '40%' }}
           />
           <Handle
             className="orchestration-flow-node__handle"
             position={Position.Bottom}
             type="target"
             id="in-bottom-right"
-            style={{ left: '65%' }}
+            style={{ left: '60%' }}
           />
         </>
       ) : null}
 
-      <div className="orchestration-flow-node__head">
-        <span className="orchestration-flow-node__icon" aria-hidden="true">
-          <Icon name={data.icon} size={isHub ? 14 : 12} />
-        </span>
-        <div className="orchestration-flow-node__copy">
-          <strong>{data.title}</strong>
-          {data.subtitle ? <span>{data.subtitle}</span> : null}
-        </div>
-        <span className="orchestration-flow-node__badge">
-          <i className={`orchestration-flow-node__dot is-${data.status}`} />
-          {data.badge}
-        </span>
-      </div>
+      {data.kind === 'worker' ? (
+        <Handle className="orchestration-flow-node__handle" position={Position.Top} type="target" id="in-top" />
+      ) : null}
+
+      {isCompact ? (
+        <>
+          <div className="orchestration-flow-node__head orchestration-flow-node__head--compact">
+            <span className="orchestration-flow-node__icon" aria-hidden="true">
+              <Icon name={data.icon} size={12} />
+            </span>
+            <strong className="orchestration-flow-node__title">{data.title}</strong>
+          </div>
+          <div className="orchestration-flow-node__meta">
+            <i className={`orchestration-flow-node__dot is-${data.status}`} />
+            <span>{data.badge}</span>
+          </div>
+          {data.subtitle ? <p className="orchestration-flow-node__subtitle">{data.subtitle}</p> : null}
+        </>
+      ) : (
+        <>
+          <div className="orchestration-flow-node__head">
+            <span className="orchestration-flow-node__icon" aria-hidden="true">
+              <Icon name={data.icon} size={isHub ? 14 : 12} />
+            </span>
+            <strong className="orchestration-flow-node__title">{data.title}</strong>
+            <span className="orchestration-flow-node__badge">
+              <i className={`orchestration-flow-node__dot is-${data.status}`} />
+              {data.badge}
+            </span>
+          </div>
+          {data.subtitle ? <p className="orchestration-flow-node__subtitle">{data.subtitle}</p> : null}
+        </>
+      )}
+
+      {data.kind === 'trigger' ? (
+        <Handle className="orchestration-flow-node__handle" position={Position.Right} type="source" id="out-right" />
+      ) : null}
+
+      {data.kind === 'hub' ? (
+        <>
+          <Handle className="orchestration-flow-node__handle" position={Position.Right} type="source" id="out-right" />
+          <Handle className="orchestration-flow-node__handle" position={Position.Bottom} type="source" id="out-bottom" />
+        </>
+      ) : null}
 
       {data.kind === 'memory' ? (
         <Handle className="orchestration-flow-node__handle" position={Position.Bottom} type="source" id="out-bottom" />
@@ -680,8 +787,28 @@ function OrchestrationFlowNode({ data }: NodeProps<Node<FlowNodeData>>) {
         <Handle className="orchestration-flow-node__handle" position={Position.Top} type="source" id="out-top" />
       ) : null}
 
-      {data.kind === 'trigger' || data.kind === 'hub' || data.kind === 'worker' || data.kind === 'merge' ? (
+      {data.kind === 'worker' || data.kind === 'standby' ? (
         <Handle className="orchestration-flow-node__handle" position={Position.Right} type="source" id="out-right" />
+      ) : null}
+
+      {data.kind === 'merge' ? (
+        <>
+          <Handle className="orchestration-flow-node__handle" position={Position.Right} type="source" id="out-right" />
+          <Handle
+            className="orchestration-flow-node__handle"
+            position={Position.Right}
+            type="source"
+            id="out-right-top"
+            style={{ top: '26%' }}
+          />
+          <Handle
+            className="orchestration-flow-node__handle"
+            position={Position.Right}
+            type="source"
+            id="out-right-bottom"
+            style={{ top: '74%' }}
+          />
+        </>
       ) : null}
     </div>
   )
@@ -706,8 +833,8 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
     workspaceError,
     requiresApiKey,
     onNavigate,
-    onSelectAgent,
   } = props
+
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null)
 
   const graph = useMemo(
@@ -751,46 +878,31 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
       return
     }
 
-    const fit = () =>
+    const frame = window.requestAnimationFrame(() => {
       flowInstance.fitView({
-        padding: 0.12,
-        minZoom: 0.68,
-        maxZoom: 1.08,
-        duration: 240,
+        padding: 0.16,
+        minZoom: 0.52,
+        maxZoom: 1.12,
+        duration: 220,
       })
+    })
 
-    const firstFrame = window.requestAnimationFrame(fit)
-    const secondPass = window.setTimeout(fit, 180)
-
-    return () => {
-      window.cancelAnimationFrame(firstFrame)
-      window.clearTimeout(secondPass)
-    }
-  }, [
-    flowInstance,
-    selectedAgents,
-    sessionRuns,
-    taskDraft,
-    recentPrompt,
-    latestExecution?.receivedAt,
-    bridgeError,
-    workspaceError,
-    requiresApiKey,
-  ])
+    return () => window.cancelAnimationFrame(frame)
+  }, [flowInstance, graph.nodes.length, graph.edges.length])
 
   return (
     <div className="orchestration-canvas orchestration-canvas--flow">
       <div className="orchestration-canvas__hud">
-        <span>드래그 이동 · 휠 확대</span>
+        <span>드래그로 이동 · 휠로 확대</span>
       </div>
       <ReactFlow
         nodes={graph.nodes}
         edges={graph.edges}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.12, minZoom: 0.68, maxZoom: 1.08 }}
-        minZoom={0.58}
-        maxZoom={1.28}
+        fitViewOptions={{ padding: 0.16, minZoom: 0.52, maxZoom: 1.12 }}
+        minZoom={0.48}
+        maxZoom={1.48}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
@@ -801,17 +913,12 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
         zoomOnPinch
         zoomOnDoubleClick={false}
         translateExtent={[
-          [-240, -180],
-          [BOARD_WIDTH + 240, BOARD_HEIGHT + 180],
+          [-260, -180],
+          [BOARD_WIDTH + 320, BOARD_HEIGHT + 260],
         ]}
         onInit={setFlowInstance}
         onNodeClick={(_, node) => {
           const flowNode = node as Node<FlowNodeData>
-
-          if (flowNode.data.agentId) {
-            onSelectAgent(flowNode.data.agentId)
-          }
-
           if (flowNode.data.page) {
             onNavigate(flowNode.data.page)
           }

@@ -74,7 +74,6 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     bridgeError,
     latestExecution,
     runAgentTask,
-    setActiveAgent,
     state,
     workspaceAbsolutePath,
     workspaceCurrentPath,
@@ -96,8 +95,9 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   const latestMasterMessage = [...state.chats.threads.find((thread) => thread.id === state.chats.activeThreadId)?.messages ?? []]
     .reverse()
     .find((message) => message.role === 'master')
+  const latestAgentExecution = latestExecution?.source === 'agent' ? latestExecution : null
   const workspaceLabel = summarizeWorkspaceLabel(workspaceCurrentPath, workspaceAbsolutePath)
-  const latestChangedFiles = latestExecution?.workspace.changedFiles ?? []
+  const latestChangedFiles = latestAgentExecution?.workspace.changedFiles ?? []
   const enabledAgentIds = useMemo(() => new Set(enabledAgents.map((agent) => agent.id)), [enabledAgents])
   const effectiveSelectedAgentIds = useMemo(() => {
     const preserved = selectedAgentIds.filter((id) => enabledAgentIds.has(id))
@@ -106,12 +106,16 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       return preserved
     }
 
+    if (enabledAgents.length > 0) {
+      return enabledAgents.map((agent) => agent.id)
+    }
+
     if (activeAgent && enabledAgentIds.has(activeAgent.id)) {
       return [activeAgent.id]
     }
 
-    return enabledAgents[0] ? [enabledAgents[0].id] : []
-  }, [selectedAgentIds, enabledAgentIds, activeAgent, enabledAgents])
+    return []
+  }, [selectedAgentIds, enabledAgentIds, enabledAgents, activeAgent])
 
   const needsOfficialProviders = enabledAgents.some(
     (agent) => effectiveSelectedAgentIds.includes(agent.id) && agent.provider === 'official-router',
@@ -265,7 +269,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   }, [sessionRunning])
 
   const hasWorkspaceConnection = Boolean(workspaceAbsolutePath)
-  const workspaceStatusLabel = hasWorkspaceConnection ? '작업 폴더 연결됨' : workspaceLabel
+  const workspaceStatusLabel = hasWorkspaceConnection ? '폴더 연결' : '폴더 필요'
   const canRunTask =
     Boolean(task.trim()) &&
     runnableSelectedAgents.length > 0 &&
@@ -292,10 +296,10 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     [],
   )
 
-  const executionWorkspaceLabel = latestExecution
+  const executionWorkspaceLabel = latestAgentExecution
     ? summarizeWorkspaceLabel(
-        latestExecution.workspace.cwdRelativePath,
-        latestExecution.workspace.cwdPath,
+        latestAgentExecution.workspace.cwdRelativePath,
+        latestAgentExecution.workspace.cwdPath,
       )
     : workspaceLabel
 
@@ -313,7 +317,6 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
 
       return [...base, agentId]
     })
-    setActiveAgent(agentId)
   }
 
   const runSelectedAgents = async () => {
@@ -323,7 +326,6 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     }
 
     setSessionStartedAt(Date.now())
-    setActiveAgent(runnableSelectedAgents[0].id)
     await Promise.allSettled(runnableSelectedAgents.map((agent) => runAgentTask(agent.id, nextTask)))
     setTask('')
   }
@@ -331,7 +333,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   return (
     <section className="page">
       <PageIntro
-        description="채팅은 단일, 오케스트레이션은 여러 모델을 병렬로 돌려 결과를 모읍니다."
+        description="채팅은 단일, 오케스트레이션은 여러 모델을 병렬로 돌려 결과를 비교합니다."
         icon="agent"
         title="오케스트레이션"
       />
@@ -341,15 +343,15 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
           <div>
             <h2>실행 흐름 개요</h2>
             <p className="settings-card__lead">
-              실행 전에는 핵심 블록만 보이고, 시작하면 병렬 모델과 결과 노드가 단계적으로 드러납니다.
+              실행 전엔 단순 흐름만 보이고, 실행하면 선택한 모델 블록이 병렬로 생성됩니다.
             </p>
           </div>
           <div className="orchestration-summary-bar">
             <span className={`chip ${selectedAgents.length > 0 ? 'is-active' : 'chip--soft'}`}>
-              선택 모델 {selectedAgents.length}개
+              선택 {selectedAgents.length}개
             </span>
             <span className={`chip ${runnableSelectedAgents.length > 0 ? 'is-active' : 'chip--soft'}`}>
-              실행 가능 {runnableSelectedAgents.length}개
+              실행 {runnableSelectedAgents.length}개
             </span>
             <span className={`chip ${hasWorkspaceConnection ? 'is-active' : 'chip--soft'}`}>
               {workspaceStatusLabel}
@@ -370,12 +372,11 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
               taskDraft={task}
               recentPrompt={latestMasterMessage?.text ?? ''}
               messageCount={state.chats.threads.find((thread) => thread.id === state.chats.activeThreadId)?.messages.length ?? 0}
-              latestExecution={latestExecution}
+              latestExecution={latestAgentExecution}
               bridgeError={bridgeError}
               workspaceError={workspaceError}
               requiresApiKey={skippedSelectedAgents.some((agent) => agentAvailability.get(agent.id)?.reason === 'API 키 필요')}
               onNavigate={onNavigate}
-              onSelectAgent={setActiveAgent}
             />
           </div>
 
@@ -396,8 +397,8 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
 
             <div className="orchestration-inline-dock__selection">
               <div className="orchestration-inline-dock__selectionHeader">
-                <strong>병렬로 돌릴 모델</strong>
-                <span>채팅은 단일, 여기서는 여러 모델을 함께 실행합니다.</span>
+                <strong>이번 실행 모델</strong>
+                <span>선택한 모델만 병렬 블록으로 생성됩니다.</span>
               </div>
               <div className="orchestration-inline-dock__agentSwitch">
                 {enabledAgents.map((agent) => {
@@ -620,13 +621,13 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
               {sessionRuns[0] ? <span className="chip chip--soft">{sessionRuns[0].status}</span> : null}
             </div>
 
-            {latestExecution ? (
+            {latestAgentExecution ? (
               <>
                 <div className="summary-row">
                   <span>최근 실제 실행</span>
                   <strong>
-                    {executionProviderLabel(latestExecution.provider)} ·{' '}
-                    {formatFriendlyModelName(latestExecution.model)}
+                    {executionProviderLabel(latestAgentExecution.provider)} ·{' '}
+                    {formatFriendlyModelName(latestAgentExecution.model)}
                   </strong>
                 </div>
                 <div className="summary-row">
@@ -646,7 +647,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                   ) : (
                     <span className="chip chip--soft">변경 파일 없음</span>
                   )}
-                  {latestExecution.workspace.changeDetectionLimited ? (
+                  {latestAgentExecution.workspace.changeDetectionLimited ? (
                     <span className="chip chip--soft">일부 변경만 표시</span>
                   ) : null}
                 </div>

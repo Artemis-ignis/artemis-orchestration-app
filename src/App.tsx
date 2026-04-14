@@ -97,7 +97,7 @@ function summarizeWorkspaceLocation(workspaceCurrentPath?: string, workspaceAbso
   if (!workspaceCurrentPath || workspaceCurrentPath === workspaceAbsolutePath) {
     return {
       label: '루트 작업 폴더',
-      title: resolved,
+      title: '루트 작업 폴더',
     }
   }
 
@@ -106,7 +106,7 @@ function summarizeWorkspaceLocation(workspaceCurrentPath?: string, workspaceAbso
 
   return {
     label: leaf,
-    title: resolved,
+    title: '현재 작업 폴더',
   }
 }
 
