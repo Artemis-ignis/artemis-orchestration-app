@@ -10,6 +10,8 @@ export type WorkspaceEntry = {
   size: number
   updatedAt: string
   editable: boolean
+  deletable: boolean
+  protectionReason: string | null
 }
 
 export type WorkspaceListing = {
@@ -24,6 +26,7 @@ export type WorkspaceListing = {
     fileCount: number
     folderCount: number
     totalBytes: number
+    systemEntryCount: number
   }
 }
 
@@ -37,12 +40,22 @@ export type WorkspaceFile = {
   size: number
   updatedAt: string
   editable: boolean
+  deletable: boolean
+  protectionReason: string | null
   content: string
 }
 
 type WorkspaceDefault = {
   ok: boolean
   rootPath: string
+}
+
+function describeEndpoint(input: string) {
+  try {
+    return new URL(input, window.location.origin).origin
+  } catch {
+    return '로컬 브리지'
+  }
 }
 
 async function fetchWithTimeout(input: string, init?: RequestInit, timeoutMs = 20_000) {
@@ -52,8 +65,14 @@ async function fetchWithTimeout(input: string, init?: RequestInit, timeoutMs = 2
   try {
     return await fetch(input, { ...init, signal: controller.signal })
   } catch (error) {
+    const endpoint = describeEndpoint(input)
+
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('로컬 작업 폴더 응답 시간이 초과되었습니다.')
+      throw new Error(`${endpoint} 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.`)
+    }
+
+    if (error instanceof TypeError) {
+      throw new Error(`${endpoint}에 연결하지 못했습니다. 로컬 브리지 실행 상태를 확인해 주세요.`)
     }
 
     throw error
@@ -98,10 +117,12 @@ export async function fetchWorkspaceListing({
   bridgeUrl,
   rootPath,
   currentPath = '',
+  includeSystem = false,
 }: {
   bridgeUrl: string
   rootPath?: string
   currentPath?: string
+  includeSystem?: boolean
 }) {
   const query = new URLSearchParams()
 
@@ -111,6 +132,10 @@ export async function fetchWorkspaceListing({
 
   if (currentPath) {
     query.set('path', currentPath)
+  }
+
+  if (includeSystem) {
+    query.set('includeSystem', 'true')
   }
 
   const suffix = query.size > 0 ? `?${query.toString()}` : ''
@@ -144,11 +169,13 @@ export async function createWorkspaceFolderRequest({
   rootPath,
   currentPath,
   name,
+  includeSystem = false,
 }: {
   bridgeUrl: string
   rootPath: string
   currentPath: string
   name: string
+  includeSystem?: boolean
 }) {
   const response = await fetchWithTimeout(
     `${bridgeUrl}/api/workspace/folder`,
@@ -161,6 +188,7 @@ export async function createWorkspaceFolderRequest({
         rootPath,
         currentPath,
         name,
+        includeSystem,
       }),
     },
     20_000,
@@ -204,11 +232,13 @@ export async function uploadWorkspaceFilesRequest({
   rootPath,
   currentPath,
   files,
+  includeSystem = false,
 }: {
   bridgeUrl: string
   rootPath: string
   currentPath: string
   files: FileList
+  includeSystem?: boolean
 }) {
   const payload = await Promise.all(
     Array.from(files).map(async (file) => {
@@ -232,6 +262,7 @@ export async function uploadWorkspaceFilesRequest({
         rootPath,
         currentPath,
         files: payload,
+        includeSystem,
       }),
     },
     60_000,
@@ -244,10 +275,12 @@ export async function deleteWorkspaceEntryRequest({
   bridgeUrl,
   rootPath,
   path,
+  includeSystem = false,
 }: {
   bridgeUrl: string
   rootPath: string
   path: string
+  includeSystem?: boolean
 }) {
   const response = await fetchWithTimeout(
     `${bridgeUrl}/api/workspace/delete`,
@@ -259,6 +292,7 @@ export async function deleteWorkspaceEntryRequest({
       body: JSON.stringify({
         rootPath,
         path,
+        includeSystem,
       }),
     },
     20_000,

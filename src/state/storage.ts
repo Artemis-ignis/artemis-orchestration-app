@@ -1,14 +1,45 @@
+import { OLLAMA_LOCAL_MODEL } from '../lib/agentCatalog'
 import { buildInitialAgents, createDefaultState } from './defaultState'
 import type { RuntimeState, ToolItem } from './types'
 
-const STORAGE_KEY = 'artemis-runtime-state/v13'
-const LEGACY_STORAGE_KEYS: string[] = []
+const STORAGE_KEY = 'artemis-runtime-state/v16'
+const LEGACY_STORAGE_KEYS = [
+  'artemis-runtime-state/v15',
+  'artemis-runtime-state/v14',
+  'artemis-runtime-state/v13',
+]
 const MAX_PERSISTED_FILE_CONTENT = 20_000
 const LEGACY_CHAT_NOISE_PATTERNS = [
   '요청을 활동 로그와 인사이트에 기록했습니다.',
   '요청 내용을 작업 메모로 정리했습니다.',
   '필요하면 문서, 파일, 자동화 흐름 중 어느 방향으로 넘길지 더 구체화하겠습니다.',
 ] as const
+const LEGACY_OLLAMA_MODELS = new Set([
+  'gemma4:e2b',
+  'gemma4-e2b',
+  'gemma4 e2b',
+  'gemma4:e4b',
+  'gemma4-e4b',
+  'gemma4 e4b',
+  'gemma4-uncensored:latest',
+  'gemma4-uncensored',
+  'gemma4-uncensored-q4fast:latest',
+  'gemma4-uncensored-q4fast',
+  'gemma4-uncensored-fast:latest',
+  'gemma4-uncensored-fast',
+  'gemma4-e4b-fast:latest',
+  'gemma4-e4b-fast',
+])
+const SUPPORTED_AGENT_PRESETS = new Set(['codex-cli', 'official-router', 'ollama-local'])
+const LEGACY_CLOUD_AGENT_PRESETS = new Set([
+  'openai-direct',
+  'gemini-openai',
+  'claude-anthropic',
+  'openrouter-free',
+  'aihubmix-free',
+  'nvidia-trial',
+  'custom-openai',
+])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -28,6 +59,10 @@ function isLegacyChatNoise(message: RuntimeState['chats']['threads'][number]['me
 
 function isRealSkill(item: ToolItem) {
   return Boolean(item.path) && (item.source === 'local-skill' || item.source === 'plugin-skill')
+}
+
+function isLegacyOllamaModel(value: unknown) {
+  return typeof value === 'string' && LEGACY_OLLAMA_MODELS.has(value.trim().toLowerCase())
 }
 
 function normalizeState(candidate: unknown): RuntimeState {
@@ -115,9 +150,7 @@ function normalizeState(candidate: unknown): RuntimeState {
           ? settings.activeTab
           : fallback.settings.activeTab,
     },
-    apiKeys: Array.isArray(candidate.apiKeys)
-      ? (candidate.apiKeys as RuntimeState['apiKeys'])
-      : fallback.apiKeys,
+    apiKeys: [],
   }
 
   if (!next.chats.threads.some((thread) => thread.id === next.chats.activeThreadId)) {
@@ -135,28 +168,58 @@ function normalizeState(candidate: unknown): RuntimeState {
   const seedAgents = buildInitialAgents()
   const seedAgentMap = new Map(seedAgents.map((seed) => [seed.id, seed]))
 
-  next.agents.items = next.agents.items.map((item) => {
+  next.agents.items = next.agents.items
+    .map((item) => {
+      if (
+        typeof item.preset !== 'string' ||
+        LEGACY_CLOUD_AGENT_PRESETS.has(item.preset) ||
+        !SUPPORTED_AGENT_PRESETS.has(item.preset)
+      ) {
+        return null
+      }
+
     const seed = seedAgentMap.get(item.id)
 
-    if (!seed) {
-      return item
-    }
+      if (!seed) {
+        return item
+      }
 
-    return {
-      ...item,
-      name: item.name || seed.name,
-      role: item.role || seed.role,
-      description: item.description || seed.description,
-      provider: item.provider || seed.provider,
-      preset: item.preset || seed.preset,
-      baseUrl: item.baseUrl || seed.baseUrl,
-      model: item.model || seed.model,
-      capabilities:
-        Array.isArray(item.capabilities) && item.capabilities.length > 0
-          ? item.capabilities
-          : seed.capabilities,
-    }
-  })
+      const merged = {
+        ...item,
+        name: item.name || seed.name,
+        role: item.role || seed.role,
+        description: item.description || seed.description,
+        provider: item.provider || seed.provider,
+        preset: item.preset || seed.preset,
+        baseUrl: item.baseUrl || seed.baseUrl,
+        model: item.model || seed.model,
+        capabilities:
+          Array.isArray(item.capabilities) && item.capabilities.length > 0
+            ? item.capabilities
+            : seed.capabilities,
+      }
+
+      if (
+        item.id === 'agent-ollama' ||
+        isLegacyOllamaModel(item.model) ||
+        isLegacyOllamaModel(item.name)
+      ) {
+        return {
+          ...merged,
+          name: seed.name,
+          role: seed.role,
+          description: seed.description,
+          provider: seed.provider,
+          preset: seed.preset,
+          baseUrl: seed.baseUrl,
+          model: OLLAMA_LOCAL_MODEL,
+          capabilities: seed.capabilities,
+        }
+      }
+
+      return merged
+    })
+    .filter((item): item is RuntimeState['agents']['items'][number] => item !== null)
 
   const missingSeedAgents = seedAgents.filter(
     (seed) => !next.agents.items.some((item) => item.id === seed.id),
@@ -164,6 +227,10 @@ function normalizeState(candidate: unknown): RuntimeState {
 
   if (missingSeedAgents.length > 0) {
     next.agents.items = [...next.agents.items, ...missingSeedAgents]
+  }
+
+  if (isLegacyOllamaModel(next.settings.ollamaModel)) {
+    next.settings.ollamaModel = OLLAMA_LOCAL_MODEL
   }
 
   return next

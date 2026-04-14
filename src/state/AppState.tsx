@@ -3,8 +3,14 @@ import {
   executeModelPrompt,
   fetchBridgeHealth,
   fetchSkillCatalog,
+  type ExecuteWorkspaceContext,
   type BridgeHealth,
 } from '../lib/modelClient'
+import {
+  streamAiChat,
+  type AiRoutingMessageMeta,
+  type AiStreamFinalEvent,
+} from '../lib/aiRoutingClient'
 import {
   createWorkspaceFolderRequest,
   deleteWorkspaceEntryRequest,
@@ -23,7 +29,6 @@ import { getActiveThread, runtimeReducer } from './runtimeReducer'
 import type { AgentRun } from './types'
 
 const WORKSPACE_STORAGE_KEY = 'artemis-workspace/v1'
-
 function createId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`
 }
@@ -44,31 +49,90 @@ function emptyWorkspaceSummary(): WorkspaceListing['summary'] {
     fileCount: 0,
     folderCount: 0,
     totalBytes: 0,
+    systemEntryCount: 0,
   }
+}
+
+function buildRoutingWorkspaceContext({
+  rootPath,
+  absolutePath,
+  currentPath,
+}: {
+  rootPath: string
+  absolutePath: string
+  currentPath: string
+}): ExecuteWorkspaceContext {
+  const effectiveRoot = rootPath || absolutePath || ''
+  const effectiveCwdPath = absolutePath || rootPath || ''
+  return {
+    rootPath: effectiveRoot,
+    cwdPath: effectiveCwdPath,
+    cwdRelativePath: currentPath || '',
+    changedAt: new Date().toISOString(),
+    changedFiles: [],
+    changeDetectionLimited: false,
+  }
+}
+
+function buildRoutingMessages(
+  messages: Array<{ role: string; text: string }>,
+): Array<{ role: 'master' | 'assistant'; text: string }> {
+  return messages.flatMap((message) => {
+    if (message.role === 'master' || message.role === 'assistant') {
+      return [{ role: message.role, text: message.text }]
+    }
+    return []
+  })
+}
+
+function buildOfficialRouterSystemPrompt({
+  agentName,
+  workspacePath,
+}: {
+  agentName: string
+  workspacePath: string
+}) {
+  return [
+    `너의 이름은 ${agentName || '아르테미스'}다. 사용자를 항상 마스터라고 부른다.`,
+    '항상 한국어로 답하고, 요청이 분명하면 바로 짧고 정확하게 답한다.',
+    '짧은 인사나 잡담에는 자연스럽고 부담 없이 답한다.',
+    '불필요한 "결론:", "다음 조치:" 같은 템플릿 문구는 쓰지 않는다.',
+    '요청이 애매할 때만 한 가지 짧은 질문으로 되묻는다.',
+    '실제로 하지 않은 파일 수정, 실행, 검색을 했다고 말하지 않는다.',
+    '현재 세션은 공식 API 무료 후보를 고르는 채팅 경로이므로, 실제 파일 수정이 필요하면 Codex CLI가 필요하다고 짧게 안내한다.',
+    workspacePath ? `참고 작업 경로: ${workspacePath}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 function loadWorkspacePrefs() {
   if (typeof window === 'undefined') {
-    return { rootPath: '', currentPath: '' }
+    return { rootPath: '', currentPath: '', showSystemEntries: false }
   }
 
   try {
     const raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY)
     if (!raw) {
-      return { rootPath: '', currentPath: '' }
+      return { rootPath: '', currentPath: '', showSystemEntries: false }
     }
 
-    const parsed = JSON.parse(raw) as { rootPath?: string; currentPath?: string }
+    const parsed = JSON.parse(raw) as {
+      rootPath?: string
+      currentPath?: string
+      showSystemEntries?: boolean
+    }
     return {
       rootPath: parsed.rootPath ?? '',
       currentPath: parsed.currentPath ?? '',
+      showSystemEntries: parsed.showSystemEntries ?? false,
     }
   } catch {
-    return { rootPath: '', currentPath: '' }
+    return { rootPath: '', currentPath: '', showSystemEntries: false }
   }
 }
 
-function saveWorkspacePrefs(rootPath: string, currentPath: string) {
+function saveWorkspacePrefs(rootPath: string, currentPath: string, showSystemEntries: boolean) {
   if (typeof window === 'undefined') {
     return
   }
@@ -76,10 +140,11 @@ function saveWorkspacePrefs(rootPath: string, currentPath: string) {
   try {
     window.localStorage.setItem(
       WORKSPACE_STORAGE_KEY,
-      JSON.stringify({
-        rootPath,
-        currentPath,
-      }),
+        JSON.stringify({
+          rootPath,
+          currentPath,
+          showSystemEntries,
+        }),
     )
   } catch (error) {
     console.warn('Artemis 작업 폴더 상태 저장에 실패했습니다.', error)
@@ -99,9 +164,14 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
   const [bridgeHealth, setBridgeHealth] = useState<BridgeHealth | null>(null)
   const [bridgeError, setBridgeError] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [latestExecution, setLatestExecution] =
+    useState<ArtemisContextValue['latestExecution']>(null)
   const [workspaceRootPath, setWorkspaceRootPath] = useState(() => loadWorkspacePrefs().rootPath)
   const [workspaceCurrentPath, setWorkspaceCurrentPath] = useState(
     () => loadWorkspacePrefs().currentPath,
+  )
+  const [workspaceShowSystemEntries, setWorkspaceShowSystemEntries] = useState(
+    () => loadWorkspacePrefs().showSystemEntries,
   )
   const [workspaceAbsolutePath, setWorkspaceAbsolutePath] = useState('')
   const [workspaceParentPath, setWorkspaceParentPath] = useState<string | null>(null)
@@ -111,7 +181,6 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
   )
   const [workspaceLoading, setWorkspaceLoading] = useState(false)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
-
   useEffect(() => {
     const timer = window.setTimeout(() => {
       saveRuntimeState(state)
@@ -121,8 +190,8 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
   }, [state])
 
   useEffect(() => {
-    saveWorkspacePrefs(workspaceRootPath, workspaceCurrentPath)
-  }, [workspaceCurrentPath, workspaceRootPath])
+    saveWorkspacePrefs(workspaceRootPath, workspaceCurrentPath, workspaceShowSystemEntries)
+  }, [workspaceCurrentPath, workspaceRootPath, workspaceShowSystemEntries])
 
   const applyWorkspaceListing = (listing: WorkspaceListing) => {
     setWorkspaceRootPath(listing.rootPath)
@@ -133,6 +202,22 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
     setWorkspaceSummary(listing.summary)
     setWorkspaceError(null)
   }
+
+  const requestWorkspaceListing = async ({
+    rootPath,
+    currentPath,
+    includeSystem = workspaceShowSystemEntries,
+  }: {
+    rootPath: string
+    currentPath: string
+    includeSystem?: boolean
+  }) =>
+    fetchWorkspaceListing({
+      bridgeUrl: state.settings.bridgeUrl,
+      rootPath,
+      currentPath,
+      includeSystem,
+    })
 
   const ensureWorkspaceRoot = async (preferredRoot?: string) => {
     const direct = String(preferredRoot ?? workspaceRootPath).trim()
@@ -152,8 +237,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
     try {
       const rootPath = await ensureWorkspaceRoot()
       const requestedPath = nextPath ?? workspaceCurrentPath
-      const listing = await fetchWorkspaceListing({
-        bridgeUrl: state.settings.bridgeUrl,
+      const listing = await requestWorkspaceListing({
         rootPath,
         currentPath: requestedPath,
       })
@@ -171,8 +255,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
     setWorkspaceLoading(true)
 
     try {
-      const listing = await fetchWorkspaceListing({
-        bridgeUrl: state.settings.bridgeUrl,
+      const listing = await requestWorkspaceListing({
         rootPath,
         currentPath: '',
       })
@@ -191,6 +274,27 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
     await refreshWorkspace(path)
   }
 
+  const setWorkspaceSystemEntriesVisible = async (visible: boolean) => {
+    setWorkspaceLoading(true)
+
+    try {
+      const rootPath = await ensureWorkspaceRoot()
+      const listing = await requestWorkspaceListing({
+        rootPath,
+        currentPath: workspaceCurrentPath,
+        includeSystem: visible,
+      })
+      applyWorkspaceListing(listing)
+      setWorkspaceShowSystemEntries(visible)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : '작업 폴더 표시 옵션을 반영하지 못했습니다.'
+      setWorkspaceError(message)
+    } finally {
+      setWorkspaceLoading(false)
+    }
+  }
+
   const createWorkspaceFolder = async (name: string) => {
     const rootPath = await ensureWorkspaceRoot()
     const listing = await createWorkspaceFolderRequest({
@@ -198,6 +302,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       rootPath,
       currentPath: workspaceCurrentPath,
       name,
+      includeSystem: workspaceShowSystemEntries,
     })
     applyWorkspaceListing(listing)
   }
@@ -209,6 +314,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       rootPath,
       currentPath: workspaceCurrentPath,
       files,
+      includeSystem: workspaceShowSystemEntries,
     })
     applyWorkspaceListing(listing)
   }
@@ -240,6 +346,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       bridgeUrl: state.settings.bridgeUrl,
       rootPath,
       path,
+      includeSystem: workspaceShowSystemEntries,
     })
     applyWorkspaceListing(listing)
   }
@@ -319,6 +426,9 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         defaultWorkspaceResult.status === 'fulfilled' ? defaultWorkspaceResult.value.rootPath : ''
       const initialRoot = persistedWorkspace.rootPath || fallbackRoot
       const initialPath = persistedWorkspace.currentPath
+      const initialShowSystemEntries = persistedWorkspace.showSystemEntries
+
+      setWorkspaceShowSystemEntries(initialShowSystemEntries)
 
       if (!initialRoot) {
         setWorkspaceError('작업 폴더를 확인하지 못했습니다.')
@@ -330,6 +440,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           bridgeUrl: state.settings.bridgeUrl,
           rootPath: initialRoot,
           currentPath: initialPath,
+          includeSystem: initialShowSystemEntries,
         })
         if (active) {
           applyWorkspaceListing(listing)
@@ -340,6 +451,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
             bridgeUrl: state.settings.bridgeUrl,
             rootPath: initialRoot,
             currentPath: '',
+            includeSystem: initialShowSystemEntries,
           })
           if (active) {
             applyWorkspaceListing(listing)
@@ -395,10 +507,12 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
     storageUsedBytes,
     bridgeHealth,
     bridgeError,
+    latestExecution,
     workspaceRootPath,
     workspaceCurrentPath,
     workspaceAbsolutePath,
     workspaceParentPath,
+    workspaceShowSystemEntries,
     workspaceEntries,
     workspaceSummary,
     workspaceLoading,
@@ -436,6 +550,88 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       setBridgeError(null)
 
       try {
+        const rootPath = await ensureWorkspaceRoot()
+
+        if (selectedAgent?.provider === 'official-router') {
+          let finalEvent: AiStreamFinalEvent | null = null
+          let streamError: string | null = null
+          let streamedText = ''
+          const officialRouterSystemPrompt = buildOfficialRouterSystemPrompt({
+            agentName: state.settings.agentName,
+            workspacePath: workspaceAbsolutePath || rootPath || '',
+          })
+
+          await streamAiChat(
+            state.settings.bridgeUrl,
+            {
+              sessionId: activeThread.id,
+              prompt: nextPrompt,
+              messages: buildRoutingMessages(activeThread.messages.slice(-12)),
+              systemPrompt: officialRouterSystemPrompt,
+            },
+            {
+              signal: options?.signal,
+              onMeta: options?.onStreamMeta,
+              onAttempt: options?.onStreamAttempt,
+              onAttemptFailed: options?.onStreamAttemptFailed,
+              onToken: (token) => {
+                streamedText += token
+                options?.onStreamToken?.(token)
+              },
+              onFinal: (payload) => {
+                finalEvent = payload
+                options?.onStreamFinal?.(payload)
+              },
+              onError: (message) => {
+                streamError = message
+              },
+            },
+          )
+
+          if (streamError) {
+            throw new Error(streamError)
+          }
+
+          const finalPayload = finalEvent as AiStreamFinalEvent | null
+
+          if (!finalPayload) {
+            throw new Error('스트리밍은 연결됐지만 최종 응답을 마무리하지 못했습니다.')
+          }
+
+          const routingMeta: AiRoutingMessageMeta = {
+            routing_mode: finalPayload.routing_mode,
+            final_provider: finalPayload.provider,
+            final_provider_label: finalPayload.provider_label,
+            final_model: finalPayload.model,
+            final_display_name: finalPayload.display_name,
+            first_token_at: finalPayload.first_token_at ?? null,
+            score_at_selection: finalPayload.score_at_selection,
+            attempts: finalPayload.attempts,
+          }
+
+          dispatch({
+            type: 'RUN_PROMPT',
+            prompt: nextPrompt,
+            assistantText: finalPayload.text || streamedText.trim(),
+            provider: finalPayload.provider,
+            model: finalPayload.model,
+            routingMeta,
+          })
+          setLatestExecution({
+            source: 'chat',
+            request: nextPrompt,
+            provider: finalPayload.provider,
+            model: finalPayload.model,
+            receivedAt: nowIso(),
+            workspace: buildRoutingWorkspaceContext({
+              rootPath,
+              absolutePath: workspaceAbsolutePath,
+              currentPath: workspaceCurrentPath,
+            }),
+          })
+          return
+        }
+
         if (
           selectedAgent?.provider === 'openai-compatible' &&
           !state.apiKeys.find((item) => item.id === selectedAgent.apiKeyId)
@@ -450,7 +646,6 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           throw new Error('Claude 에이전트는 API 키가 필요합니다. 설정에서 먼저 연결해 주세요.')
         }
 
-        const rootPath = await ensureWorkspaceRoot()
         const response = await executeModelPrompt({
           bridgeUrl: state.settings.bridgeUrl,
           prompt: nextPrompt,
@@ -470,6 +665,14 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           provider: response.provider,
           model: response.model,
         })
+        setLatestExecution({
+          source: 'chat',
+          request: nextPrompt,
+          provider: response.provider,
+          model: response.model,
+          receivedAt: nowIso(),
+          workspace: response.workspace,
+        })
 
         await refreshWorkspace(workspaceCurrentPath)
       } catch (error) {
@@ -486,6 +689,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
     createThread: () => dispatch({ type: 'CREATE_THREAD' }),
     connectWorkspace,
     refreshWorkspace,
+    setWorkspaceSystemEntriesVisible,
     createWorkspaceFolder,
     uploadWorkspaceFiles,
     openWorkspaceFolder,
@@ -498,7 +702,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
     updateSettings: (patch) => dispatch({ type: 'UPDATE_SETTINGS', patch }),
     selectChatModel: (provider, model) =>
       dispatch({ type: 'SELECT_CHAT_MODEL', provider, model }),
-    addApiKey: (label, key) => dispatch({ type: 'ADD_API_KEY', label, key }),
+    addApiKey: (label, key, presetId) => dispatch({ type: 'ADD_API_KEY', label, key, presetId }),
     removeApiKey: (keyId) => dispatch({ type: 'REMOVE_API_KEY', keyId }),
     setActiveAgent: (agentId) => dispatch({ type: 'SET_ACTIVE_AGENT', agentId }),
     createAgent: (presetId = 'codex-cli') => dispatch({ type: 'CREATE_AGENT', presetId }),
@@ -555,6 +759,63 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
 
       try {
         const rootPath = await ensureWorkspaceRoot()
+
+        if (agent.provider === 'official-router') {
+          let finalEvent: AiStreamFinalEvent | null = null
+          let streamError: string | null = null
+
+          await streamAiChat(
+            state.settings.bridgeUrl,
+            {
+              sessionId: runId,
+              prompt: nextTask,
+              messages: buildRoutingMessages(activeThread.messages.slice(-6)),
+              systemPrompt: agent.systemPrompt,
+            },
+            {
+              onFinal: (payload) => {
+                finalEvent = payload
+              },
+              onError: (message) => {
+                streamError = message
+              },
+            },
+          )
+
+          if (streamError) {
+            throw new Error(streamError)
+          }
+
+          const finalPayload = finalEvent as AiStreamFinalEvent | null
+
+          if (!finalPayload) {
+            throw new Error('오케스트레이션 라우터가 최종 응답을 만들지 못했습니다.')
+          }
+
+          dispatch({
+            type: 'COMPLETE_AGENT_RUN',
+            runId,
+            agentId,
+            task: nextTask,
+            assistantText: finalPayload.text,
+            provider: finalPayload.provider,
+            model: finalPayload.model,
+          })
+          setLatestExecution({
+            source: 'agent',
+            request: nextTask,
+            provider: finalPayload.provider,
+            model: finalPayload.model,
+            receivedAt: nowIso(),
+            workspace: buildRoutingWorkspaceContext({
+              rootPath,
+              absolutePath: workspaceAbsolutePath,
+              currentPath: workspaceCurrentPath,
+            }),
+          })
+          return
+        }
+
         const response = await executeModelPrompt({
           bridgeUrl: state.settings.bridgeUrl,
           prompt: nextTask,
@@ -576,6 +837,14 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           provider: response.provider,
           model: response.model,
         })
+        setLatestExecution({
+          source: 'agent',
+          request: nextTask,
+          provider: response.provider,
+          model: response.model,
+          receivedAt: nowIso(),
+          workspace: response.workspace,
+        })
 
         await refreshWorkspace(workspaceCurrentPath)
       } catch (error) {
@@ -594,9 +863,11 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       setWorkspaceCurrentPath('')
       setWorkspaceAbsolutePath('')
       setWorkspaceParentPath(null)
+      setWorkspaceShowSystemEntries(false)
       setWorkspaceEntries([])
       setWorkspaceSummary(emptyWorkspaceSummary())
       setWorkspaceError(null)
+      setLatestExecution(null)
       dispatch({ type: 'RESET_ALL' })
       void refreshWorkspace('')
     },

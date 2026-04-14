@@ -1,0 +1,16 @@
+{
+  "name": "Artemis Workspace",
+  "short_name": "Artemis",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#06080f",
+  "theme_color": "#0d111a",
+  "icons": [
+    {
+      "src": "/artemis-tab.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

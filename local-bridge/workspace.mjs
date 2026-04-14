@@ -14,6 +14,7 @@ const MIME_TYPES = new Map([
   ['.jpg', 'image/jpeg'],
   ['.js', 'text/javascript'],
   ['.json', 'application/json'],
+  ['.log', 'text/plain'],
   ['.md', 'text/markdown'],
   ['.mjs', 'text/javascript'],
   ['.pdf', 'application/pdf'],
@@ -32,6 +33,7 @@ const TEXT_EXTENSIONS = new Set([
   '.html',
   '.js',
   '.json',
+  '.log',
   '.md',
   '.mjs',
   '.ts',
@@ -43,6 +45,49 @@ const TEXT_EXTENSIONS = new Set([
   '.csv',
   '.svg',
 ])
+
+const TEXT_FILE_NAMES = new Set([
+  '.editorconfig',
+  '.env',
+  '.env.development',
+  '.env.example',
+  '.env.local',
+  '.env.production',
+  '.env.test',
+  '.gitattributes',
+  '.gitignore',
+  '.npmrc',
+  '.nvmrc',
+])
+
+const FILE_NAME_MIME_TYPES = new Map([
+  ['.editorconfig', 'text/plain'],
+  ['.env', 'text/plain'],
+  ['.env.development', 'text/plain'],
+  ['.env.example', 'text/plain'],
+  ['.env.local', 'text/plain'],
+  ['.env.production', 'text/plain'],
+  ['.env.test', 'text/plain'],
+  ['.gitattributes', 'text/plain'],
+  ['.gitignore', 'text/plain'],
+  ['.npmrc', 'text/plain'],
+  ['.nvmrc', 'text/plain'],
+])
+
+const PROTECTED_DELETE_ROOT_NAMES = new Set(['.git', 'node_modules'])
+const DEFAULT_HIDDEN_WORKSPACE_FOLDER_NAMES = new Set([
+  '.artemis-logs',
+  '.cache',
+  '.git',
+  '.next',
+  '.playwright-cli',
+  '.turbo',
+  'build',
+  'coverage',
+  'dist',
+  'node_modules',
+])
+const DEFAULT_HIDDEN_WORKSPACE_FILE_NAMES = new Set(['.ds_store', 'thumbs.db'])
 
 function toPortablePath(value = '') {
   return value.split(path.sep).join('/')
@@ -107,12 +152,24 @@ export function resolveWorkspaceTarget(rootPath, targetPath = '') {
 }
 
 function getMimeType(fileName) {
+  const normalizedName = path.basename(fileName).toLowerCase()
+  const exactMatch = FILE_NAME_MIME_TYPES.get(normalizedName)
+
+  if (exactMatch) {
+    return exactMatch
+  }
+
   const extension = path.extname(fileName).toLowerCase()
   return MIME_TYPES.get(extension) ?? 'application/octet-stream'
 }
 
 function isTextFile(fileName, mimeType, size, buffer) {
+  const normalizedName = path.basename(fileName).toLowerCase()
   const extension = path.extname(fileName).toLowerCase()
+
+  if (TEXT_FILE_NAMES.has(normalizedName)) {
+    return true
+  }
 
   if (TEXT_EXTENSIONS.has(extension)) {
     return true
@@ -135,11 +192,45 @@ function isTextFile(fileName, mimeType, size, buffer) {
   return true
 }
 
+function getDeleteProtection(relativePath) {
+  if (!relativePath) {
+    return {
+      deletable: false,
+      protectionReason: '작업 루트 자체는 삭제할 수 없습니다.',
+    }
+  }
+
+  const rootName = relativePath.split('/')[0]?.toLowerCase() ?? ''
+
+  if (PROTECTED_DELETE_ROOT_NAMES.has(rootName)) {
+    return {
+      deletable: false,
+      protectionReason: `${rootName} 경로는 프로젝트 안전을 위해 앱 안에서 삭제하지 않습니다.`,
+    }
+  }
+
+  return {
+    deletable: true,
+    protectionReason: null,
+  }
+}
+
+function isWorkspaceSystemEntry(entry) {
+  const normalizedName = entry.name.trim().toLowerCase()
+
+  if (entry.kind === 'folder') {
+    return DEFAULT_HIDDEN_WORKSPACE_FOLDER_NAMES.has(normalizedName)
+  }
+
+  return DEFAULT_HIDDEN_WORKSPACE_FILE_NAMES.has(normalizedName)
+}
+
 function buildEntry(rootPath, absolutePath, targetStat) {
   const relativePath = toPortablePath(path.relative(rootPath, absolutePath))
   const name = path.basename(absolutePath)
   const kind = targetStat.isDirectory() ? 'folder' : 'file'
   const mimeType = kind === 'folder' ? 'inode/directory' : getMimeType(name)
+  const deleteProtection = getDeleteProtection(relativePath)
 
   return {
     name,
@@ -151,6 +242,8 @@ function buildEntry(rootPath, absolutePath, targetStat) {
     size: kind === 'file' ? targetStat.size : 0,
     updatedAt: targetStat.mtime.toISOString(),
     editable: kind === 'file' ? isTextFile(name, mimeType, targetStat.size) : false,
+    deletable: deleteProtection.deletable,
+    protectionReason: deleteProtection.protectionReason,
   }
 }
 
@@ -164,7 +257,7 @@ function sortEntries(entries) {
   })
 }
 
-export async function listWorkspace({ rootPath, currentPath = '' }) {
+export async function listWorkspace({ rootPath, currentPath = '', includeSystem = false }) {
   const normalizedRoot = await resolveWorkspaceRoot(rootPath)
   const target = resolveWorkspaceTarget(normalizedRoot, currentPath)
   const targetStat = await stat(target.absolutePath).catch(() => null)
@@ -182,7 +275,9 @@ export async function listWorkspace({ rootPath, currentPath = '' }) {
     }),
   )
 
-  const sortedEntries = sortEntries(entries)
+  const systemEntryCount = entries.filter((item) => isWorkspaceSystemEntry(item)).length
+  const visibleEntries = includeSystem ? entries : entries.filter((item) => !isWorkspaceSystemEntry(item))
+  const sortedEntries = sortEntries(visibleEntries)
   const fileCount = sortedEntries.filter((item) => item.kind === 'file').length
   const folderCount = sortedEntries.filter((item) => item.kind === 'folder').length
   const totalBytes = sortedEntries.reduce((sum, item) => sum + item.size, 0)
@@ -201,6 +296,7 @@ export async function listWorkspace({ rootPath, currentPath = '' }) {
       fileCount,
       folderCount,
       totalBytes,
+      systemEntryCount,
     },
   }
 }
@@ -217,6 +313,7 @@ export async function readWorkspaceFileContent({ rootPath, filePath }) {
   const buffer = await readFile(target.absolutePath)
   const mimeType = getMimeType(path.basename(target.absolutePath))
   const editable = isTextFile(path.basename(target.absolutePath), mimeType, targetStat.size, buffer)
+  const deleteProtection = getDeleteProtection(target.relativePath)
 
   return {
     rootPath: normalizedRoot,
@@ -227,18 +324,20 @@ export async function readWorkspaceFileContent({ rootPath, filePath }) {
     size: targetStat.size,
     updatedAt: targetStat.mtime.toISOString(),
     editable,
+    deletable: deleteProtection.deletable,
+    protectionReason: deleteProtection.protectionReason,
     content: editable ? buffer.toString('utf8') : '',
   }
 }
 
-export async function createWorkspaceFolder({ rootPath, currentPath = '', name }) {
+export async function createWorkspaceFolder({ rootPath, currentPath = '', name, includeSystem = false }) {
   const normalizedRoot = await resolveWorkspaceRoot(rootPath)
   const parent = resolveWorkspaceTarget(normalizedRoot, currentPath)
   const safeName = ensureValidName(name)
   const nextPath = path.join(parent.absolutePath, safeName)
 
   await mkdir(nextPath)
-  return listWorkspace({ rootPath: normalizedRoot, currentPath: parent.relativePath })
+  return listWorkspace({ rootPath: normalizedRoot, currentPath: parent.relativePath, includeSystem })
 }
 
 export async function writeWorkspaceFileContent({ rootPath, filePath, content }) {
@@ -249,7 +348,12 @@ export async function writeWorkspaceFileContent({ rootPath, filePath, content })
   return readWorkspaceFileContent({ rootPath: normalizedRoot, filePath: target.relativePath })
 }
 
-export async function uploadWorkspaceFiles({ rootPath, currentPath = '', files }) {
+export async function uploadWorkspaceFiles({
+  rootPath,
+  currentPath = '',
+  files,
+  includeSystem = false,
+}) {
   const normalizedRoot = await resolveWorkspaceRoot(rootPath)
   const parent = resolveWorkspaceTarget(normalizedRoot, currentPath)
 
@@ -264,20 +368,21 @@ export async function uploadWorkspaceFiles({ rootPath, currentPath = '', files }
     await writeFile(targetPath, bytes)
   }
 
-  return listWorkspace({ rootPath: normalizedRoot, currentPath: parent.relativePath })
+  return listWorkspace({ rootPath: normalizedRoot, currentPath: parent.relativePath, includeSystem })
 }
 
-export async function deleteWorkspaceEntry({ rootPath, targetPath }) {
+export async function deleteWorkspaceEntry({ rootPath, targetPath, includeSystem = false }) {
   const normalizedRoot = await resolveWorkspaceRoot(rootPath)
   const target = resolveWorkspaceTarget(normalizedRoot, targetPath)
+  const deleteProtection = getDeleteProtection(target.relativePath)
 
-  if (!target.relativePath) {
-    throw new Error('작업 폴더 루트는 삭제할 수 없습니다.')
+  if (!deleteProtection.deletable) {
+    throw new Error(deleteProtection.protectionReason)
   }
 
   await rm(target.absolutePath, { recursive: true, force: false })
   const parentPath = toPortablePath(path.dirname(target.relativePath)).replace(/^\.$/, '')
-  return listWorkspace({ rootPath: normalizedRoot, currentPath: parentPath })
+  return listWorkspace({ rootPath: normalizedRoot, currentPath: parentPath, includeSystem })
 }
 
 export async function revealWorkspacePath({ rootPath, targetPath = '' }) {

@@ -1,10 +1,16 @@
 import { createContext, useContext } from 'react'
-import type { BridgeHealth } from '../lib/modelClient'
+import type {
+  AiStreamAttemptEvent,
+  AiStreamFinalEvent,
+  AiStreamMetaEvent,
+} from '../lib/aiRoutingClient'
+import type { BridgeHealth, ExecuteWorkspaceContext } from '../lib/modelClient'
 import type { WorkspaceEntry, WorkspaceFile, WorkspaceListing } from '../lib/workspaceClient'
 import type {
   AgentItem,
   AgentPresetId,
   AgentRun,
+  ApiKeyTargetPresetId,
   ChatThread,
   InsightItem,
   RuntimeState,
@@ -22,10 +28,19 @@ export type ArtemisContextValue = {
   isGenerating: boolean
   bridgeHealth: BridgeHealth | null
   bridgeError: string | null
+  latestExecution: {
+    source: 'chat' | 'agent'
+    request: string
+    provider: string
+    model: string
+    receivedAt: string
+    workspace: ExecuteWorkspaceContext
+  } | null
   workspaceRootPath: string
   workspaceCurrentPath: string
   workspaceAbsolutePath: string
   workspaceParentPath: string | null
+  workspaceShowSystemEntries: boolean
   workspaceEntries: WorkspaceEntry[]
   workspaceSummary: WorkspaceListing['summary']
   workspaceLoading: boolean
@@ -33,13 +48,24 @@ export type ArtemisContextValue = {
   setComposerText: (text: string) => void
   sendPrompt: (
     prompt?: string,
-    options?: { provider?: 'ollama' | 'codex'; model?: string; agentId?: string },
+    options?: {
+      provider?: 'ollama' | 'codex'
+      model?: string
+      agentId?: string
+      signal?: AbortSignal
+      onStreamMeta?: (meta: AiStreamMetaEvent) => void
+      onStreamAttempt?: (attempt: AiStreamAttemptEvent) => void
+      onStreamAttemptFailed?: (attempt: AiStreamAttemptEvent) => void
+      onStreamToken?: (token: string) => void
+      onStreamFinal?: (payload: AiStreamFinalEvent) => void
+    },
   ) => Promise<void>
   refreshBridgeHealth: () => Promise<void>
   syncSkills: () => Promise<void>
   createThread: () => void
   connectWorkspace: (rootPath: string) => Promise<void>
   refreshWorkspace: (nextPath?: string) => Promise<void>
+  setWorkspaceSystemEntriesVisible: (visible: boolean) => Promise<void>
   createWorkspaceFolder: (name: string) => Promise<void>
   uploadWorkspaceFiles: (files: FileList) => Promise<void>
   openWorkspaceFolder: (path: string) => Promise<void>
@@ -51,7 +77,7 @@ export type ArtemisContextValue = {
   markInsight: (insightId: string, status: InsightItem['status']) => void
   updateSettings: (patch: Partial<RuntimeState['settings']>) => void
   selectChatModel: (provider: 'ollama' | 'codex', model: string) => void
-  addApiKey: (label: string, key: string) => void
+  addApiKey: (label: string, key: string, presetId: ApiKeyTargetPresetId) => void
   removeApiKey: (keyId: string) => void
   setActiveAgent: (agentId: string) => void
   createAgent: (presetId?: AgentPresetId) => void

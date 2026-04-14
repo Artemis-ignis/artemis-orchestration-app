@@ -19,6 +19,7 @@ dist-ssr
 *.local
 .playwright-cli/
 output/
+.tmp-ai-router-test-*/
 artemis-live-test/
 artemis-workspace-test/
 .codex-tmp-verify.js

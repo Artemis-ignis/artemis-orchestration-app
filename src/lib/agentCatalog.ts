@@ -5,6 +5,8 @@ import type {
   AgentProviderKind,
 } from '../state/types'
 
+export const OLLAMA_LOCAL_MODEL = 'gemma4-E4B-uncensored-q4fast:latest'
+
 export type AgentPreset = {
   id: AgentPresetId
   label: string
@@ -32,6 +34,24 @@ export const AGENT_PRESETS: AgentPreset[] = [
     capabilities: ['chat', 'code', 'files'],
   },
   {
+    id: 'official-router',
+    label: '공식 무료 라우터',
+    provider: 'official-router',
+    baseUrl: '',
+    model: 'auto-best-free',
+    description:
+      'OpenRouter, NVIDIA Build, Gemini Developer API의 무료 후보를 자동 선택하고 실패 시 다음 후보로 자동 폴백합니다.',
+    requiresApiKey: false,
+    officialUrl: '',
+    recommendedModels: [
+      'auto-best-free',
+      'auto-best-free-coding',
+      'auto-best-free-fast',
+      'manual',
+    ],
+    capabilities: ['chat', 'code', 'files', 'web', 'automation'],
+  },
+  {
     id: 'openai-direct',
     label: 'OpenAI GPT',
     provider: 'openai-compatible',
@@ -48,11 +68,11 @@ export const AGENT_PRESETS: AgentPreset[] = [
     label: 'Ollama 로컬',
     provider: 'ollama',
     baseUrl: 'http://127.0.0.1:11434',
-    model: 'gemma4:e2b',
+    model: OLLAMA_LOCAL_MODEL,
     description: '내 PC의 Ollama 모델로 빠른 초안, 요약, 로컬 작업을 처리합니다.',
     requiresApiKey: false,
     officialUrl: 'https://ollama.com/library',
-    recommendedModels: ['gemma4:e2b', 'gemma4-uncensored:latest', 'qwen2.5-coder:14b'],
+    recommendedModels: [OLLAMA_LOCAL_MODEL],
     capabilities: ['chat', 'files', 'code'],
   },
   {
@@ -81,7 +101,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
   },
   {
     id: 'openrouter-free',
-    label: 'OpenRouter 무료',
+    label: 'OpenRouter 무료 모델',
     provider: 'openai-compatible',
     baseUrl: 'https://openrouter.ai/api/v1',
     model: 'openrouter/free',
@@ -97,7 +117,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
   },
   {
     id: 'aihubmix-free',
-    label: 'AIHubMix 무료',
+    label: 'AIHubMix 무료 모델',
     provider: 'openai-compatible',
     baseUrl: 'https://aihubmix.com/v1',
     model: 'coding-glm-4.7-free',
@@ -178,6 +198,8 @@ export function getAgentProviderLabel(provider: AgentProviderKind) {
       return 'Codex CLI'
     case 'ollama':
       return 'Ollama'
+    case 'official-router':
+      return '공식 무료 라우터'
     case 'anthropic':
       return 'Anthropic'
     default:

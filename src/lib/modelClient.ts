@@ -25,6 +25,24 @@ export type ExecuteResponse = {
   provider: string
   model: string
   text: string
+  workspace: ExecuteWorkspaceContext
+}
+
+export type ExecuteFileChange = {
+  relativePath: string
+  absolutePath: string
+  changeType: 'created' | 'modified' | 'deleted'
+  size: number
+  updatedAt: string
+}
+
+export type ExecuteWorkspaceContext = {
+  rootPath: string
+  cwdPath: string
+  cwdRelativePath: string
+  changedAt: string
+  changedFiles: ExecuteFileChange[]
+  changeDetectionLimited: boolean
 }
 
 export type SignalFeedItem = {
@@ -57,6 +75,14 @@ export type SkillsResponse = {
   items: BridgeSkillItem[]
 }
 
+function describeEndpoint(input: string) {
+  try {
+    return new URL(input, window.location.origin).origin
+  } catch {
+    return '로컬 브리지'
+  }
+}
+
 async function fetchWithTimeout(input: string, init?: RequestInit, timeoutMs = 15_000) {
   const controller = new AbortController()
   const timer = window.setTimeout(() => controller.abort(), timeoutMs)
@@ -64,8 +90,14 @@ async function fetchWithTimeout(input: string, init?: RequestInit, timeoutMs = 1
   try {
     return await fetch(input, { ...init, signal: controller.signal })
   } catch (error) {
+    const endpoint = describeEndpoint(input)
+
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('응답 대기 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.')
+      throw new Error(`${endpoint} 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.`)
+    }
+
+    if (error instanceof TypeError) {
+      throw new Error(`${endpoint}에 연결하지 못했습니다. 로컬 브리지 실행 상태를 확인해 주세요.`)
     }
 
     throw error

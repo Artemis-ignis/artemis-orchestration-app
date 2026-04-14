@@ -1,6 +1,15 @@
 import type { IconName } from './icons'
 
 export type PageId =
+  | 'home'
+  | 'pricing'
+  | 'contact'
+  | 'privacy'
+  | 'terms'
+  | 'start'
+  | 'account'
+  | 'billing-success'
+  | 'billing-cancel'
   | 'chat'
   | 'files'
   | 'insights'
@@ -11,7 +20,10 @@ export type PageId =
   | 'settings'
   | 'guide'
 
-export type VisiblePageId = Exclude<PageId, 'guide'>
+ export type VisiblePageId = Exclude<
+ PageId,
+  'guide' | 'home' | 'pricing' | 'contact' | 'privacy' | 'terms' | 'start' | 'account' | 'billing-success' | 'billing-cancel'
+>
 
 export type SettingsTab = 'profile' | 'models' | 'preferences'
 

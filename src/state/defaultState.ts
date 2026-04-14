@@ -1,4 +1,4 @@
-import { buildAgentFromPreset } from '../lib/agentCatalog'
+import { OLLAMA_LOCAL_MODEL, buildAgentFromPreset } from '../lib/agentCatalog'
 import type { RuntimeState } from './types'
 
 function createId(prefix: string) {
@@ -17,35 +17,22 @@ export function buildInitialAgents() {
     description: '로컬 Codex CLI로 코드 작성, 수정, 구조 분석을 처리합니다.',
   })
 
-  const openAiAgent = buildAgentFromPreset('openai-direct', {
-    id: 'agent-openai',
-    name: 'GPT-5.4 (OpenAI API)',
-    role: 'OpenAI 에이전트',
-    description: 'OpenAI API로 실제 GPT 모델과 직접 연결합니다.',
-  })
-
-  const geminiAgent = buildAgentFromPreset('gemini-openai', {
-    id: 'agent-gemini',
-    name: 'Gemini 2.5 Flash (Google)',
-    role: 'Gemini 에이전트',
-    description: 'Gemini OpenAI 호환 API로 빠른 분석과 요약을 처리합니다.',
-  })
-
-  const claudeAgent = buildAgentFromPreset('claude-anthropic', {
-    id: 'agent-claude',
-    name: 'Claude Sonnet 4 (Anthropic)',
-    role: 'Claude 에이전트',
-    description: 'Anthropic Messages API로 실제 Claude 모델과 연결합니다.',
+  const officialRouterAgent = buildAgentFromPreset('official-router', {
+    id: 'agent-router',
+    name: '공식 무료 라우터',
+    role: '자동 라우팅 에이전트',
+    description:
+      'OpenRouter, NVIDIA Build, Gemini Developer API의 무료 후보를 점수 순서로 고르고 실패 시 자동으로 다음 후보로 넘깁니다.',
   })
 
   const ollamaAgent = buildAgentFromPreset('ollama-local', {
     id: 'agent-ollama',
-    name: 'gemma4:e2b (Ollama)',
+    name: 'gemma4-E4B-uncensored-q4fast (Ollama)',
     role: '로컬 모델 에이전트',
-    description: 'Ollama 로컬 모델로 빠른 초안, 요약, 정리 작업을 처리합니다.',
+    description: 'gemma4-E4B-uncensored-q4fast 로컬 모델로 빠른 초안, 요약, 정리 작업을 처리합니다.',
   })
 
-  return [codexAgent, openAiAgent, geminiAgent, claudeAgent, ollamaAgent]
+  return [codexAgent, officialRouterAgent, ollamaAgent]
 }
 
 export function createDefaultState(): RuntimeState {
@@ -103,7 +90,7 @@ export function createDefaultState(): RuntimeState {
       timezone: 'Asia/Seoul',
       locationSharing: false,
       modelProvider: 'codex',
-      ollamaModel: 'gemma4:e2b',
+      ollamaModel: OLLAMA_LOCAL_MODEL,
       codexModel: 'gpt-5.4',
       bridgeUrl: 'http://127.0.0.1:4174',
     },

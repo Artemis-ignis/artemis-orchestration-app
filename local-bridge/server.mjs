@@ -1,8 +1,12 @@
 import http from 'node:http'
 import { spawn } from 'node:child_process'
-import { access, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
+import { access, appendFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { OAuth2Client } from 'google-auth-library'
 import {
   createWorkspaceFolder,
   deleteWorkspaceEntry,
@@ -15,6 +19,37 @@ import {
   uploadWorkspaceFiles,
   writeWorkspaceFileContent,
 } from './workspace.mjs'
+import { createAiRouter } from './ai/router.mjs'
+
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+function loadEnvFile(targetPath) {
+  if (!existsSync(targetPath)) {
+    return
+  }
+
+  const raw = readFileSync(targetPath, 'utf8')
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue
+    }
+
+    const separatorIndex = trimmed.indexOf('=')
+    if (separatorIndex <= 0) {
+      continue
+    }
+
+    const key = trimmed.slice(0, separatorIndex).trim()
+    const value = trimmed.slice(separatorIndex + 1).trim().replace(/^(['"])(.*)\1$/, '$2')
+    if (key && !(key in process.env)) {
+      process.env[key] = value
+    }
+  }
+}
+
+loadEnvFile(path.join(PROJECT_ROOT, '.env'))
+loadEnvFile(path.join(PROJECT_ROOT, '.env.local'))
 
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.ARTEMIS_BRIDGE_PORT ?? 4174)
@@ -24,6 +59,33 @@ const CODEX_HOME = process.env.CODEX_HOME ?? path.join(USER_HOME, '.codex')
 const DEFAULT_CODEX_PATH =
   process.env.ARTEMIS_CODEX_PATH ??
   path.join(USER_HOME, '.codex', '.sandbox-bin', 'codex.exe')
+const GOOGLE_CLIENT_ID =
+  process.env.GOOGLE_CLIENT_ID?.trim() ||
+  process.env.VITE_GOOGLE_CLIENT_ID?.trim() ||
+  ''
+const PUBLIC_SESSION_SECRET =
+  process.env.ARTEMIS_PUBLIC_SESSION_SECRET?.trim() || randomBytes(32).toString('hex')
+const PUBLIC_SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 14
+const PUBLIC_SESSION_COOKIE_NAME = 'artemis_public_session'
+const googleOAuthClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null
+const APP_ENCRYPTION_KEY =
+  process.env.APP_ENCRYPTION_KEY?.trim() ||
+  process.env.ARTEMIS_PUBLIC_SESSION_SECRET?.trim() ||
+  ''
+const DEFAULT_ROUTING_MODE = process.env.DEFAULT_ROUTING_MODE?.trim() || 'auto-best-free'
+const FIRST_TOKEN_TIMEOUT_MS = Number(process.env.FIRST_TOKEN_TIMEOUT_MS ?? 20_000)
+const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS ?? 120_000)
+const OPENROUTER_APP_TITLE = process.env.OPENROUTER_APP_TITLE?.trim() || 'Artemis Orchestration'
+const OPENROUTER_HTTP_REFERER =
+  process.env.OPENROUTER_HTTP_REFERER?.trim() ||
+  process.env.VITE_APP_URL?.trim() ||
+  'http://127.0.0.1:4173'
+
+if (!process.env.ARTEMIS_PUBLIC_SESSION_SECRET?.trim()) {
+  console.warn(
+    '[public-auth] ARTEMIS_PUBLIC_SESSION_SECRET is not set. Public sessions will reset whenever the bridge restarts.',
+  )
+}
 
 const CATEGORY_TO_CODE = {
   전체: 'all',
@@ -82,15 +144,134 @@ const SIGNAL_RESULT_LIMIT = 6
 const SIGNAL_CACHE_TTL_MS = 45_000
 const EXECUTION_TIMEOUT_MS = 240_000
 const SIGNAL_CODEX_TRANSLATION_MODEL = 'gpt-5.4-mini'
+const OLLAMA_LOCAL_MODEL = 'gemma4-E4B-uncensored-q4fast:latest'
+const PUBLIC_INQUIRY_DIRECTORY = path.join(process.cwd(), 'output', 'public-inquiries')
+const PUBLIC_ACCOUNT_DIRECTORY = path.join(process.cwd(), 'output', 'public-accounts')
+const PUBLIC_ACCOUNT_FILE = path.join(PUBLIC_ACCOUNT_DIRECTORY, 'accounts.json')
+const PUBLIC_ALLOWED_ORIGINS = new Set(
+  [
+    process.env.VITE_APP_URL?.trim(),
+    'http://127.0.0.1:4173',
+    'http://localhost:4173',
+  ].filter(Boolean),
+)
+const WORKSPACE_SNAPSHOT_MAX_DIRECTORIES = 160
+const WORKSPACE_SNAPSHOT_MAX_FILES = 1_200
+const WORKSPACE_CHANGE_RESULT_LIMIT = 64
+const WORKSPACE_SNAPSHOT_SKIPPED_FOLDERS = new Set([
+  '.cache',
+  '.git',
+  '.next',
+  '.playwright-cli',
+  '.turbo',
+  'build',
+  'coverage',
+  'dist',
+  'node_modules',
+])
 
-function sendJson(response, statusCode, payload) {
+function createCorsHeaders(request) {
+  const origin = request.headers.origin
+  const allowOrigin = origin && PUBLIC_ALLOWED_ORIGINS.has(origin) ? origin : '*'
+  const headers = {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    Vary: 'Origin',
+  }
+
+  if (allowOrigin !== '*') {
+    headers['Access-Control-Allow-Credentials'] = 'true'
+  }
+
+  return headers
+}
+
+function sendJson(request, response, statusCode, payload, extraHeaders = {}) {
   response.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    ...createCorsHeaders(request),
+    ...extraHeaders,
   })
   response.end(JSON.stringify(payload))
+}
+
+function parseCookies(request) {
+  const header = request.headers.cookie ?? ''
+  return header.split(';').reduce((cookies, part) => {
+    const [rawKey, ...rawValue] = part.trim().split('=')
+    if (!rawKey) {
+      return cookies
+    }
+
+    cookies[rawKey] = decodeURIComponent(rawValue.join('='))
+    return cookies
+  }, {})
+}
+
+function createPublicSessionCookie(token = '', { clear = false } = {}) {
+  const parts = [
+    `${PUBLIC_SESSION_COOKIE_NAME}=${clear ? '' : token}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+  ]
+
+  if (clear) {
+    parts.push('Max-Age=0')
+  } else {
+    parts.push(`Max-Age=${Math.floor(PUBLIC_SESSION_TTL_MS / 1000)}`)
+  }
+
+  return parts.join('; ')
+}
+
+function encodeBase64Url(value) {
+  return Buffer.from(value, 'utf8').toString('base64url')
+}
+
+function createPublicSessionToken(payload) {
+  const body = encodeBase64Url(JSON.stringify(payload))
+  const signature = createHmac('sha256', PUBLIC_SESSION_SECRET).update(body).digest('base64url')
+  return `${body}.${signature}`
+}
+
+function verifyPublicSessionToken(token = '') {
+  const [body, signature] = String(token).split('.')
+
+  if (!body || !signature) {
+    throw new Error('로그인 세션이 필요합니다.')
+  }
+
+  const expected = createHmac('sha256', PUBLIC_SESSION_SECRET).update(body).digest('base64url')
+  const signatureBuffer = Buffer.from(signature)
+  const expectedBuffer = Buffer.from(expected)
+  if (
+    signatureBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(signatureBuffer, expectedBuffer)
+  ) {
+    throw new Error('로그인 세션이 유효하지 않습니다.')
+  }
+
+  const parsed = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'))
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('로그인 세션을 해석하지 못했습니다.')
+  }
+
+  if (typeof parsed.exp !== 'number' || parsed.exp <= Date.now()) {
+    throw new Error('로그인 세션이 만료되었습니다.')
+  }
+
+  return parsed
+}
+
+function readPublicSessionFromRequest(request) {
+  const cookies = parseCookies(request)
+  if (cookies[PUBLIC_SESSION_COOKIE_NAME]) {
+    return verifyPublicSessionToken(cookies[PUBLIC_SESSION_COOKIE_NAME])
+  }
+
+  throw new Error('로그인이 필요합니다.')
 }
 
 function getErrorStatus(error) {
@@ -103,6 +284,8 @@ function getErrorStatus(error) {
   if (
     message.includes('api key') ||
     message.includes('base url') ||
+    message.includes('google') ||
+    message.includes('로그인') ||
     message.includes('ollama') ||
     message.includes('작업 폴더') ||
     message.includes('경로') ||
@@ -220,6 +403,472 @@ function stripHtml(value = '') {
     .trim()
 }
 
+function toPortablePath(value = '') {
+  return value.split(path.sep).join('/')
+}
+
+function parseBooleanFlag(value) {
+  return value === true || value === 'true' || value === '1'
+}
+
+function normalizeInquiryText(value = '') {
+  return String(value).trim().replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n')
+}
+
+function isValidEmail(value = '') {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).trim())
+}
+
+function normalizePublicPlan(value = '') {
+  const normalized = String(value).trim().toLowerCase()
+  return normalized === 'plus' || normalized === 'pro' ? normalized : 'free'
+}
+
+function createPublicAccountId() {
+  return `acct-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+async function readPublicAccountsStore() {
+  await mkdir(PUBLIC_ACCOUNT_DIRECTORY, { recursive: true })
+
+  try {
+    const raw = await readFile(PUBLIC_ACCOUNT_FILE, 'utf8')
+    const parsed = JSON.parse(raw)
+
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed
+    }
+  } catch {
+    // 저장소가 아직 없으면 비어 있는 객체로 시작한다.
+  }
+
+  return {}
+}
+
+async function writePublicAccountsStore(store) {
+  await mkdir(PUBLIC_ACCOUNT_DIRECTORY, { recursive: true })
+  await writeFile(PUBLIC_ACCOUNT_FILE, JSON.stringify(store, null, 2), 'utf8')
+}
+
+function toPublicAccountSnapshot(account) {
+  return {
+    accountId: account.id,
+    name: account.name,
+    email: account.email,
+    teamSize: account.teamSize,
+    role: account.role,
+    useCase: account.useCase,
+    selectedPlan: account.selectedPlan,
+    activePlan: account.activePlan,
+    accountStatus: account.accountStatus,
+    billingState: account.billingState,
+    authProvider: account.authProvider || 'none',
+    googleSub: account.googleSub || '',
+    avatarUrl: account.avatarUrl || '',
+    emailVerified: account.emailVerified === true,
+    inquiryCount: Number(account.inquiryCount ?? 0),
+    lastInquiryId: account.lastInquiryId ?? '',
+    updatedAt: account.updatedAt,
+  }
+}
+
+function sendSseEvent(response, eventName, payload) {
+  response.write(`event: ${eventName}\n`)
+  response.write(`data: ${JSON.stringify(payload)}\n\n`)
+}
+
+const aiRouter = createAiRouter({
+  projectRoot: PROJECT_ROOT,
+  fetchWithTimeout,
+  requestTimeoutMs: REQUEST_TIMEOUT_MS,
+  firstTokenTimeoutMs: FIRST_TOKEN_TIMEOUT_MS,
+  appEncryptionKey: APP_ENCRYPTION_KEY,
+  publicSessionSecret: PUBLIC_SESSION_SECRET,
+  openRouterTitle: OPENROUTER_APP_TITLE,
+  openRouterReferer: OPENROUTER_HTTP_REFERER,
+})
+
+async function savePublicAccount(payload = {}, options = {}) {
+  const session = options.session ?? null
+  const email = normalizeInquiryText(session?.email || payload.email).toLowerCase()
+  const name = normalizeInquiryText(payload.name)
+  const teamSize = normalizeInquiryText(payload.teamSize)
+  const role = normalizeInquiryText(payload.role)
+  const useCase = normalizeInquiryText(payload.useCase)
+  const selectedPlan = normalizePublicPlan(payload.planIntent ?? payload.plan)
+  const googleSub = normalizeInquiryText(session?.googleSub || payload.googleSub)
+  const avatarUrl = normalizeInquiryText(payload.avatarUrl)
+  const authProvider =
+    (googleSub ? 'google' : normalizeInquiryText(payload.authProvider)) || 'none'
+  const emailVerified = googleSub ? true : payload.emailVerified === true
+  const activatePlan = options.activate === true
+  const inquiryId = normalizeInquiryText(options.inquiryId)
+
+  if (!isValidEmail(email)) {
+    throw new Error('올바른 이메일 주소가 필요합니다.')
+  }
+
+  const store = await readPublicAccountsStore()
+  const current = store[email] ?? {
+    id: createPublicAccountId(),
+    createdAt: new Date().toISOString(),
+    inquiryCount: 0,
+  }
+
+  const nextSelectedPlan = selectedPlan || current.selectedPlan || 'free'
+  const nextActivePlan = activatePlan
+    ? nextSelectedPlan
+    : current.activePlan || 'free'
+  const selectedPaidPlan = nextSelectedPlan !== 'free'
+  const currentHasActivePaidPlan =
+    current.activePlan === nextSelectedPlan && current.billingState === 'active'
+
+  let nextAccountStatus = current.accountStatus || 'guest'
+  let nextBillingState = current.billingState || 'none'
+
+  if (activatePlan) {
+    nextAccountStatus = nextSelectedPlan === 'free' ? 'trial' : 'active'
+    nextBillingState = nextSelectedPlan === 'free' ? 'trial' : 'active'
+  } else if (selectedPaidPlan && !currentHasActivePaidPlan) {
+    nextAccountStatus = 'lead'
+    nextBillingState = 'pending'
+  } else if (!current.accountStatus || nextSelectedPlan === 'free') {
+    nextAccountStatus = 'trial'
+    nextBillingState = current.billingState === 'active' ? current.billingState : 'trial'
+  }
+
+  const entry = {
+    ...current,
+    name: name || current.name || '',
+    email,
+    teamSize: teamSize || current.teamSize || '',
+    role: role || current.role || '',
+    useCase: useCase || current.useCase || '',
+    selectedPlan: nextSelectedPlan,
+    activePlan: nextActivePlan,
+    accountStatus: nextAccountStatus,
+    billingState: nextBillingState,
+    authProvider: authProvider || current.authProvider || 'none',
+    googleSub: googleSub || current.googleSub || '',
+    avatarUrl: avatarUrl || current.avatarUrl || '',
+    emailVerified: emailVerified || current.emailVerified === true,
+    inquiryCount: inquiryId ? Number(current.inquiryCount ?? 0) + 1 : Number(current.inquiryCount ?? 0),
+    lastInquiryId: inquiryId || current.lastInquiryId || '',
+    updatedAt: new Date().toISOString(),
+  }
+
+  store[email] = entry
+  await writePublicAccountsStore(store)
+  return toPublicAccountSnapshot(entry)
+}
+
+async function getPublicAccountByEmail(email = '') {
+  const normalizedEmail = normalizeInquiryText(email).toLowerCase()
+
+  if (!isValidEmail(normalizedEmail)) {
+    throw new Error('올바른 이메일 주소가 필요합니다.')
+  }
+
+  const store = await readPublicAccountsStore()
+  const account = store[normalizedEmail]
+
+  if (!account) {
+    throw new Error('등록된 계정 정보를 찾지 못했습니다.')
+  }
+
+  return toPublicAccountSnapshot(account)
+}
+
+async function getPublicAccountByGoogleSubject(googleSub = '') {
+  const normalizedGoogleSub = normalizeInquiryText(googleSub)
+
+  if (!normalizedGoogleSub) {
+    throw new Error('Google 계정 식별자가 필요합니다.')
+  }
+
+  const store = await readPublicAccountsStore()
+  const account = Object.values(store).find((entry) => entry.googleSub === normalizedGoogleSub)
+
+  if (!account) {
+    throw new Error('등록된 Google 계정 정보를 찾지 못했습니다.')
+  }
+
+  return toPublicAccountSnapshot(account)
+}
+
+async function signInPublicAccountWithGoogle(payload = {}) {
+  if (!googleOAuthClient || !GOOGLE_CLIENT_ID) {
+    throw new Error('Google 로그인을 아직 설정하지 않았습니다.')
+  }
+
+  const credential = normalizeInquiryText(payload.credential)
+  if (!credential) {
+    throw new Error('Google 로그인 토큰이 필요합니다.')
+  }
+
+  const ticket = await googleOAuthClient.verifyIdToken({
+    idToken: credential,
+    audience: GOOGLE_CLIENT_ID,
+  })
+  const googlePayload = ticket.getPayload()
+
+  if (!googlePayload?.sub || !googlePayload.email) {
+    throw new Error('Google 계정 정보를 확인하지 못했습니다.')
+  }
+
+  if (googlePayload.email_verified !== true) {
+    throw new Error('이메일 검증이 완료된 Google 계정이 필요합니다.')
+  }
+
+  const account = await savePublicAccount(
+    {
+      name: googlePayload.name ?? '',
+      email: googlePayload.email,
+      teamSize: payload.teamSize,
+      role: payload.role,
+      useCase: payload.useCase,
+      planIntent: payload.planIntent,
+      googleSub: googlePayload.sub,
+      avatarUrl: googlePayload.picture ?? '',
+      authProvider: 'google',
+      emailVerified: true,
+    },
+    {
+      activate: normalizePublicPlan(payload.planIntent) === 'free',
+    },
+  )
+
+  const authenticatedAt = new Date().toISOString()
+  const sessionToken = createPublicSessionToken({
+    email: account.email,
+    googleSub: googlePayload.sub,
+    authenticatedAt,
+    exp: Date.now() + PUBLIC_SESSION_TTL_MS,
+  })
+
+  return {
+    account,
+    sessionToken,
+    authenticatedAt,
+  }
+}
+
+async function getAuthenticatedPublicAccount(request) {
+  const session = readPublicSessionFromRequest(request)
+
+  if (session.googleSub) {
+    return getPublicAccountByGoogleSubject(session.googleSub)
+  }
+
+  return getPublicAccountByEmail(session.email ?? '')
+}
+
+async function savePublicInquiry(payload = {}) {
+  const session = payload.session ?? null
+  const name = normalizeInquiryText(payload.name)
+  const email = normalizeInquiryText(session?.email || payload.email)
+  const teamSize = normalizeInquiryText(payload.teamSize)
+  const plan = normalizeInquiryText(payload.plan) || 'Free'
+  const useCase = normalizeInquiryText(payload.useCase)
+
+  if (!name) {
+    throw new Error('문의자 이름이 필요합니다.')
+  }
+
+  if (!isValidEmail(email)) {
+    throw new Error('올바른 이메일 주소가 필요합니다.')
+  }
+
+  if (!useCase) {
+    throw new Error('주요 용도를 입력해 주세요.')
+  }
+
+  await mkdir(PUBLIC_INQUIRY_DIRECTORY, { recursive: true })
+
+  const id = `inq-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+  const targetPath = path.join(PUBLIC_INQUIRY_DIRECTORY, 'submissions.jsonl')
+  const entry = {
+    id,
+    receivedAt: new Date().toISOString(),
+    name,
+    email,
+    teamSize,
+    plan,
+    useCase,
+  }
+
+  await appendFile(targetPath, `${JSON.stringify(entry)}\n`, 'utf8')
+  const account = await savePublicAccount(
+    {
+      name,
+      email,
+      teamSize,
+      useCase,
+      planIntent: normalizePublicPlan(plan),
+      googleSub: session?.googleSub,
+    },
+    {
+      inquiryId: id,
+      session,
+    },
+  )
+
+  return { id, account }
+}
+
+function createWorkspaceContext({
+  rootPath,
+  cwdPath,
+  cwdRelativePath,
+  changedFiles = [],
+  changeDetectionLimited = false,
+}) {
+  return {
+    rootPath,
+    cwdPath,
+    cwdRelativePath,
+    changedAt: new Date().toISOString(),
+    changedFiles,
+    changeDetectionLimited,
+  }
+}
+
+async function captureWorkspaceSnapshot(rootPath, cwdPath) {
+  const entries = new Map()
+  const cwdStat = await stat(cwdPath).catch(() => null)
+
+  if (!cwdStat?.isDirectory()) {
+    return { entries, limited: false }
+  }
+
+  let directoryCount = 0
+  let fileCount = 0
+  let limited = false
+
+  const walk = async (targetPath) => {
+    if (limited) {
+      return
+    }
+
+    directoryCount += 1
+    if (directoryCount > WORKSPACE_SNAPSHOT_MAX_DIRECTORIES) {
+      limited = true
+      return
+    }
+
+    const dirents = await readdir(targetPath, { withFileTypes: true }).catch(() => [])
+
+    for (const entry of dirents) {
+      if (limited) {
+        break
+      }
+
+      if (entry.isDirectory()) {
+        if (WORKSPACE_SNAPSHOT_SKIPPED_FOLDERS.has(entry.name.toLowerCase())) {
+          continue
+        }
+
+        await walk(path.join(targetPath, entry.name))
+        continue
+      }
+
+      if (!entry.isFile()) {
+        continue
+      }
+
+      fileCount += 1
+      if (fileCount > WORKSPACE_SNAPSHOT_MAX_FILES) {
+        limited = true
+        break
+      }
+
+      const absolutePath = path.join(targetPath, entry.name)
+      const fileStat = await stat(absolutePath).catch(() => null)
+
+      if (!fileStat?.isFile()) {
+        continue
+      }
+
+      const relativePath = toPortablePath(path.relative(rootPath, absolutePath))
+
+      entries.set(relativePath, {
+        relativePath,
+        absolutePath,
+        size: fileStat.size,
+        updatedAt: fileStat.mtime.toISOString(),
+        mtimeMs: fileStat.mtimeMs,
+      })
+    }
+  }
+
+  await walk(cwdPath)
+  return { entries, limited }
+}
+
+function diffWorkspaceSnapshots(beforeSnapshot, afterSnapshot) {
+  const changedFiles = []
+
+  for (const [relativePath, afterEntry] of afterSnapshot.entries) {
+    const beforeEntry = beforeSnapshot.entries.get(relativePath)
+
+    if (!beforeEntry) {
+      changedFiles.push({
+        relativePath,
+        absolutePath: afterEntry.absolutePath,
+        changeType: 'created',
+        size: afterEntry.size,
+        updatedAt: afterEntry.updatedAt,
+      })
+      continue
+    }
+
+    if (beforeEntry.size !== afterEntry.size || beforeEntry.mtimeMs !== afterEntry.mtimeMs) {
+      changedFiles.push({
+        relativePath,
+        absolutePath: afterEntry.absolutePath,
+        changeType: 'modified',
+        size: afterEntry.size,
+        updatedAt: afterEntry.updatedAt,
+      })
+    }
+  }
+
+  for (const [relativePath, beforeEntry] of beforeSnapshot.entries) {
+    if (afterSnapshot.entries.has(relativePath)) {
+      continue
+    }
+
+    changedFiles.push({
+      relativePath,
+      absolutePath: beforeEntry.absolutePath,
+      changeType: 'deleted',
+      size: beforeEntry.size,
+      updatedAt: beforeEntry.updatedAt,
+    })
+  }
+
+  changedFiles.sort((left, right) => {
+    const timeGap = new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+
+    if (timeGap !== 0) {
+      return timeGap
+    }
+
+    return left.relativePath.localeCompare(right.relativePath, 'ko-KR', {
+      numeric: true,
+      sensitivity: 'base',
+    })
+  })
+
+  const limitedByResultSize = changedFiles.length > WORKSPACE_CHANGE_RESULT_LIMIT
+
+  return {
+    changedFiles: changedFiles.slice(0, WORKSPACE_CHANGE_RESULT_LIMIT),
+    changeDetectionLimited:
+      beforeSnapshot.limited || afterSnapshot.limited || limitedByResultSize,
+  }
+}
+
 function executionProviderLabel(provider) {
   switch (provider) {
     case 'codex':
@@ -235,8 +884,32 @@ function executionProviderLabel(provider) {
   }
 }
 
-function escapePowerShellLiteral(value = '') {
-  return String(value).replace(/'/g, "''")
+function decodeBufferText(buffer) {
+  if (!buffer || buffer.length === 0) {
+    return ''
+  }
+
+  if (buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
+    return buffer.subarray(3).toString('utf8')
+  }
+
+  if (buffer[0] === 0xff && buffer[1] === 0xfe) {
+    return new TextDecoder('utf-16le').decode(buffer.subarray(2))
+  }
+
+  if (buffer[0] === 0xfe && buffer[1] === 0xff) {
+    return new TextDecoder('utf-16be').decode(buffer.subarray(2))
+  }
+
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer)
+  } catch {
+    try {
+      return new TextDecoder('euc-kr', { fatal: true }).decode(buffer)
+    } catch {
+      return buffer.toString('utf8')
+    }
+  }
 }
 
 function extractXmlValue(block, tag) {
@@ -444,6 +1117,14 @@ async function getOllamaTags() {
   return Array.isArray(data.models) ? data.models.map((item) => item.name) : []
 }
 
+function selectPreferredOllamaModel(models = []) {
+  if (!Array.isArray(models)) {
+    return null
+  }
+
+  return models.find((item) => item === OLLAMA_LOCAL_MODEL) ?? null
+}
+
 function spawnProcess(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const { timeoutMs = 0, input = null, ...spawnOptions } = options
@@ -453,17 +1134,17 @@ function spawnProcess(command, args, options = {}) {
       ...spawnOptions,
     })
 
-    let stdout = ''
-    let stderr = ''
+    const stdoutChunks = []
+    const stderrChunks = []
     let timedOut = false
     let timer = null
 
     child.stdout.on('data', (chunk) => {
-      stdout += chunk.toString('utf8')
+      stdoutChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
     })
 
     child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString('utf8')
+      stderrChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
     })
 
     if (typeof input === 'string') {
@@ -478,13 +1159,18 @@ function spawnProcess(command, args, options = {}) {
         clearTimeout(timer)
       }
 
-      resolve({ code, stdout, stderr, timedOut })
+      resolve({
+        code,
+        stdout: decodeBufferText(Buffer.concat(stdoutChunks)),
+        stderr: decodeBufferText(Buffer.concat(stderrChunks)),
+        timedOut,
+      })
     })
 
     if (timeoutMs > 0) {
       timer = setTimeout(() => {
         timedOut = true
-        stderr += '\n프로세스 응답 시간이 초과되었습니다.'
+        stderrChunks.push(Buffer.from('\n프로세스 응답 시간이 초과되었습니다.', 'utf8'))
         child.kill()
 
         setTimeout(() => {
@@ -668,7 +1354,6 @@ function buildCodexPrompt({ prompt, messages, settings, agent, enabledTools, wor
 async function runCodex({ prompt, messages, settings, agent, cwd, workspaceRoot, enabledTools }) {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), 'artemis-codex-'))
   const outputPath = path.join(tempDir, 'last-message.txt')
-  const promptPath = path.join(tempDir, 'prompt.txt')
   const model = agent?.model || settings?.codexModel || 'gpt-5.4'
   const fullPrompt = buildCodexPrompt({
     prompt,
@@ -679,21 +1364,27 @@ async function runCodex({ prompt, messages, settings, agent, cwd, workspaceRoot,
     workspaceRoot,
     workspaceCwd: cwd,
   })
-  const script = [
-    `$prompt = Get-Content -LiteralPath '${escapePowerShellLiteral(promptPath)}' -Raw -Encoding UTF8`,
-    `$prompt | & '${escapePowerShellLiteral(DEFAULT_CODEX_PATH)}' exec --skip-git-repo-check --full-auto -s workspace-write -C '${escapePowerShellLiteral(
-      cwd,
-    )}' -o '${escapePowerShellLiteral(outputPath)}' --model '${escapePowerShellLiteral(model)}' -`,
-    'exit $LASTEXITCODE',
-  ].join('; ')
 
   try {
-    await writeFile(promptPath, fullPrompt, 'utf8')
-    const result = await spawnProcess('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
+    const result = await spawnProcess(DEFAULT_CODEX_PATH, [
+      'exec',
+      '--skip-git-repo-check',
+      '--full-auto',
+      '-s',
+      'workspace-write',
+      '-C',
+      cwd,
+      '-o',
+      outputPath,
+      '--model',
+      model,
+      '-',
+    ], {
       cwd,
       timeoutMs: EXECUTION_TIMEOUT_MS,
+      input: fullPrompt,
     })
-    const rawText = await readFile(outputPath, 'utf8').catch(() => '')
+    const rawText = decodeBufferText(await readFile(outputPath).catch(() => Buffer.alloc(0)))
 
     if (result.timedOut) {
       throw new Error('Codex 응답 시간이 초과되었습니다. 모델 상태나 로그인 상태를 확인해 주세요.')
@@ -887,6 +1578,7 @@ async function getHealth() {
 
   const ollamaModels =
     ollamaModelsResult.status === 'fulfilled' ? ollamaModelsResult.value : []
+  const ollamaModel = selectPreferredOllamaModel(ollamaModels)
   const codex =
     codexStatusResult.status === 'fulfilled'
       ? codexStatusResult.value
@@ -898,13 +1590,10 @@ async function getHealth() {
     providers: [
       {
         provider: 'ollama',
-        available: ollamaModels.length > 0,
-        ready: ollamaModels.length > 0,
-        models: ollamaModels,
-        detail:
-          ollamaModels.length > 0
-            ? `${ollamaModels.length}개의 로컬 모델을 사용할 수 있습니다.`
-            : '사용 가능한 Ollama 모델이 없습니다.',
+        available: Boolean(ollamaModel),
+        ready: Boolean(ollamaModel),
+        models: ollamaModel ? [ollamaModel] : [],
+        detail: ollamaModel ? 'Ollama ' + ollamaModel + ' 모델을 사용할 수 있습니다.' : '사용 가능한 Ollama 모델이 없습니다.',
       },
       {
         provider: 'codex',
@@ -935,23 +1624,12 @@ async function execute(body) {
           : 'codex'
       : provider
 
-  const chosenModel =
-    chosenProvider === 'ollama'
-      ? agent?.model ||
-        settings.ollamaModel ||
-        health.providers.find((item) => item.provider === 'ollama')?.models[0]
-      : chosenProvider === 'codex'
-        ? agent?.model || settings.codexModel || 'gpt-5.4'
-        : agent?.model || '알 수 없음'
+  const ollamaModel = health.providers.find((item) => item.provider === 'ollama')?.models[0] ?? null
 
   const workspaceRoot = await resolveWorkspaceRoot(body.rootPath)
   const workspaceCwd = resolveWorkspaceTarget(workspaceRoot, body.cwdPath || '').absolutePath
-
   if (chosenProvider === 'ollama') {
-    const model =
-      agent?.model ||
-      settings.ollamaModel ||
-      health.providers.find((item) => item.provider === 'ollama')?.models[0]
+    const model = ollamaModel
 
     if (!model) {
       throw new Error('사용 가능한 Ollama 모델을 찾지 못했습니다.')
@@ -997,6 +1675,34 @@ async function execute(body) {
     workspaceRoot,
     enabledTools,
   })
+}
+
+async function executeWithWorkspace(body) {
+  const workspaceRoot = await resolveWorkspaceRoot(body.rootPath)
+  const workspaceTarget = resolveWorkspaceTarget(workspaceRoot, body.cwdPath || '')
+  const workspaceContextBase = {
+    rootPath: workspaceRoot,
+    cwdPath: workspaceTarget.absolutePath,
+    cwdRelativePath: workspaceTarget.relativePath,
+  }
+  const beforeSnapshot = await captureWorkspaceSnapshot(
+    workspaceRoot,
+    workspaceTarget.absolutePath,
+  )
+  const result = await execute(body)
+  const afterSnapshot = await captureWorkspaceSnapshot(
+    workspaceRoot,
+    workspaceTarget.absolutePath,
+  )
+  const workspaceDiff = diffWorkspaceSnapshots(beforeSnapshot, afterSnapshot)
+
+  return {
+    ...result,
+    workspace: createWorkspaceContext({
+      ...workspaceContextBase,
+      ...workspaceDiff,
+    }),
+  }
 }
 
 function dedupeSignalItems(items) {
@@ -1408,11 +2114,7 @@ async function translateSignalBatch(items) {
   }
 
   const models = await getOllamaTags().catch(() => [])
-  const translationModel =
-    models.find((item) => item === 'gemma4:e2b') ??
-    models.find((item) => /gemma|qwen|llama/i.test(item)) ??
-    models[0] ??
-    null
+  const translationModel = models.find((item) => item === OLLAMA_LOCAL_MODEL) ?? null
 
   if (translationModel) {
     const translatedItems = await Promise.allSettled(
@@ -1588,28 +2290,154 @@ async function listSkills() {
 
 const server = http.createServer(async (request, response) => {
   if (!request.url) {
-    sendJson(response, 404, { ok: false, error: '요청 경로가 없습니다.' })
+    sendJson(request, response, 404, { ok: false, error: '요청 경로가 없습니다.' })
     return
   }
 
   if (request.method === 'OPTIONS') {
     response.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+      ...createCorsHeaders(request),
     })
     response.end()
     return
   }
 
   try {
+    const requestUrl = new URL(request.url, `http://${HOST}:${PORT}`)
+    const pathname = requestUrl.pathname
+
     if (request.method === 'GET' && request.url === '/api/health') {
-      sendJson(response, 200, await getHealth())
+      sendJson(request, response, 200, await getHealth())
+      return
+    }
+
+    if (request.method === 'GET' && pathname === '/api/ai/providers') {
+      sendJson(request, response, 200, {
+        ok: true,
+        providers: aiRouter.getProviders(),
+      })
+      return
+    }
+
+    if (request.method === 'POST' && pathname.startsWith('/api/ai/providers/')) {
+      const segments = pathname.split('/').filter(Boolean)
+      const provider = segments[3] ?? ''
+      const action = segments[4] ?? ''
+      const body = await readBody(request)
+
+      if (action === 'save') {
+        const saved = aiRouter.saveProvider(provider, {
+          enabled: body.enabled,
+          apiKey: body.apiKey,
+          candidateModels: body.candidateModels,
+          authType: body.authType,
+        })
+        if (saved.configured) {
+          await aiRouter.refreshProviderModels(provider, { verify: false })
+        }
+        sendJson(request, response, 200, {
+          ok: true,
+          provider: aiRouter.getProviders().find((item) => item.provider === provider) ?? saved,
+        })
+        return
+      }
+
+      if (action === 'test') {
+        sendJson(request, response, 200, {
+          ok: true,
+          ...(await aiRouter.testProvider(provider)),
+        })
+        return
+      }
+    }
+
+    if (request.method === 'GET' && pathname === '/api/ai/models') {
+      sendJson(request, response, 200, {
+        ok: true,
+        models: aiRouter.listModels({
+          provider: requestUrl.searchParams.get('provider') ?? undefined,
+          includeExcluded: parseBooleanFlag(requestUrl.searchParams.get('includeExcluded')),
+        }),
+      })
+      return
+    }
+
+    if (request.method === 'POST' && pathname === '/api/ai/models/refresh') {
+      const body = await readBody(request)
+      const provider = body.provider ? String(body.provider) : ''
+      const models = provider
+        ? await aiRouter.refreshProviderModels(provider, { verify: true })
+        : await aiRouter.refreshAllModels({ verify: true })
+      sendJson(request, response, 200, {
+        ok: true,
+        models,
+      })
+      return
+    }
+
+    if (request.method === 'POST' && pathname === '/api/ai/route/preview') {
+      const body = await readBody(request)
+      sendJson(request, response, 200, {
+        ok: true,
+        ...(await aiRouter.previewRoute(body)),
+      })
+      return
+    }
+
+    if (request.method === 'GET' && pathname === '/api/ai/routing/logs') {
+      sendJson(request, response, 200, {
+        ok: true,
+        items: aiRouter.listRoutingLogs({
+          limit: Number(requestUrl.searchParams.get('limit') ?? 100),
+        }),
+      })
+      return
+    }
+
+    if (request.method === 'GET' && pathname === '/api/ai/settings') {
+      sendJson(request, response, 200, {
+        ok: true,
+        ...aiRouter.getSettings(),
+      })
+      return
+    }
+
+    if (request.method === 'POST' && pathname === '/api/ai/settings') {
+      const body = await readBody(request)
+      sendJson(request, response, 200, {
+        ok: true,
+        ...aiRouter.saveSettings(body),
+      })
+      return
+    }
+
+    if (request.method === 'POST' && pathname === '/api/ai/chat/stream') {
+      const body = await readBody(request)
+      response.writeHead(200, {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        ...createCorsHeaders(request),
+      })
+
+      try {
+        await aiRouter.streamChat(body, {
+          writeEvent: async (eventName, payload) => {
+            sendSseEvent(response, eventName, payload)
+          },
+        })
+      } catch (error) {
+        sendSseEvent(response, 'error', {
+          message: error instanceof Error ? error.message : 'AI 스트리밍 중 오류가 발생했습니다.',
+        })
+      } finally {
+        response.end()
+      }
       return
     }
 
     if (request.method === 'GET' && request.url.startsWith('/api/workspace/default')) {
-      sendJson(response, 200, { ok: true, ...(await getDefaultWorkspace()) })
+      sendJson(request, response, 200, { ok: true, ...(await getDefaultWorkspace()) })
       return
     }
 
@@ -1617,7 +2445,7 @@ const server = http.createServer(async (request, response) => {
       const requestUrl = new URL(request.url, `http://${HOST}:${PORT}`)
       const rootPath = requestUrl.searchParams.get('rootPath') ?? undefined
       const filePath = requestUrl.searchParams.get('path') ?? ''
-      sendJson(response, 200, {
+      sendJson(request, response, 200, {
         ok: true,
         ...(await readWorkspaceFileContent({ rootPath, filePath })),
       })
@@ -1628,9 +2456,10 @@ const server = http.createServer(async (request, response) => {
       const requestUrl = new URL(request.url, `http://${HOST}:${PORT}`)
       const rootPath = requestUrl.searchParams.get('rootPath') ?? undefined
       const currentPath = requestUrl.searchParams.get('path') ?? ''
-      sendJson(response, 200, {
+      const includeSystem = parseBooleanFlag(requestUrl.searchParams.get('includeSystem'))
+      sendJson(request, response, 200, {
         ok: true,
-        ...(await listWorkspace({ rootPath, currentPath })),
+        ...(await listWorkspace({ rootPath, currentPath, includeSystem })),
       })
       return
     }
@@ -1640,7 +2469,7 @@ const server = http.createServer(async (request, response) => {
       const category = requestUrl.searchParams.get('category') || '전체'
       const feed = await buildSignalsFeed(category)
 
-      sendJson(response, 200, {
+      sendJson(request, response, 200, {
         ok: true,
         generatedAt: feed.generatedAt,
         items: feed.items,
@@ -1650,7 +2479,7 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === 'GET' && request.url === '/api/skills') {
       const catalog = await listSkills()
-      sendJson(response, 200, {
+      sendJson(request, response, 200, {
         ok: true,
         generatedAt: catalog.generatedAt,
         items: catalog.items,
@@ -1660,19 +2489,86 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === 'POST' && request.url === '/api/execute') {
       const body = await readBody(request)
-      const result = await execute(body)
-      sendJson(response, 200, { ok: true, ...result })
+      const result = await executeWithWorkspace(body)
+      sendJson(request, response, 200, { ok: true, ...result })
+      return
+    }
+
+    if (request.method === 'POST' && request.url === '/api/public/contact') {
+      const body = await readBody(request)
+      let session = null
+      try {
+        session = readPublicSessionFromRequest(request)
+      } catch {
+        session = null
+      }
+      sendJson(request, response, 200, {
+        ok: true,
+        ...(await savePublicInquiry({
+          ...body,
+          session,
+        })),
+      })
+      return
+    }
+
+    if (request.method === 'POST' && request.url === '/api/public/auth/google') {
+      const body = await readBody(request)
+      const authResult = await signInPublicAccountWithGoogle(body)
+      sendJson(request, response, 200, {
+        ok: true,
+        account: authResult.account,
+        authenticatedAt: authResult.authenticatedAt,
+      }, {
+        'Set-Cookie': createPublicSessionCookie(authResult.sessionToken),
+      })
+      return
+    }
+
+    if (request.method === 'POST' && request.url === '/api/public/auth/signout') {
+      sendJson(request, response, 200, { ok: true }, {
+        'Set-Cookie': createPublicSessionCookie('', { clear: true }),
+      })
+      return
+    }
+
+    if (request.method === 'GET' && request.url === '/api/public/account/session') {
+      sendJson(request, response, 200, {
+        ok: true,
+        account: await getAuthenticatedPublicAccount(request),
+      })
+      return
+    }
+
+    if (request.method === 'POST' && request.url === '/api/public/account/start') {
+      const body = await readBody(request)
+      const session = readPublicSessionFromRequest(request)
+      sendJson(request, response, 200, {
+        ok: true,
+        account: await savePublicAccount(body, { session }),
+      })
+      return
+    }
+
+    if (request.method === 'POST' && request.url === '/api/public/account/activate') {
+      const body = await readBody(request)
+      const session = readPublicSessionFromRequest(request)
+      sendJson(request, response, 200, {
+        ok: true,
+        account: await savePublicAccount(body, { activate: true, session }),
+      })
       return
     }
 
     if (request.method === 'POST' && request.url === '/api/workspace/folder') {
       const body = await readBody(request)
-      sendJson(response, 200, {
+      sendJson(request, response, 200, {
         ok: true,
         ...(await createWorkspaceFolder({
           rootPath: body.rootPath,
           currentPath: body.currentPath,
           name: body.name,
+          includeSystem: parseBooleanFlag(body.includeSystem),
         })),
       })
       return
@@ -1680,7 +2576,7 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === 'POST' && request.url === '/api/workspace/write') {
       const body = await readBody(request)
-      sendJson(response, 200, {
+      sendJson(request, response, 200, {
         ok: true,
         ...(await writeWorkspaceFileContent({
           rootPath: body.rootPath,
@@ -1693,12 +2589,13 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === 'POST' && request.url === '/api/workspace/upload') {
       const body = await readBody(request)
-      sendJson(response, 200, {
+      sendJson(request, response, 200, {
         ok: true,
         ...(await uploadWorkspaceFiles({
           rootPath: body.rootPath,
           currentPath: body.currentPath,
           files: body.files,
+          includeSystem: parseBooleanFlag(body.includeSystem),
         })),
       })
       return
@@ -1706,11 +2603,12 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === 'POST' && request.url === '/api/workspace/delete') {
       const body = await readBody(request)
-      sendJson(response, 200, {
+      sendJson(request, response, 200, {
         ok: true,
         ...(await deleteWorkspaceEntry({
           rootPath: body.rootPath,
           targetPath: body.path,
+          includeSystem: parseBooleanFlag(body.includeSystem),
         })),
       })
       return
@@ -1718,7 +2616,7 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === 'POST' && request.url === '/api/workspace/reveal') {
       const body = await readBody(request)
-      sendJson(response, 200, {
+      sendJson(request, response, 200, {
         ok: true,
         ...(await revealWorkspacePath({
           rootPath: body.rootPath,
@@ -1728,9 +2626,9 @@ const server = http.createServer(async (request, response) => {
       return
     }
 
-    sendJson(response, 404, { ok: false, error: '지원하지 않는 경로입니다.' })
+    sendJson(request, response, 404, { ok: false, error: '지원하지 않는 경로입니다.' })
   } catch (error) {
-    sendJson(response, getErrorStatus(error), {
+    sendJson(request, response, getErrorStatus(error), {
       ok: false,
       error: error instanceof Error ? error.message : '브리지 내부 오류가 발생했습니다.',
     })

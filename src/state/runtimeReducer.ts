@@ -1,10 +1,11 @@
-import { buildAgentFromPreset } from '../lib/agentCatalog'
+import { buildAgentFromPreset, getAgentPreset } from '../lib/agentCatalog'
 import type {
   ActivityItem,
   AgentItem,
   AgentPresetId,
   AgentRun,
   ApiKeyItem,
+  ApiKeyTargetPresetId,
   ChatMessage,
   ChatThread,
   InsightItem,
@@ -34,7 +35,14 @@ function maskKey(key: string) {
 
 export type Action =
   | { type: 'SET_COMPOSER'; text: string }
-  | { type: 'RUN_PROMPT'; prompt: string; assistantText?: string; provider?: string; model?: string }
+  | {
+      type: 'RUN_PROMPT'
+      prompt: string
+      assistantText?: string
+      provider?: string
+      model?: string
+      routingMeta?: ChatMessage['routingMeta']
+    }
   | { type: 'APPEND_CHAT_ERROR'; prompt: string; error: string }
   | { type: 'CREATE_THREAD' }
   | { type: 'CREATE_FOLDER'; name: string; parentId: string | null }
@@ -45,7 +53,7 @@ export type Action =
   | { type: 'MARK_INSIGHT'; insightId: string; status: InsightItem['status'] }
   | { type: 'UPDATE_SETTINGS'; patch: Partial<RuntimeState['settings']> }
   | { type: 'SELECT_CHAT_MODEL'; provider: 'ollama' | 'codex'; model: string }
-  | { type: 'ADD_API_KEY'; label: string; key: string }
+  | { type: 'ADD_API_KEY'; label: string; key: string; presetId: ApiKeyTargetPresetId }
   | { type: 'REMOVE_API_KEY'; keyId: string }
   | { type: 'ADD_SIGNAL'; title: string; category: string; description: string }
   | { type: 'TOGGLE_SIGNAL'; signalId: string }
@@ -82,12 +90,17 @@ function updateActiveThread(state: RuntimeState, nextThread: ChatThread) {
   return state.chats.threads.map((thread) => (thread.id === nextThread.id ? nextThread : thread))
 }
 
+function findMatchingApiKey(apiKeys: ApiKeyItem[], presetId: AgentPresetId) {
+  return apiKeys.find((item) => item.presetId === presetId) ?? null
+}
+
 function appendChatMessage(
   state: RuntimeState,
   prompt: string,
   assistantText: string,
   provider?: string,
   model?: string,
+  routingMeta?: ChatMessage['routingMeta'],
 ) {
   const activeThread = getActiveThread(state)
   const createdAt = nowIso()
@@ -107,6 +120,7 @@ function appendChatMessage(
     createdAt: nowIso(),
     provider,
     model,
+    routingMeta,
   }
 
   const nextThread: ChatThread = {
@@ -169,6 +183,7 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
         action.assistantText?.trim() || '모델 응답이 비어 있습니다.',
         action.provider,
         action.model,
+        action.routingMeta,
       )
 
       return {
@@ -372,6 +387,7 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
       const item: ApiKeyItem = {
         id: createId('key'),
         label: action.label.trim() || '새 API 키',
+        presetId: action.presetId,
         value: action.key.trim(),
         maskedKey: maskKey(action.key),
         createdAt: nowIso(),
@@ -452,7 +468,14 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
       }
 
     case 'CREATE_AGENT': {
-      const nextAgent = buildAgentFromPreset(action.presetId)
+      const preset = getAgentPreset(action.presetId)
+      const matchedApiKey = preset.requiresApiKey
+        ? findMatchingApiKey(state.apiKeys, action.presetId)
+        : null
+      const nextAgent = {
+        ...buildAgentFromPreset(action.presetId),
+        apiKeyId: matchedApiKey?.id ?? null,
+      }
       return {
         ...state,
         agents: {

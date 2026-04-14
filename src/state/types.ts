@@ -1,3 +1,4 @@
+import type { AiRoutingMessageMeta } from '../lib/aiRoutingClient'
 import type { SettingsTab } from '../crewData'
 
 export type ChatRole = 'master' | 'assistant' | 'tool'
@@ -11,6 +12,7 @@ export type ChatMessage = {
   intent?: string
   provider?: string
   model?: string
+  routingMeta?: AiRoutingMessageMeta
 }
 
 export type ChatThread = {
@@ -49,11 +51,26 @@ export type ToolItem = {
   originLabel: string
 }
 
-export type AgentProviderKind = 'ollama' | 'codex' | 'openai-compatible' | 'anthropic'
+export type AgentProviderKind =
+  | 'ollama'
+  | 'codex'
+  | 'official-router'
+  | 'openai-compatible'
+  | 'anthropic'
 
 export type AgentPresetId =
   | 'ollama-local'
   | 'codex-cli'
+  | 'official-router'
+  | 'openai-direct'
+  | 'gemini-openai'
+  | 'claude-anthropic'
+  | 'openrouter-free'
+  | 'aihubmix-free'
+  | 'nvidia-trial'
+  | 'custom-openai'
+
+export type ApiKeyTargetPresetId =
   | 'openai-direct'
   | 'gemini-openai'
   | 'claude-anthropic'
@@ -149,6 +166,7 @@ export type SignalItem = {
 export type ApiKeyItem = {
   id: string
   label: string
+  presetId: ApiKeyTargetPresetId
   value: string
   maskedKey: string
   createdAt: string
