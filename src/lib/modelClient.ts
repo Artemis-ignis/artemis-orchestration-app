@@ -172,7 +172,7 @@ export async function executeModelPrompt({
 }: {
   bridgeUrl: string
   prompt: string
-  messages: ChatMessage[]
+  messages: Array<Pick<ChatMessage, 'role' | 'text'>>
   settings: SettingsState
   agent?: AgentItem
   apiKeys?: ApiKeyItem[]

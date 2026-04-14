@@ -102,6 +102,13 @@ function MessageCard({
   routingMeta?: AiRoutingMessageMeta
 }) {
   const [showMeta, setShowMeta] = useState(false)
+  const hasRoutingFallback =
+    role === 'assistant' &&
+    Boolean(
+      routingMeta?.attempts.some(
+        (attempt) => !attempt.success || Boolean(attempt.fallback_reason) || Boolean(attempt.error_type),
+      ),
+    )
   const label =
       provider === 'codex'
       ? 'Codex CLI'
@@ -165,14 +172,14 @@ function MessageCard({
           </div>
         ) : null}
         <p>{text}</p>
-        {role === 'assistant' && routingMeta && routingMeta.attempts.length > 1 ? (
+        {role === 'assistant' && routingMeta && hasRoutingFallback ? (
           <div className="message-routeMeta">
             <button
               className="message-routeMeta__toggle"
               onClick={() => setShowMeta((value) => !value)}
               type="button"
             >
-              {showMeta ? '시도 로그 숨기기' : `후보 전환 ${routingMeta.attempts.length}회`}
+              {showMeta ? '시도 로그 숨기기' : '라우팅 로그 보기'}
             </button>
             {showMeta ? (
               <div className="message-routeMeta__panel">
@@ -389,6 +396,12 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
     selectedAgent?.model ??
     (selectedProvider === 'codex' ? state.settings.codexModel : state.settings.ollamaModel)
   const topPreviewCandidate = streamMeta?.top_candidate ?? aiRoutePreview?.candidates[0] ?? null
+  const hasStreamFallback = streamAttempts.some(
+    (attempt) =>
+      ('success' in attempt && !attempt.success) ||
+      Boolean(attempt.fallback_reason) ||
+      Boolean(attempt.error_type),
+  )
   const currentModelName =
     selectedAgent?.provider === 'official-router'
       ? topPreviewCandidate?.display_name ?? '자동 무료 최상'
@@ -718,7 +731,7 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
                     <span>실시간 스트리밍</span>
                   </div>
                   <p>{streamedText || '답변을 준비하고 있습니다.'}</p>
-                  {streamMeta?.top_candidate || streamAttempts.length > 1 ? (
+                  {streamMeta?.top_candidate || hasStreamFallback ? (
                     <div className="message-streamMeta">
                       {streamMeta?.top_candidate ? (
                         <span>
@@ -726,8 +739,8 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
                           {streamMeta.top_candidate.display_name}
                         </span>
                       ) : null}
-                      {streamAttempts.length > 1 ? (
-                        <span>후보 전환 {streamAttempts.length}회</span>
+                      {hasStreamFallback ? (
+                        <span>후보 전환 발생</span>
                       ) : null}
                     </div>
                   ) : null}

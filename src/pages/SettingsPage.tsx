@@ -18,7 +18,7 @@ import {
 } from '../lib/aiRoutingClient'
 import { getAgentPreset } from '../lib/agentCatalog'
 import { formatFriendlyModelName } from '../crewPageHelpers'
-import { EmptyState, PageIntro } from '../crewPageShared'
+import { DisclosureSection, EmptyState, PageIntro } from '../crewPageShared'
 import { Icon } from '../icons'
 import { useArtemisApp } from '../state/context'
 import type { AgentCapability, AgentPresetId } from '../state/types'
@@ -415,13 +415,19 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
       </section>
 
       <section className="settings-card">
-        <div className="panel-card__header">
-          <h2>공식 API 공급자</h2>
-          <button className="ghost-button ghost-button--compact" disabled={busyKey === 'all:refresh'} onClick={() => void refreshProviderCatalog()} type="button">
-            후보 새로고침
-          </button>
-        </div>
-        <div className="provider-grid provider-grid--official">
+        <DisclosureSection
+          className="settings-disclosure"
+          defaultOpen
+          summary="OpenRouter, NVIDIA Build, Gemini 공식 키 저장과 연결 테스트"
+          title="1. 공식 API 공급자"
+        >
+          <div className="panel-card__header">
+            <p className="settings-card__lead">공급자별 키를 저장하고 무료 후보 탐색 상태를 바로 확인합니다.</p>
+            <button className="ghost-button ghost-button--compact" disabled={busyKey === 'all:refresh'} onClick={() => void refreshProviderCatalog()} type="button">
+              후보 새로고침
+            </button>
+          </div>
+          <div className="provider-grid provider-grid--official">
           {OFFICIAL_PROVIDER_ORDER.map((providerId) => {
             const provider = aiProviders.find((item) => item.provider === providerId)
             const draft = providerDrafts[providerId] ?? { enabled: false, apiKey: '', candidateModelsText: '' }
@@ -492,15 +498,22 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
               </article>
             )
           })}
-        </div>
+          </div>
+        </DisclosureSection>
       </section>
 
       <section className="settings-card">
-        <div className="panel-card__header">
-          <h2>무료 라우팅 정책</h2>
-          <span className="chip chip--soft">{aiSettings ? routingModeLabel(aiSettings.routing_mode) : '불러오는 중'}</span>
-        </div>
-        <div className="settings-modeGrid">
+        <DisclosureSection
+          className="settings-disclosure"
+          defaultOpen={false}
+          summary="자동 무료 최상, 코딩 최상, 빠른 응답, 수동 선택"
+          title="2. 무료 라우팅 정책"
+        >
+          <div className="panel-card__header">
+            <p className="settings-card__lead">자동 모드는 검증된 무료 후보를 점수 순으로 시도하고, 실패하면 다음 후보로 넘어갑니다.</p>
+            <span className="chip chip--soft">{aiSettings ? routingModeLabel(aiSettings.routing_mode) : '불러오는 중'}</span>
+          </div>
+          <div className="settings-modeGrid">
           {aiSettings?.available_modes.map((mode) => (
             <button
               key={mode.id}
@@ -537,8 +550,8 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
           <Icon name="check" size={16} />
           <span>자동 무료 모드는 검증된 무료 후보를 점수 순서로 시도하고, 실패하면 다음 후보로 자동 폴백합니다.</span>
         </div>
-        {aiSettings?.routing_mode === 'manual' ? (
-          <div className="settings-apiTargetGrid">
+          {aiSettings?.routing_mode === 'manual' ? (
+            <div className="settings-apiTargetGrid">
             {manualCandidates.map((candidate) => (
               <button
                 key={`${candidate.provider}:${candidate.model_id}`}
@@ -552,12 +565,19 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
                 <small>{candidate.provider_label ?? candidate.provider}</small>
               </button>
             ))}
-          </div>
-        ) : null}
+            </div>
+          ) : null}
+        </DisclosureSection>
       </section>
 
       <section className="settings-card">
-        <div className="panel-card__header">
+        <DisclosureSection
+          className="settings-disclosure"
+          defaultOpen={false}
+          summary="후보 점수, 최근 상태, 제외 여부"
+          title="3. 무료 후보 관리"
+        >
+          <div className="panel-card__header">
           <h2>무료 후보 관리</h2>
           <span className="chip chip--soft">{aiModels.length}개</span>
         </div>
@@ -594,10 +614,17 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
           </div>
         ) : (
           <EmptyState title="무료 후보가 아직 없습니다" description="공급자 키를 저장하고 연결 테스트를 실행하면 이 목록이 채워집니다." />
-        )}
+          )}
+        </DisclosureSection>
       </section>
 
       <section className="settings-card settings-card--split">
+        <DisclosureSection
+          className="settings-disclosure"
+          defaultOpen={false}
+          summary="채팅에 실제로 노출되는 Codex, 공식 무료 라우터, Ollama"
+          title="4. 채팅 에이전트"
+        >
         <div className="settings-card__side">
           <div className="panel-card__header">
             <h2>채팅 에이전트</h2>
@@ -709,6 +736,7 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
             <EmptyState title="선택된 에이전트가 없습니다" description="왼쪽에서 채팅 에이전트를 고르면 이름과 역할을 수정할 수 있습니다." />
           )}
         </div>
+        </DisclosureSection>
       </section>
     </div>
   )

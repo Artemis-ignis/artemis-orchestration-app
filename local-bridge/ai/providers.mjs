@@ -61,17 +61,77 @@ async function readJsonSafe(response) {
   }
 }
 
-async function readSseStream(response, { onEvent, firstTokenTimeoutMs }) {
+function parseSseChunk(part) {
+  const lines = part
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  let eventName = 'message'
+  const dataLines = []
+  for (const line of lines) {
+    if (line.startsWith('event:')) {
+      eventName = line.slice(6).trim()
+    } else if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trim())
+    }
+  }
+
+  if (dataLines.length === 0) {
+    return null
+  }
+
+  return {
+    eventName,
+    data: dataLines.join('\n'),
+  }
+}
+
+async function readSseStream(response, {
+  provider,
+  onEvent,
+  firstTokenTimeoutMs,
+  idleTimeoutMs = 45_000,
+}) {
   const decoder = new TextDecoder()
   const reader = response.body.getReader()
   let buffer = ''
   let firstEventTimer = null
+  let idleTimer = null
+  let streamTimedOut = false
 
   if (firstTokenTimeoutMs > 0) {
     firstEventTimer = setTimeout(() => {
       reader.cancel('first-token-timeout').catch(() => {})
     }, firstTokenTimeoutMs)
   }
+
+  const resetIdleTimer = () => {
+    if (idleTimer) {
+      clearTimeout(idleTimer)
+    }
+    if (idleTimeoutMs > 0) {
+      idleTimer = setTimeout(() => {
+        streamTimedOut = true
+        reader.cancel('stream-idle-timeout').catch(() => {})
+      }, idleTimeoutMs)
+    }
+  }
+
+  const dispatchPart = async (part) => {
+    const parsed = parseSseChunk(part)
+    if (!parsed) {
+      return
+    }
+
+    if (firstEventTimer) {
+      clearTimeout(firstEventTimer)
+      firstEventTimer = null
+    }
+    await onEvent({ event: parsed.eventName, data: parsed.data })
+  }
+
+  resetIdleTimer()
 
   try {
     while (true) {
@@ -80,39 +140,36 @@ async function readSseStream(response, { onEvent, firstTokenTimeoutMs }) {
         break
       }
 
+      resetIdleTimer()
       buffer += decoder.decode(value, { stream: true })
       const parts = buffer.split('\n\n')
       buffer = parts.pop() ?? ''
 
       for (const part of parts) {
-        const lines = part
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter(Boolean)
-
-        let eventName = 'message'
-        const dataLines = []
-        for (const line of lines) {
-          if (line.startsWith('event:')) {
-            eventName = line.slice(6).trim()
-          } else if (line.startsWith('data:')) {
-            dataLines.push(line.slice(5).trim())
-          }
-        }
-
-        const data = dataLines.join('\n')
-        if (firstEventTimer) {
-          clearTimeout(firstEventTimer)
-          firstEventTimer = null
-        }
-        await onEvent({ event: eventName, data })
+        await dispatchPart(part)
       }
     }
   } finally {
     if (firstEventTimer) {
       clearTimeout(firstEventTimer)
     }
+    if (idleTimer) {
+      clearTimeout(idleTimer)
+    }
     reader.releaseLock()
+  }
+
+  if (buffer.trim()) {
+    await dispatchPart(buffer)
+  }
+
+  if (streamTimedOut) {
+    throw createProviderError({
+      provider,
+      type: 'timeout',
+      message: '스트리밍이 중간에 멈춰 응답 대기 시간이 초과되었습니다.',
+      retryable: true,
+    })
   }
 }
 
@@ -261,6 +318,7 @@ async function handleOpenAiCompatibleStream({
   let text = ''
   let firstTokenAt = null
   await readSseStream(response, {
+    provider,
     firstTokenTimeoutMs,
     onEvent: async ({ data }) => {
       if (!data || data === '[DONE]') {
@@ -370,6 +428,7 @@ async function handleGeminiStream({
   let text = ''
   let firstTokenAt = null
   await readSseStream(response, {
+    provider: 'gemini',
     firstTokenTimeoutMs,
     onEvent: async ({ data }) => {
       if (!data) {

@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState, type PropsWithChildren } from 'react'
+import { useEffect, useMemo, useReducer, useState, type PropsWithChildren } from 'react'
 import {
   executeModelPrompt,
   fetchBridgeHealth,
@@ -76,15 +76,19 @@ function buildRoutingWorkspaceContext({
   }
 }
 
-function buildRoutingMessages(
+function buildPromptHistory(
   messages: Array<{ role: string; text: string }>,
-): Array<{ role: 'master' | 'assistant'; text: string }> {
-  return messages.flatMap((message) => {
-    if (message.role === 'master' || message.role === 'assistant') {
-      return [{ role: message.role, text: message.text }]
-    }
-    return []
-  })
+  limit: number,
+): Array<{ role: 'master'; text: string }> {
+  // 이전 assistant 답변 문체가 다음 모델 호출에 전염되지 않도록
+  // 사용자의 최근 요청만 컨텍스트로 전달한다.
+  return messages
+    .filter((message) => message.role === 'master')
+    .slice(-limit)
+    .flatMap((message) => {
+      const text = message.text.trim()
+      return text ? [{ role: 'master' as const, text }] : []
+    })
 }
 
 function buildOfficialRouterSystemPrompt({
@@ -495,7 +499,18 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
   const activeThread = getActiveThread(state)
   const activeAgent =
     state.agents.items.find((item) => item.id === state.agents.activeAgentId) ?? null
-  const activeAgentRuns = state.agents.runs.filter((run) => run.agentId === activeAgent?.id)
+  const activeAgentRuns = useMemo(
+    () =>
+      state.agents.runs
+        .filter((run) => run.agentId === activeAgent?.id)
+        .slice()
+        .sort((left, right) => {
+          const leftTime = Date.parse(left.finishedAt ?? left.startedAt)
+          const rightTime = Date.parse(right.finishedAt ?? right.startedAt)
+          return rightTime - leftTime
+        }),
+    [state.agents.runs, activeAgent?.id],
+  )
   const enabledToolsCount = state.tools.items.filter((item) => item.enabled).length
   const unreadInsightsCount = state.insights.items.filter((item) => item.status === 'unread').length
   const todayIso = startOfTodayIso()
@@ -583,7 +598,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
             {
               sessionId: activeThread.id,
               prompt: nextPrompt,
-              messages: buildRoutingMessages(activeThread.messages.slice(-12)),
+              messages: buildPromptHistory(activeThread.messages, 12),
               systemPrompt: officialRouterSystemPrompt,
             },
             {
@@ -666,7 +681,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         const response = await executeModelPrompt({
           bridgeUrl: state.settings.bridgeUrl,
           prompt: nextPrompt,
-          messages: activeThread.messages.slice(-8),
+          messages: buildPromptHistory(activeThread.messages, 8),
           settings: requestSettings,
           agent: selectedAgent ?? undefined,
           apiKeys: state.apiKeys,
@@ -804,7 +819,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
             {
               sessionId: runId,
               prompt: nextTask,
-              messages: buildRoutingMessages(activeThread.messages.slice(-6)),
+              messages: buildPromptHistory(activeThread.messages, 6),
               systemPrompt: agent.systemPrompt,
             },
             {
@@ -870,7 +885,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         const response = await executeModelPrompt({
           bridgeUrl: state.settings.bridgeUrl,
           prompt: nextTask,
-          messages: activeThread.messages.slice(-6),
+          messages: buildPromptHistory(activeThread.messages, 6),
           settings: state.settings,
           agent,
           apiKeys: state.apiKeys,

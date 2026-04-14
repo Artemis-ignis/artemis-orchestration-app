@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { PageId } from '../crewData'
+import { fetchAiProviders, type AiProviderState } from '../lib/aiRoutingClient'
 import { DisclosureSection, EmptyState, PageIntro } from '../crewPageShared'
 import {
   changeTypeLabel,
@@ -41,18 +42,37 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     workspaceSummary,
   } = useArtemisApp()
   const [task, setTask] = useState('')
+  const [aiProviders, setAiProviders] = useState<AiProviderState[]>([])
 
   const activeTools = state.tools.items.filter((item) => item.enabled)
   const latestMasterMessage = [...activeThread.messages]
     .reverse()
     .find((message) => message.role === 'master')
-  const latestRun = activeAgentRuns[0]
+  const latestRun = useMemo(
+    () =>
+      activeAgentRuns
+        .slice()
+        .sort((left, right) => {
+          const leftTime = Date.parse(left.finishedAt ?? left.startedAt)
+          const rightTime = Date.parse(right.finishedAt ?? right.startedAt)
+          return rightTime - leftTime
+        })[0] ?? null,
+    [activeAgentRuns],
+  )
   const liveRunLogs = latestRun?.logs.slice(-6) ?? []
   const latestChangedFiles = latestExecution?.workspace.changedFiles ?? []
   const readyProviderCount = bridgeHealth?.providers.filter((item) => item.ready).length ?? 0
   const ollamaReady =
     bridgeHealth?.providers.find((item) => item.provider === 'ollama')?.ready ?? false
-  const hasReadyProvider = Boolean(readyProviderCount || ollamaReady)
+  const officialProviders =
+    activeAgent?.provider === 'official-router' ? aiProviders : []
+  const readyOfficialProviders = officialProviders.filter(
+    (item) => item.enabled && item.configured && (item.status === 'ready' || item.available_count > 0),
+  )
+  const hasReadyProvider =
+    activeAgent?.provider === 'official-router'
+      ? readyOfficialProviders.length > 0
+      : Boolean(readyProviderCount || ollamaReady)
   const hasWorkspaceConnection = Boolean(workspaceAbsolutePath)
   const subscribedSignalCount = state.signals.items.filter((item) => item.subscribed).length
   const subscribedSignalTitles = state.signals.items
@@ -91,6 +111,36 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     ],
     [],
   )
+
+  useEffect(() => {
+    let active = true
+
+    if (activeAgent?.provider !== 'official-router') {
+      return () => {
+        active = false
+      }
+    }
+
+    const loadProviders = async () => {
+      try {
+        const providers = await fetchAiProviders(state.settings.bridgeUrl)
+        if (!active) {
+          return
+        }
+        setAiProviders(providers)
+      } catch {
+        if (!active) {
+          return
+        }
+        setAiProviders([])
+      }
+    }
+
+    void loadProviders()
+    return () => {
+      active = false
+    }
+  }, [activeAgent?.provider, state.settings.bridgeUrl])
 
   return (
     <section className="page">

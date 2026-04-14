@@ -146,6 +146,8 @@ export type AiRoutingSettings = {
   weights: Record<string, Record<string, number>>
 }
 
+const STREAM_IDLE_TIMEOUT_MS = 45_000
+
 export type AiRoutePreview = {
   mode: AiRoutingMode
   weights: Record<string, number>
@@ -170,6 +172,33 @@ async function fetchJson<T>(bridgeUrl: string, routePath: string, options: JsonO
   }
 
   return payload as T
+}
+
+function parseSseChunk(part: string) {
+  const lines = part
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  let eventName = 'message'
+  const dataLines = []
+
+  for (const line of lines) {
+    if (line.startsWith('event:')) {
+      eventName = line.slice(6).trim()
+    } else if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trim())
+    }
+  }
+
+  if (dataLines.length === 0) {
+    return null
+  }
+
+  return {
+    eventName,
+    data: JSON.parse(dataLines.join('\n')),
+  }
 }
 
 export async function fetchAiProviders(bridgeUrl: string) {
@@ -305,63 +334,82 @@ export async function streamAiChat(
   const decoder = new TextDecoder()
   const reader = response.body.getReader()
   let buffer = ''
+  let idleTimer: ReturnType<typeof setTimeout> | null = null
+  let streamTimedOut = false
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) {
-      break
+  const resetIdleTimer = () => {
+    if (idleTimer) {
+      clearTimeout(idleTimer)
+    }
+    idleTimer = setTimeout(() => {
+      streamTimedOut = true
+      reader.cancel('stream-idle-timeout').catch(() => {})
+    }, STREAM_IDLE_TIMEOUT_MS)
+  }
+
+  const dispatchPart = (part: string) => {
+    const parsed = parseSseChunk(part)
+    if (!parsed) {
+      return
     }
 
-    buffer += decoder.decode(value, { stream: true })
-    const parts = buffer.split('\n\n')
-    buffer = parts.pop() ?? ''
-
-    for (const part of parts) {
-      const lines = part
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-
-      let eventName = 'message'
-      const dataLines = []
-
-      for (const line of lines) {
-        if (line.startsWith('event:')) {
-          eventName = line.slice(6).trim()
-        } else if (line.startsWith('data:')) {
-          dataLines.push(line.slice(5).trim())
+    const { eventName, data } = parsed
+    switch (eventName) {
+      case 'meta':
+        handlers.onMeta?.(data as AiStreamMetaEvent)
+        break
+      case 'attempt':
+        handlers.onAttempt?.(data as AiStreamAttemptEvent)
+        break
+      case 'attempt_failed':
+        handlers.onAttemptFailed?.(data as AiStreamAttemptEvent)
+        break
+      case 'token':
+        if (typeof data.content === 'string') {
+          handlers.onToken?.(data.content)
         }
+        break
+      case 'final':
+        handlers.onFinal?.(data as AiStreamFinalEvent)
+        break
+      case 'error':
+        handlers.onError?.(String(data.message ?? '스트리밍 오류가 발생했습니다.'))
+        break
+      default:
+        break
+    }
+  }
+
+  resetIdleTimer()
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) {
+        break
       }
 
-      if (dataLines.length === 0) {
-        continue
-      }
+      resetIdleTimer()
+      buffer += decoder.decode(value, { stream: true })
+      const parts = buffer.split('\n\n')
+      buffer = parts.pop() ?? ''
 
-      const data = JSON.parse(dataLines.join('\n'))
-      switch (eventName) {
-        case 'meta':
-          handlers.onMeta?.(data as AiStreamMetaEvent)
-          break
-        case 'attempt':
-          handlers.onAttempt?.(data as AiStreamAttemptEvent)
-          break
-        case 'attempt_failed':
-          handlers.onAttemptFailed?.(data as AiStreamAttemptEvent)
-          break
-        case 'token':
-          if (typeof data.content === 'string') {
-            handlers.onToken?.(data.content)
-          }
-          break
-        case 'final':
-          handlers.onFinal?.(data as AiStreamFinalEvent)
-          break
-        case 'error':
-          handlers.onError?.(String(data.message ?? '스트리밍 오류가 발생했습니다.'))
-          break
-        default:
-          break
+      for (const part of parts) {
+        dispatchPart(part)
       }
     }
+  } finally {
+    if (idleTimer) {
+      clearTimeout(idleTimer)
+    }
+    reader.releaseLock()
+  }
+
+  if (buffer.trim()) {
+    dispatchPart(buffer)
+  }
+
+  if (streamTimedOut) {
+    throw new Error('스트리밍이 중간에 멈춰 응답 대기 시간이 초과되었습니다.')
   }
 }
