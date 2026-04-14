@@ -29,3 +29,9 @@
 - Replaced large orchestration cards with smaller hub-and-module nodes.
 - Hid subtitles on side modules so the graph reads like a real orchestration board.
 - Refreshed `docs/screenshots/orchestration.png` with the latest compact layout.
+
+### Interactive orchestration canvas pass
+
+- Replaced the fixed orchestration SVG/card layout with a real `@xyflow/react` canvas.
+- Verified the viewport transform changes on drag and zoom in a headless browser run.
+- Reduced per-node copy so the graph reads as compact modules instead of heavy content cards.

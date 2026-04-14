@@ -26,3 +26,9 @@
 - Orchestration now uses compact hub modules instead of large card blocks.
 - Only the center hub keeps a subtitle; side modules render as short node labels.
 - Ollama health on `4174` is confirmed with `gemma4-E4B-uncensored-q4fast:latest`.
+
+## Latest update 2
+
+- Replaced the fixed orchestration illustration with a real React Flow canvas.
+- Verified drag-to-pan and wheel-to-zoom behavior in a headless browser run.
+- Tightened mini-node copy so the board reads like a tool graph instead of stacked cards.
