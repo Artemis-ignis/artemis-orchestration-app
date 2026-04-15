@@ -1,0 +1,136 @@
+.settings-overviewGrid,
+.provider-grid,
+.provider-grid--official,
+.provider-grid--local,
+.settings-apiTargetGrid,
+.settings-agentCreateGrid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.settings-overviewGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.settings-overviewCard,
+.provider-card__surface,
+.settings-apiTarget,
+.settings-presetOption,
+.agent-list-item {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(164, 184, 219, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.settings-overviewCard {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-overviewCard__label {
+  color: var(--color-text-dim);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-overviewCard strong {
+  font-size: 1.05rem;
+}
+
+.provider-grid--local {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.provider-grid--official,
+.settings-apiTargetGrid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.provider-card,
+.settings-card {
+  padding: var(--space-5);
+}
+
+.provider-card__head,
+.provider-card__identity,
+.settings-card--split {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.provider-card__identity {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.provider-card__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(124, 168, 255, 0.16);
+  background: rgba(124, 168, 255, 0.08);
+  color: var(--color-accent);
+}
+
+.provider-card__summary {
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.settings-toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-apiTarget,
+.settings-presetOption,
+.agent-list-item {
+  width: 100%;
+  text-align: left;
+  border-color: rgba(164, 184, 219, 0.08);
+  color: inherit;
+}
+
+.settings-apiTarget.is-selected,
+.settings-presetOption.is-selected,
+.agent-list-item.is-selected {
+  border-color: rgba(124, 168, 255, 0.22);
+  background: rgba(124, 168, 255, 0.08);
+}
+
+.settings-presetOption,
+.agent-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.settings-presetOption__copy,
+.agent-list-item__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-card__side,
+.settings-card__main {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (max-width: 1080px) {
+  .settings-overviewGrid {
+    grid-template-columns: 1fr;
+  }
+}

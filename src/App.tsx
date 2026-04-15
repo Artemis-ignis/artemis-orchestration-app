@@ -1,14 +1,16 @@
 import { Suspense, lazy, useCallback, useEffect, useState, useTransition } from 'react'
 import './App.css'
 import { navigationItems, type PageId, type VisiblePageId } from './crewData'
-import { Icon } from './icons'
+import { AppShell, SidebarNav, type SidebarItem } from './components/ui/AppShell'
+import { PanelCard, StatCard, StatusPill } from './components/ui/primitives'
 import { useArtemisApp } from './state/context'
 
 const NEW_CHAT_LABEL = '새 채팅'
-const LOADING_SUFFIX = '준비 중'
-const LOADING_DESCRIPTION = '필요한 화면과 상태를 불러오고 있습니다.'
-const HOME_LABEL = 'Artemis 작업 홈'
+const LOADING_SUFFIX = '불러오는 중'
+const LOADING_DESCRIPTION = '화면과 관련 상태를 불러오고 있습니다.'
+const HOME_LABEL = 'Artemis 작업 콘솔'
 const PRIMARY_NAV_LABEL = '주요 메뉴'
+const SUPPORT_NAV_LABEL = '도구와 관리'
 const SKIP_TO_CONTENT_LABEL = '본문으로 바로 이동'
 
 const CrewPage = lazy(async () => {
@@ -89,8 +91,8 @@ function summarizeWorkspaceLocation(workspaceCurrentPath?: string, workspaceAbso
 
   if (!resolved) {
     return {
-      label: '작업 루트 미연결',
-      title: '작업 루트 미연결',
+      label: '작업 폴더 미연결',
+      title: '작업 폴더 미연결',
     }
   }
 
@@ -134,11 +136,9 @@ export default function App() {
   const navigate = useCallback(
     (nextPage: PageId) => {
       const resolved = resolvePage(nextPage)
-
       if (resolved === page) {
         return
       }
-
       window.location.assign(`#/${resolved}`)
     },
     [page],
@@ -155,7 +155,6 @@ export default function App() {
 
   useEffect(() => {
     const raw = window.location.hash.replace(/^#\/?/, '')
-
     if (!raw || hiddenMarketingPages.has(raw as PageId)) {
       window.history.replaceState(null, '', '#/chat')
       startTransition(() => setPage('chat'))
@@ -241,32 +240,41 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [createThread, navigate, page])
 
+  const mapNavItem = (item: (typeof navigationItems)[number]): SidebarItem => ({
+    id: item.id,
+    label: item.label,
+    icon: item.icon,
+    active: page === item.id,
+    hotkey: item.hotkey,
+    onClick: () => navigate(item.id),
+  })
+
   return (
     <>
       <a className="skip-link" href="#main-content">
         {SKIP_TO_CONTENT_LABEL}
       </a>
 
-      <div className="crew-shell">
-        <aside className="sidebar">
-          <div className="sidebar__top">
-            <div className="sidebar__brandRow">
+      <AppShell
+        sidebar={
+          <SidebarNav
+            brand={
               <button
                 aria-label={HOME_LABEL}
-                className="brand-mark"
+                className="app-brand"
                 onClick={() => navigate('chat')}
                 title={HOME_LABEL}
                 type="button"
               >
-                Artemis
+                <span className="app-brand__mark" aria-hidden="true" />
+                <span>Artemis</span>
               </button>
-            </div>
-
-            <div className="sidebar__utilityList">
+            }
+            primaryAction={
               <button
                 aria-label={NEW_CHAT_LABEL}
                 aria-keyshortcuts="N"
-                className="sidebar__primaryAction"
+                className="app-primary-action"
                 onClick={() => {
                   createThread()
                   navigate('chat')
@@ -274,77 +282,43 @@ export default function App() {
                 title={NEW_CHAT_LABEL}
                 type="button"
               >
-                <Icon name="plus" size={17} />
+                <span className="app-primary-action__plus">+</span>
                 <span>{NEW_CHAT_LABEL}</span>
               </button>
-            </div>
-
-            <div aria-label={PRIMARY_NAV_LABEL} className="sidebar__sections">
-              <section className="sidebar__section">
-                <span className="sidebar__sectionLabel">작업</span>
-                <nav className="sidebar__nav">
-                  {workspaceNavigationItems.map((item) => (
-                    <button
-                      key={item.id}
-                      aria-current={page === item.id ? 'page' : undefined}
-                      aria-keyshortcuts={item.hotkey}
-                      className={`nav-item ${page === item.id ? 'is-active' : ''}`}
-                      onClick={() => navigate(item.id)}
-                      title={`${item.label} (${item.hotkey})`}
-                      type="button"
-                    >
-                      <span className="nav-item__leading">
-                        <span className="nav-item__icon">
-                          <Icon name={item.icon} size={17} />
-                        </span>
-                        <span>{item.label}</span>
-                      </span>
-                    </button>
-                  ))}
-                </nav>
-              </section>
-
-              <section className="sidebar__section">
-                <span className="sidebar__sectionLabel">도구와 관리</span>
-                <nav className="sidebar__nav">
-                  {supportNavigationItems.map((item) => (
-                    <button
-                      key={item.id}
-                      aria-current={page === item.id ? 'page' : undefined}
-                      aria-keyshortcuts={item.hotkey}
-                      className={`nav-item ${page === item.id ? 'is-active' : ''}`}
-                      onClick={() => navigate(item.id)}
-                      title={`${item.label} (${item.hotkey})`}
-                      type="button"
-                    >
-                      <span className="nav-item__leading">
-                        <span className="nav-item__icon">
-                          <Icon name={item.icon} size={17} />
-                        </span>
-                        <span>{item.label}</span>
-                      </span>
-                    </button>
-                  ))}
-                </nav>
-              </section>
-            </div>
+            }
+            sections={[
+              { label: PRIMARY_NAV_LABEL, items: workspaceNavigationItems.map(mapNavItem) },
+              { label: SUPPORT_NAV_LABEL, items: supportNavigationItems.map(mapNavItem) },
+            ]}
+            footer={
+              <PanelCard className="app-sidebar__status" tone="muted">
+                <div className="app-sidebar__statusGrid">
+                  <StatCard
+                    label="실행기"
+                    meta={readyProviderCount > 0 ? '연결 확인 완료' : '확인 필요'}
+                    tone={readyProviderCount > 0 ? 'success' : 'muted'}
+                    value={`${readyProviderCount}개 준비`}
+                  />
+                  <StatCard label="작업 위치" meta={workspaceLocation.title} value={workspaceLocation.label} />
+                </div>
+              </PanelCard>
+            }
+          />
+        }
+      >
+        <div id="main-content" tabIndex={-1}>
+          <div className="app-frame__statusRow app-frame__statusRow--top">
+            <StatusPill tone="muted">Premium AI Operator Console</StatusPill>
+            <StatusPill tone={readyProviderCount > 0 ? 'success' : 'warning'}>
+              {readyProviderCount > 0 ? `${readyProviderCount}개 실행기 준비` : '실행기 확인 필요'}
+            </StatusPill>
+            <StatusPill tone="muted">{workspaceLocation.label}</StatusPill>
           </div>
 
-          <div className="sidebar__bottom">
-            <div className="sidebar__meta">
-              <span>
-                {readyProviderCount > 0 ? `${readyProviderCount}개 실행기 준비됨` : '실행기 상태 확인 필요'}
-              </span>
-              <strong title={workspaceLocation.title}>{workspaceLocation.label}</strong>
-            </div>
-          </div>
-        </aside>
-
-        <main className="page-frame" id="main-content" tabIndex={-1}>
           <Suspense
             fallback={
               <section className="page page-loading">
-                <div className="panel-card panel-card--muted page-loading__card">
+                <div className="ui-panel ui-panel--muted page-loading__card">
                   <strong>
                     {currentPageLabel} {LOADING_SUFFIX}
                   </strong>
@@ -355,8 +329,8 @@ export default function App() {
           >
             <CrewPage page={page as VisiblePageId} onNavigate={navigate} />
           </Suspense>
-        </main>
-      </div>
+        </div>
+      </AppShell>
     </>
   )
 }

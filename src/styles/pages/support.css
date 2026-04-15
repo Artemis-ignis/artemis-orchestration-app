@@ -1,0 +1,20 @@
+.signals-page,
+.insights-page,
+.skills-page,
+.activity-page {
+  gap: var(--space-6);
+}
+
+.signals-overview-strip {
+  gap: var(--space-4);
+}
+
+.signals-overview-tile,
+.signals-source-card,
+.signals-feed-panel,
+.signals-inspector,
+.signals-post-view {
+  border-radius: var(--radius-xl);
+  border-color: rgba(164, 184, 219, 0.08);
+  background: linear-gradient(180deg, rgba(15, 23, 37, 0.96), rgba(10, 16, 27, 0.96));
+}
