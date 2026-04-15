@@ -78,3 +78,40 @@
   - `failed`
 - The latest public orchestration screenshot shows the parallel worker state instead of the old all-nodes-everywhere layout.
 - Public settings screenshots now use a dedicated doc-screenshot mode that strips saved provider state before capture.
+
+## 2026-04-15 Auto-post Generator
+
+- The signals stack now has a second lane for `auto-generated posts` built on top of the existing signal collectors instead of replacing them.
+- The bridge now starts an hourly auto-post scheduler and persists scheduler state, settings, dedupe hashes, and generated post ids under `generated-posts/`.
+- Auto-post runs now store both article files and metadata files:
+  - `generated-posts/YYYY-MM-DD/{timestamp}-{slug}.html`
+  - `generated-posts/YYYY-MM-DD/{timestamp}-{slug}.json`
+  - `generated-posts/index.json`
+  - `generated-posts/state.json`
+- Auto-post runs now cache media assets under `media-cache/` and can fall back to Playwright screenshots when OG media is missing.
+- The scheduler currently defaults to:
+  - enabled
+  - `intervalMs = 3600000`
+  - `topK = 1`
+  - `generationModel = gpt-5.4-mini`
+  - screenshot fallback enabled
+- The signals page now has two tabs:
+  - live signals
+  - auto-generated posts
+- The auto-post tab now supports:
+  - scheduler status
+  - settings patching
+  - immediate run
+  - post list
+  - HTML preview
+  - regenerate
+  - export
+  - reveal folder
+- Manual verification confirmed one real generated article was saved locally and rendered in the browser preview.
+- Runtime-generated article files and media cache are now gitignored so test output does not pollute the repo.
+
+## Next Checks
+
+- Watch whether hourly generation time stays acceptable when the bridge is also serving chat and orchestration traffic.
+- Decide whether the default generation model should stay `gpt-5.4-mini` or become configurable per category with a lighter fallback chain.
+- Consider trimming absolute local file paths from detailed auto-post API responses if the same API is ever exposed outside localhost.

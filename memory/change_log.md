@@ -91,6 +91,44 @@
 - Regenerated `docs/screenshots/settings.png` so the public settings screenshot matches the new stable local-runtime UI.
 - Removed the temporary duplicated commented block left in `src/pages/SettingsPage.tsx` after the hotfix so the file is smaller and easier to maintain.
 
+### Signals auto-post generator
+
+- Added a new auto-post pipeline under `local-bridge/auto-posts/` with separate modules for normalization, scoring, media collection, generation, storage, candidate collection, and scheduling.
+- Reused the existing signal query and source collectors from `local-bridge/server.mjs` by adding a raw `collectSignalItems(category)` path that feeds both the live signal UI and the auto-post scheduler.
+- Added candidate normalization and dedupe handling for canonical URLs, arXiv ids, and YouTube ids so the scheduler can skip repeated topics across runs.
+- Added scoring that blends recency, source quality, AI-topic relevance, community signals, media presence, and category weights before selecting the top candidates.
+- Added source-specific enrichment for Hacker News, GitHub, arXiv, and generic webpages, including OG metadata extraction and related source stats.
+- Added a media pipeline that tries oEmbed first, then OG image/video metadata, then cached remote assets, and finally Playwright screenshots as a fallback.
+- Added a Korean long-form article generator with:
+  - a versioned prompt builder
+  - Codex-backed structured JSON generation
+  - a rules-based HTML fallback when the model call fails
+- Added persistent storage for:
+  - generated HTML articles
+  - JSON metadata
+  - index and scheduler state
+  - scheduler settings
+  - media cache files
+- Added bridge APIs for:
+  - listing auto-posts
+  - fetching details
+  - manual run
+  - regenerate
+  - export
+  - reveal folder
+  - scheduler state
+  - settings patch
+  - media asset serving
+- Reworked `src/pages/SignalsPage.tsx` into two tabs so the UI now supports both the existing real-time signal feed and the new auto-generated article workflow.
+- Added a full article management panel in the signals page with scheduler state, editable settings, recent post cards, HTML preview, media/source sections, regenerate, export, and folder-open actions.
+- Added frontend types and bridge client helpers for the new auto-post API surface.
+- Documented the feature in `README.md`, added a verified screenshot, and added `generated-posts/` plus `media-cache/` to `.gitignore`.
+- Verified end-to-end that:
+  - `POST /api/auto-posts/run` creates a real article,
+  - saved HTML/JSON files exist on disk,
+  - list/detail/state/export APIs respond,
+  - the signals auto-post tab renders the saved article preview in the browser.
+
 ### Orchestration state persistence
 
 - Added a dedicated `orchestration` state slice so the current draft, selected model set, and latest orchestration session survive page navigation and reloads.

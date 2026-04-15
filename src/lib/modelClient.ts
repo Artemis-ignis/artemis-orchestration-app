@@ -5,6 +5,13 @@ import type {
   SettingsState,
   ToolItem,
 } from '../state/types'
+import type {
+  AutoPostDetailResponse,
+  AutoPostExportResponse,
+  AutoPostsListResponse,
+  AutoPostsRunResponse,
+  AutoPostsStateResponse,
+} from '../types/autoPosts'
 
 export type ProviderStatus = {
   provider: 'ollama' | 'codex'
@@ -61,6 +68,11 @@ export type SignalFeedItem = {
   source: string
   category: string
   publishedAt: string
+  sourceType?: string
+  sourceLabel?: string
+  categoryLabel?: string
+  discoveredAt?: string
+  rawMeta?: Record<string, unknown>
 }
 
 export type SignalFeedResponse = {
@@ -163,6 +175,130 @@ export async function fetchSkillCatalog(bridgeUrl: string) {
 }
 
 export const fetchSkillsCatalog = fetchSkillCatalog
+
+export async function fetchAutoPosts(bridgeUrl: string) {
+  const response = await fetchWithTimeout(`${bridgeUrl}/api/auto-posts`, undefined, 45_000)
+  return readJson<AutoPostsListResponse>(response)
+}
+
+export async function fetchAutoPostDetail(bridgeUrl: string, postId: string) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/auto-posts/${encodeURIComponent(postId)}`,
+    undefined,
+    45_000,
+  )
+  return readJson<AutoPostDetailResponse>(response)
+}
+
+export async function fetchAutoPostState(bridgeUrl: string) {
+  const response = await fetchWithTimeout(`${bridgeUrl}/api/auto-posts/state`, undefined, 20_000)
+  return readJson<AutoPostsStateResponse>(response)
+}
+
+export async function runAutoPosts({
+  bridgeUrl,
+  category,
+  limit,
+  force = false,
+}: {
+  bridgeUrl: string
+  category?: string
+  limit?: number
+  force?: boolean
+}) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/auto-posts/run`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ category, limit, force }),
+    },
+    260_000,
+  )
+  return readJson<AutoPostsRunResponse>(response)
+}
+
+export async function regenerateAutoPost(bridgeUrl: string, postId: string) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/auto-posts/${encodeURIComponent(postId)}/regenerate`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({}),
+    },
+    260_000,
+  )
+  return readJson<AutoPostsRunResponse>(response)
+}
+
+export async function updateAutoPostSettings({
+  bridgeUrl,
+  patch,
+}: {
+  bridgeUrl: string
+  patch: Record<string, unknown>
+}) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/auto-posts/settings`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify(patch),
+    },
+    30_000,
+  )
+  return readJson<AutoPostsStateResponse>(response)
+}
+
+export async function exportAutoPost({
+  bridgeUrl,
+  postId,
+  format = 'html',
+}: {
+  bridgeUrl: string
+  postId: string
+  format?: 'html' | 'markdown'
+}) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/auto-posts/${encodeURIComponent(postId)}/publish-export`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ format }),
+    },
+    30_000,
+  )
+  return readJson<AutoPostExportResponse>(response)
+}
+
+export async function revealAutoPostFolder({
+  bridgeUrl,
+  postId,
+}: {
+  bridgeUrl: string
+  postId: string
+}) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/auto-posts/${encodeURIComponent(postId)}/reveal`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({}),
+    },
+    20_000,
+  )
+  return readJson<{ ok: boolean; absolutePath: string }>(response)
+}
 
 export async function executeModelPrompt({
   bridgeUrl,

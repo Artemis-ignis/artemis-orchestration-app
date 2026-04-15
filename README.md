@@ -34,6 +34,10 @@
 
 ![Artemis 오케스트레이션 화면](docs/screenshots/orchestration.png)
 
+### 시그널 자동 게시글
+
+![Artemis 시그널 자동 게시글 화면](docs/screenshots/signals-auto-posts.png)
+
 ## 이 기능이 하는 일
 
 설정 화면에서 공급자별 API 키를 저장하면, 아르테미스가 아래 순서로 동작합니다.
@@ -44,6 +48,37 @@
 4. 가장 점수가 높은 무료 후보부터 시도합니다.
 5. 실패하면 다음 무료 후보로 자동 폴백합니다.
 6. 채팅 화면에서 스트리밍 응답, 시도 로그, 폴백 이유를 함께 보여줍니다.
+
+## 시그널 자동 게시글 생성기
+
+이번 버전에는 기존 시그널 피드를 확장한 `자동 게시글 생성기`가 들어 있습니다.
+
+브리지는 아래 순서로 동작합니다.
+
+1. 기존 시그널 쿼리 구조로 Hacker News, GitHub, arXiv 공개 피드를 수집합니다.
+2. URL 정규화와 소스별 메타데이터 확장으로 후보를 정리합니다.
+3. 최신성, 출처 품질, AI 관련성, 커뮤니티 반응, 카테고리 가중치로 점수를 계산합니다.
+4. 상위 1~3개 후보만 골라 대표 미디어를 확보합니다.
+5. Codex로 한국어 장문 HTML 기사형 게시글을 생성합니다.
+6. 생성 실패 시에도 규칙 기반 fallback HTML을 저장합니다.
+7. 결과물과 상태는 아래 경로에 저장됩니다.
+
+- `generated-posts/YYYY-MM-DD/*.html`
+- `generated-posts/YYYY-MM-DD/*.json`
+- `generated-posts/index.json`
+- `generated-posts/state.json`
+- `media-cache/*`
+
+프런트의 `시그널 -> 자동 생성 게시글` 탭에서는 아래를 바로 할 수 있습니다.
+
+- 생성된 게시글 목록 보기
+- 실제 HTML 미리보기
+- 원문 링크와 첨부 미디어 확인
+- `지금 실행`
+- `재생성`
+- `폴더 열기`
+- `HTML 내보내기`
+- 스케줄러 상태 및 설정 관리
 
 ## 왜 3개 공급자만 지원하나
 
@@ -174,6 +209,24 @@ npm run dev
 npm run build
 ```
 
+### 6. 자동 게시글 수동 실행 확인
+
+PowerShell 예시:
+
+```powershell
+$body = @{
+  category = 'AI 및 기술'
+  limit    = 1
+  force    = $true
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+  -Uri 'http://127.0.0.1:4174/api/auto-posts/run' `
+  -Method Post `
+  -ContentType 'application/json; charset=utf-8' `
+  -Body $body
+```
+
 ## WSL 기준 실행
 
 아래 순서대로 그대로 실행하면 됩니다.
@@ -221,6 +274,16 @@ OpenRouter 부가 정보:
 데이터 저장 경로:
 
 - `ARTEMIS_DATA_DIR`
+- `ARTEMIS_AUTO_POST_OUTPUT_DIR`
+
+자동 게시글 생성기:
+
+- `ARTEMIS_AUTO_POST_ENABLED`
+- `ARTEMIS_AUTO_POST_INTERVAL_MS`
+- `ARTEMIS_AUTO_POST_TOP_K`
+- `ARTEMIS_AUTO_POST_MODEL`
+- `ARTEMIS_AUTO_POST_SCREENSHOT_FALLBACK`
+- `ARTEMIS_AUTO_POST_OUTPUT_DIR`
 
 자세한 예시는 [`.env.example`](.env.example) 를 보면 됩니다.
 

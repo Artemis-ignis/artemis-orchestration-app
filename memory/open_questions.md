@@ -1,19 +1,20 @@
 # Open Questions
 
-## 현재 가정
+## Current Assumptions
 
-- 마스터는 공개 랜딩보다 기존 Artemis 워크스페이스 품질을 우선한다.
-- Hermes-style 운영 구조는 문서와 메모 파일 중심으로 유지하고, 과한 프레임워크는 추가하지 않는다.
-- 로컬 Ollama는 단일 모델 체제로 계속 유지한다.
+- Master is prioritizing the existing Artemis workspace UX over a separate public landing experience.
+- Hermes-style workflow documents and memory files should stay lightweight and practical instead of growing into a large framework.
+- Local Ollama remains a single-model runtime for now unless more local models are intentionally added.
 
-## 아직 미확정
+## Still Unresolved
 
-- Google 로그인 운영 키를 실제로 연결할지 여부
-- OpenRouter / NVIDIA Build / Gemini 실키를 넣어 최종 스트리밍 검증까지 진행할지 여부
-- 공개 마케팅 페이지를 완전히 제거할지, 비노출 상태로 유지할지 여부
+- Verify the remaining official-provider paths end to end, especially Google, OpenRouter, and Gemini flows.
+- Decide whether the secondary navigation groups should collapse by default to reduce first-screen density further.
+- Re-check public screenshots whenever workspace labels, runtime cards, or orchestration labels change again.
 
-## 다음에 확인할 문제
+## 2026-04-15 Auto-post Follow-ups
 
-- 오케스트레이션 실행 도크를 더 얇은 하단 바 형태로 바꿀지
-- 설정 화면의 아이콘/칩 비율을 한 번 더 눌러야 하는지
-- 채팅 화면의 라우팅 메타를 더 줄일지 여부
+- Decide whether auto-post generation should always create one deep-dive article or optionally create a bundled multi-topic article when the top candidates are too weak individually.
+- Decide whether detailed auto-post JSON responses should stop returning absolute local `htmlFilePath` and `jsonFilePath` values.
+- Decide whether a second lighter fallback model should be configured when `gpt-5.4-mini` generation is slow or temporarily unavailable.
+- Decide whether old generated posts should be pruned automatically after a retention window or kept indefinitely in the local workspace.
