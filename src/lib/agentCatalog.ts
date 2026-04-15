@@ -27,7 +27,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     provider: 'codex',
     baseUrl: '',
     model: 'gpt-5.4',
-    description: '로컬 Codex CLI와 ChatGPT 로그인으로 코드 작업과 실전형 질의를 처리합니다.',
+    description: '로컬 Codex CLI와 ChatGPT 로그인을 통해 코드 작업과 실전형 질의를 처리합니다.',
     requiresApiKey: false,
     officialUrl: 'https://developers.openai.com/codex/cli',
     recommendedModels: ['gpt-5.4', 'gpt-5.4-mini'],
@@ -35,20 +35,14 @@ export const AGENT_PRESETS: AgentPreset[] = [
   },
   {
     id: 'official-router',
-    label: '공식 무료 라우터',
+    label: '공식 API',
     provider: 'official-router',
-    baseUrl: '',
-    model: 'auto-best-free',
-    description:
-      'OpenRouter, NVIDIA Build, Gemini Developer API의 무료 후보를 자동 선택하고 실패 시 다음 후보로 자동 폴백합니다.',
+    baseUrl: 'openrouter',
+    model: 'openai/gpt-4.1-mini',
+    description: 'OpenRouter, NVIDIA Build, Gemini 중 하나를 직접 선택하고 원하는 모델 ID로 바로 실행합니다.',
     requiresApiKey: false,
     officialUrl: '',
-    recommendedModels: [
-      'auto-best-free',
-      'auto-best-free-coding',
-      'auto-best-free-fast',
-      'manual',
-    ],
+    recommendedModels: ['openai/gpt-4.1-mini', 'google/gemini-2.5-flash-preview', 'gemini-2.5-flash'],
     capabilities: ['chat', 'code', 'files', 'web', 'automation'],
   },
   {
@@ -108,11 +102,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     description: 'OpenRouter 무료 라우터를 통해 공개 무료 모델을 연결합니다.',
     requiresApiKey: true,
     officialUrl: 'https://openrouter.ai/docs/guides/routing/routers/free-models-router',
-    recommendedModels: [
-      'openrouter/free',
-      'qwen/qwen3-coder:free',
-      'deepseek/deepseek-r1:free',
-    ],
+    recommendedModels: ['openrouter/free', 'qwen/qwen3-coder:free', 'deepseek/deepseek-r1:free'],
     capabilities: ['chat', 'web', 'automation'],
   },
   {
@@ -124,11 +114,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     description: 'AIHubMix의 OpenAI 호환 무료 모델을 연결합니다.',
     requiresApiKey: true,
     officialUrl: 'https://docs.aihubmix.com/en/api/Opencode',
-    recommendedModels: [
-      'coding-glm-4.7-free',
-      'coding-minimax-m2.1-free',
-      'Qwen/Qwen3-30B-A3B',
-    ],
+    recommendedModels: ['coding-glm-4.7-free', 'coding-minimax-m2.1-free', 'Qwen/Qwen3-30B-A3B'],
     capabilities: ['chat', 'code', 'automation'],
   },
   {
@@ -184,7 +170,7 @@ export function buildAgentFromPreset(
     apiKeyId: null,
     systemPrompt:
       overrides?.systemPrompt ??
-      '항상 한국어로 답하고, 결론부터 간결하고 실무적으로 정리합니다. 필요하면 실행 결과와 다음 조치를 분리해서 제시합니다.',
+      '항상 한국어로 답하고 결론부터 간결하게 정리합니다. 필요하면 실행 결과와 다음 조치를 분리해서 제시합니다.',
     enabled: true,
     capabilities: preset.capabilities,
     status: 'idle',
@@ -199,7 +185,7 @@ export function getAgentProviderLabel(provider: AgentProviderKind) {
     case 'ollama':
       return 'Ollama'
     case 'official-router':
-      return '공식 무료 라우터'
+      return '공식 API'
     case 'anthropic':
       return 'Anthropic'
     default:

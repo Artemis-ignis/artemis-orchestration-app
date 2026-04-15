@@ -4,7 +4,6 @@ import {
   fetchAiModels,
   fetchAiProviders,
   fetchAiSettings,
-  previewAiRoute,
   refreshAiModels,
   saveAiProvider,
   saveAiSettings,
@@ -12,11 +11,10 @@ import {
   type AiModelCatalogEntry,
   type AiProviderId,
   type AiProviderState,
-  type AiRoutePreview,
-  type AiRoutingMode,
   type AiRoutingSettings,
 } from '../lib/aiRoutingClient'
 import { getAgentPreset } from '../lib/agentCatalog'
+import type { ProviderStatus } from '../lib/modelClient'
 import { formatFriendlyModelName } from '../crewPageHelpers'
 import { DisclosureSection, EmptyState, PageIntro } from '../crewPageShared'
 import { Icon } from '../icons'
@@ -25,11 +23,16 @@ import type { AgentCapability, AgentPresetId } from '../state/types'
 
 const MANAGED_AGENT_PRESETS: AgentPresetId[] = ['official-router', 'codex-cli', 'ollama-local']
 const OFFICIAL_PROVIDER_ORDER: AiProviderId[] = ['openrouter', 'nvidia-build', 'gemini']
+const LOCAL_PROVIDER_ORDER = ['ollama', 'codex'] as const
 
 type ProviderDraft = {
   enabled: boolean
   apiKey: string
   candidateModelsText: string
+}
+
+type LocalProviderCard = ProviderStatus & {
+  provider: (typeof LOCAL_PROVIDER_ORDER)[number]
 }
 
 function isDocScreenshotMode() {
@@ -92,45 +95,95 @@ function localProviderIconName(provider: 'ollama' | 'codex'): 'spark' | 'agent' 
   return provider === 'ollama' ? 'spark' : 'agent'
 }
 
-function localProviderSummary(provider: 'ollama' | 'codex', detail: string) {
-  if (provider === 'ollama') {
-    return detail.includes('사용할 수 있습니다.')
-      ? '내 PC의 작은 로컬 모델을 바로 채팅과 오케스트레이션에 붙입니다.'
-      : 'Ollama 앱, 모델 설치, 업데이트 상태를 먼저 확인해야 합니다.'
+function formatLocalProviderTime(value?: string | null) {
+  if (!value) {
+    return '기록 없음'
   }
 
-  return detail.includes('Logged in')
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString('ko-KR', {
+        hour12: false,
+      })
+}
+
+function localProviderSummary(provider: LocalProviderCard) {
+  if (provider.provider === 'ollama') {
+    if (provider.ready && provider.stale) {
+      return '최근 확인은 실패했지만 마지막으로 확인된 Ollama 모델 상태를 유지 중입니다.'
+    }
+
+    if (provider.ready) {
+      return '로컬 Ollama 모델을 바로 채팅과 오케스트레이션에 붙입니다.'
+    }
+
+    if (provider.available) {
+      return 'Ollama 서버는 보이지만 바로 쓸 모델 상태를 다시 확인해야 합니다.'
+    }
+
+    return 'Ollama 앱 실행과 모델 목록 확인이 필요합니다.'
+  }
+
+  return provider.ready
     ? '로컬 Codex CLI가 실제 파일 수정과 코드 작업을 처리합니다.'
     : 'Codex CLI 로그인 또는 준비 상태를 다시 확인해야 합니다.'
 }
 
-function localProviderStatusLabel(provider: { available: boolean; ready: boolean }) {
+function localProviderStatusLabel(provider: {
+  available: boolean
+  ready: boolean
+  stale?: boolean
+}) {
+  if (provider.ready && provider.stale) return '마지막 정상 상태'
   if (provider.ready) return '준비 완료'
   if (provider.available) return '부분 준비'
   return '미연결'
 }
 
+function buildFallbackLocalProvider(
+  provider: (typeof LOCAL_PROVIDER_ORDER)[number],
+  bridgeError: string | null,
+): LocalProviderCard {
+  const isOllama = provider === 'ollama'
+
+  return {
+    provider,
+    available: false,
+    ready: false,
+    models: isOllama ? [] : ['gpt-5.4', 'gpt-5.4-mini'],
+    detail: isOllama
+      ? '로컬 Ollama 상태를 아직 확인하지 못했습니다.'
+      : 'Codex CLI 상태를 아직 확인하지 못했습니다.',
+    warning: bridgeError ? '최근 확인에 실패했습니다.' : '상태 확인 전입니다.',
+    lastError: bridgeError,
+    stale: Boolean(bridgeError),
+    lastCheckedAt: null,
+    lastSuccessAt: null,
+  }
+}
+
 function providerAutoSummary(provider: AiProviderId) {
   switch (provider) {
     case 'openrouter':
-      return '키를 저장하면 OpenRouter 무료 후보 중 실제로 호출되는 모델만 자동 후보에 들어갑니다.'
+      return 'OpenRouter 키를 저장하고 연결을 확인한 뒤 원하는 모델 ID로 바로 실행합니다.'
     case 'nvidia-build':
-      return '키를 저장하면 NVIDIA Build 무료 호출 가능 후보만 자동 검증 후 후보에 들어갑니다.'
+      return 'NVIDIA Build 키를 저장하고 연결을 확인한 뒤 원하는 모델 ID를 직접 붙일 수 있습니다.'
     case 'gemini':
-      return '키를 저장하면 Gemini 무료 호출 가능 후보만 확인해서 자동 후보에 넣습니다.'
+      return 'Gemini Developer API 키를 저장하고 원하는 모델 ID로 바로 호출합니다.'
     default:
-      return '키를 저장하고 테스트를 통과한 무료 후보만 자동 라우팅에 들어갑니다.'
+      return '공식 공급자를 연결한 뒤 원하는 모델 ID를 직접 지정합니다.'
   }
 }
 
 function providerInputHint(provider: AiProviderId) {
   switch (provider) {
     case 'openrouter':
-      return 'OpenRouter 공식 키를 넣으면 OpenRouter 무료 후보만 검사합니다.'
+      return 'OpenRouter 공식 키를 넣으면 해당 계정으로 직접 모델을 호출합니다.'
     case 'nvidia-build':
-      return 'NVIDIA Build 공식 키를 넣으면 NVIDIA 무료 개발 후보만 검사합니다.'
+      return 'NVIDIA Build 공식 키를 넣으면 해당 계정으로 직접 모델을 호출합니다.'
     case 'gemini':
-      return 'Gemini Developer API 키를 넣으면 Gemini 무료 후보만 검사합니다.'
+      return 'Gemini Developer API 키를 넣으면 해당 계정으로 직접 모델을 호출합니다.'
     default:
       return '공식 사이트에서 받은 키만 넣어 주세요.'
   }
@@ -140,7 +193,7 @@ function providerFlowSteps(provider: AiProviderId) {
   return [
     '키 저장',
     `${provider === 'gemini' ? 'Gemini' : provider === 'nvidia-build' ? 'NVIDIA' : 'OpenRouter'} 연결 테스트`,
-    '통과한 무료 후보만 자동 선택',
+    '원하는 모델 ID 지정',
   ]
 }
 
@@ -148,24 +201,46 @@ function providerStatusLabel(provider: AiProviderState) {
   if (!provider.enabled) return '비활성'
   if (!provider.configured) return '미설정'
   if (provider.status === 'ready') return '연결 성공'
-  if (provider.available_count > 0) return '무료 후보 탐색 가능'
+  if (provider.available_count > 0) return '모델 확인됨'
   if (provider.last_test_status === 'failed') return '연결 실패'
   return '설정됨'
 }
 
-function routingModeLabel(mode: AiRoutingMode) {
-  switch (mode) {
-    case 'auto-best-free':
-      return '자동 무료 최상'
-    case 'auto-best-free-coding':
-      return '자동 무료 코딩 최상'
-    case 'auto-best-free-fast':
-      return '자동 무료 빠른 응답'
-    case 'manual':
-      return '수동 선택'
-    default:
-      return mode
+function providerRecentStatus(provider: AiProviderState) {
+  const normalizeStatusText = (value: string) =>
+    value
+      .replaceAll('무료 후보를 검증했고 지금 바로 사용할 수 있습니다.', '직접 호출 가능한 모델을 확인했고 지금 바로 사용할 수 있습니다.')
+      .replaceAll('키는 저장됐지만 지금 바로 쓸 수 있는 무료 후보를 찾지 못했습니다.', '키는 저장됐지만 지금 바로 쓸 수 있는 모델을 찾지 못했습니다.')
+      .replaceAll('API 키를 저장하면 무료 후보를 검증합니다.', 'API 키를 저장하면 직접 호출 가능한 모델을 확인합니다.')
+      .replaceAll('무료 후보는 보이지만 현재 키로 바로 호출되는 모델을 찾지 못했습니다.', '현재 키로 바로 호출되는 모델을 찾지 못했습니다.')
+
+  if (provider.last_test_message) {
+    return normalizeStatusText(provider.last_test_message)
   }
+
+  if (provider.detail) {
+    return normalizeStatusText(provider.detail)
+  }
+
+  if (provider.status === 'ready') {
+    return '연결 테스트를 통과했습니다.'
+  }
+
+  if (provider.configured) {
+    return '키는 저장되었고 연결 테스트를 기다리고 있습니다.'
+  }
+
+  return '아직 설정되지 않았습니다.'
+}
+
+function providerRecentCheckedLabel(provider: AiProviderState) {
+  const value = provider.last_test_at ?? provider.checked_at ?? provider.updated_at
+
+  if (!value) {
+    return '아직 연결 테스트 전'
+  }
+
+  return `마지막 확인 ${formatLocalProviderTime(value)}`
 }
 
 function buildProviderDrafts(providers: AiProviderState[]) {
@@ -279,10 +354,12 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
   const [aiProviders, setAiProviders] = useState<AiProviderState[]>([])
   const [aiModels, setAiModels] = useState<AiModelCatalogEntry[]>([])
   const [aiSettings, setAiSettings] = useState<AiRoutingSettings | null>(null)
-  const [aiPreview, setAiPreview] = useState<AiRoutePreview | null>(null)
   const [providerDrafts, setProviderDrafts] = useState<Record<string, ProviderDraft>>({})
   const [aiError, setAiError] = useState<string | null>(null)
   const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [isRefreshingLocalProviders, setIsRefreshingLocalProviders] = useState(false)
+  const [officialProviderDraft, setOfficialProviderDraft] = useState<AiProviderId>('openrouter')
+  const [officialModelDraft, setOfficialModelDraft] = useState('')
   const docScreenshotMode = useMemo(() => isDocScreenshotMode(), [])
 
   const managedAgents = useMemo(
@@ -291,25 +368,39 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
   )
   const activeManagedAgent =
     (activeAgent && MANAGED_AGENT_PRESETS.includes(activeAgent.preset) ? activeAgent : null) ?? managedAgents[0] ?? null
-  const topCandidate = aiPreview?.candidates[0] ?? null
-  const readyLocalProviders = bridgeHealth?.providers.filter((item) => item.ready).length ?? 0
+  const officialAgents = useMemo(
+    () => state.agents.items.filter((agent) => agent.provider === 'official-router'),
+    [state.agents.items],
+  )
   const localProviders = useMemo(
-    () =>
-      ((bridgeHealth?.providers ?? []).filter(
-        (item) => item.provider === 'ollama' || item.provider === 'codex',
-      ) as Array<{
-        provider: 'ollama' | 'codex'
-        available: boolean
-        ready: boolean
-        models: string[]
-        detail: string
-      }>),
-    [bridgeHealth],
+    () => {
+      const providerMap = new Map(
+        (bridgeHealth?.providers ?? [])
+          .filter(
+            (item): item is LocalProviderCard =>
+              item.provider === 'ollama' || item.provider === 'codex',
+          )
+          .map((item) => [item.provider, item]),
+      )
+
+      return LOCAL_PROVIDER_ORDER.map(
+        (provider) => providerMap.get(provider) ?? buildFallbackLocalProvider(provider, bridgeError),
+      )
+    },
+    [bridgeError, bridgeHealth],
+  )
+  const readyLocalProviders = useMemo(
+    () => localProviders.filter((item) => item.ready).length,
+    [localProviders],
+  )
+  const showingCachedLocalState = useMemo(
+    () => localProviders.some((item) => item.stale),
+    [localProviders],
   )
   const manualCandidates = useMemo(
     () =>
       [...aiModels]
-        .filter((item) => item.free_candidate && item.verified_available && !item.excluded)
+        .filter((item) => !item.excluded)
         .sort((left, right) => (right.score ?? right.quality_score) - (left.score ?? left.quality_score)),
     [aiModels],
   )
@@ -334,10 +425,28 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
   const readyOfficialProviders = useMemo(
     () =>
       visibleAiProviders.filter(
-        (item) => item.enabled && item.configured && (item.status === 'ready' || item.available_count > 0),
+        (item) => item.enabled && item.configured,
       ).length,
     [visibleAiProviders],
   )
+  const selectedOfficialProviderState =
+    visibleAiProviders.find((item) => item.provider === officialProviderDraft) ?? null
+  const selectedOfficialModelChoices = useMemo(
+    () =>
+      manualCandidates
+        .filter((item) => item.provider === officialProviderDraft)
+        .slice(0, 8),
+    [manualCandidates, officialProviderDraft],
+  )
+
+  const handleRefreshLocalProviders = useCallback(async () => {
+    setIsRefreshingLocalProviders(true)
+    try {
+      await refreshBridgeHealth()
+    } finally {
+      setIsRefreshingLocalProviders(false)
+    }
+  }, [refreshBridgeHealth])
 
   const loadAiState = useCallback(async () => {
     try {
@@ -346,16 +455,12 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
         fetchAiSettings(state.settings.bridgeUrl),
         fetchAiModels(state.settings.bridgeUrl, { includeExcluded: true }),
       ])
-      const preview = await previewAiRoute(state.settings.bridgeUrl, {
-        routing_mode: settings.routing_mode,
-        manual_provider: settings.manual_provider,
-        manual_model: settings.manual_model,
-      })
       setAiProviders(providers)
       setAiSettings(settings)
       setAiModels(models)
-      setAiPreview(preview)
       setProviderDrafts(buildProviderDrafts(providers))
+      setOfficialProviderDraft(settings.manual_provider ?? 'openrouter')
+      setOfficialModelDraft(settings.manual_model ?? '')
       setAiError(null)
     } catch (error) {
       setAiError(error instanceof Error ? error.message : 'AI 설정을 불러오지 못했습니다.')
@@ -376,6 +481,34 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
       },
     }))
   }
+
+  const syncOfficialAgents = useCallback(
+    (provider: AiProviderId, modelId: string) => {
+      const normalizedModel = modelId.trim()
+      if (!normalizedModel) {
+        return
+      }
+
+      officialAgents.forEach((agent) => {
+        if (agent.baseUrl !== provider || agent.model !== normalizedModel) {
+          updateAgent(agent.id, {
+            baseUrl: provider,
+            model: normalizedModel,
+            description: `${providerDescription(provider)}로 ${normalizedModel}을 직접 실행합니다.`,
+          })
+        }
+      })
+    },
+    [officialAgents, updateAgent],
+  )
+
+  useEffect(() => {
+    if (!aiSettings?.manual_provider || !aiSettings.manual_model) {
+      return
+    }
+
+    syncOfficialAgents(aiSettings.manual_provider, aiSettings.manual_model)
+  }, [aiSettings, syncOfficialAgents])
 
   const saveProviderConfig = async (provider: AiProviderId) => {
     const draft = providerDrafts[provider]
@@ -413,35 +546,35 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
       await refreshAiModels(state.settings.bridgeUrl, provider)
       await loadAiState()
     } catch (error) {
-      setAiError(error instanceof Error ? error.message : '무료 후보 새로고침에 실패했습니다.')
+      setAiError(error instanceof Error ? error.message : '모델 목록 새로고침에 실패했습니다.')
     } finally {
       setBusyKey(null)
     }
   }
 
-  const updateRoutingMode = async (routingMode: AiRoutingMode) => {
-    await saveAiSettings(state.settings.bridgeUrl, {
-      routing_mode: routingMode,
-      manual_provider: routingMode === 'manual' ? aiSettings?.manual_provider ?? null : null,
-      manual_model: routingMode === 'manual' ? aiSettings?.manual_model ?? null : null,
-    })
-    await loadAiState()
-  }
+  const saveOfficialTarget = async (provider: AiProviderId, modelId: string) => {
+    const normalizedModel = modelId.trim()
+    if (!normalizedModel) {
+      setAiError('공식 API에 사용할 모델 ID를 입력해 주세요.')
+      return
+    }
 
-  const updateManualCandidate = async (provider: AiProviderId, modelId: string) => {
-    await saveAiSettings(state.settings.bridgeUrl, {
-      routing_mode: 'manual',
-      manual_provider: provider,
-      manual_model: modelId,
-    })
-    await loadAiState()
-  }
-
-  const toggleCandidateExclusion = async (model: AiModelCatalogEntry) => {
-    await saveAiSettings(state.settings.bridgeUrl, {
-      exclusions: [{ provider: model.provider, model_id: model.model_id, excluded: !model.excluded }],
-    })
-    await loadAiState()
+    setBusyKey('official-target')
+    setOfficialProviderDraft(provider)
+    setOfficialModelDraft(normalizedModel)
+    try {
+      await saveAiSettings(state.settings.bridgeUrl, {
+        routing_mode: 'manual',
+        manual_provider: provider,
+        manual_model: normalizedModel,
+      })
+      syncOfficialAgents(provider, normalizedModel)
+      await loadAiState()
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : '공식 API 기본 실행 대상을 저장하지 못했습니다.')
+    } finally {
+      setBusyKey(null)
+    }
   }
 
   return (
@@ -452,18 +585,8 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
           <span className="chip is-active">서버 암호화 저장</span>
         </div>
         <p className="settings-card__lead">
-          무료 후보도 공식 API 키는 필요합니다. 키 저장 후 테스트를 통과한 후보만 자동 무료 라우팅에 들어갑니다.
+          공식 공급자 연결과 기본 모델 지정만 남겼습니다. 저장된 공급자와 모델로 바로 실행됩니다.
         </p>
-        <div className="settings-explainGrid">
-          <article className="settings-explainCard">
-            <strong>키를 넣으면 바로 되는 일</strong>
-            <p>해당 공급자의 무료 후보를 실제로 호출해 보고, 통과한 모델만 자동 후보 목록에 넣습니다.</p>
-          </article>
-          <article className="settings-explainCard">
-            <strong>자동이 아닌 것</strong>
-            <p>키를 넣는다고 유료 모델을 멋대로 고르지 않습니다. 무료 후보가 없으면 그 공급자는 건너뜁니다.</p>
-          </article>
-        </div>
         <div className="settings-summary-strip">
           <span className={`chip ${readyLocalProviders > 0 ? 'is-active' : 'chip--soft'}`}>로컬 실행기 {readyLocalProviders}개</span>
           <span className={`chip ${readyOfficialProviders > 0 ? 'is-active' : 'chip--soft'}`}>공식 공급자 {readyOfficialProviders}개 준비</span>
@@ -473,16 +596,32 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
         </div>
         <div className="settings-ruleStrip">
           <div className="settings-ruleCard"><strong>1. 키 저장</strong><span>키는 서버에서만 복호화합니다.</span></div>
-          <div className="settings-ruleCard"><strong>2. 연결 테스트</strong><span>실제 호출 가능한 무료 후보만 통과합니다.</span></div>
-          <div className="settings-ruleCard"><strong>3. 자동 폴백</strong><span>실패하면 다음 무료 후보를 자동 시도합니다.</span></div>
+          <div className="settings-ruleCard"><strong>2. 연결 확인</strong><span>공급자별 연결 상태와 최근 오류를 바로 봅니다.</span></div>
+          <div className="settings-ruleCard"><strong>3. 모델 지정</strong><span>원하는 모델 ID를 고정해서 채팅과 오케스트레이션에 씁니다.</span></div>
         </div>
         <div className="settings-actionRow">
           <button className="primary-button" onClick={() => onNavigate('chat')} type="button">채팅 열기</button>
           <button className="ghost-button" onClick={() => onNavigate('agents')} type="button">오케스트레이션 보기</button>
-          <button className="ghost-button" onClick={() => void refreshBridgeHealth()} type="button">로컬 상태 새로고침</button>
+          <button
+            className="ghost-button"
+            disabled={isRefreshingLocalProviders}
+            onClick={() => void handleRefreshLocalProviders()}
+            type="button"
+          >
+            {isRefreshingLocalProviders ? '로컬 상태 확인 중' : '로컬 상태 새로고침'}
+          </button>
         </div>
         {aiError ? <div className="status-banner status-banner--error"><Icon name="warning" size={16} /><span>{aiError}</span></div> : null}
-        {bridgeError ? <div className="status-banner status-banner--warning"><Icon name="warning" size={16} /><span>{bridgeError}</span></div> : null}
+        {bridgeError ? (
+          <div className="status-banner status-banner--warning">
+            <Icon name="warning" size={16} />
+            <span>
+              {showingCachedLocalState
+                ? `최근 로컬 상태 확인에 실패했습니다. 마지막 정상 상태를 유지 중입니다. ${bridgeError}`
+                : bridgeError}
+            </span>
+          </div>
+        ) : null}
       </section>
 
       <section className="settings-card">
@@ -494,22 +633,33 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
         >
           <div className="panel-card__header">
             <p className="settings-card__lead">
-              로컬 실행기는 API 키 없이 바로 붙습니다. Ollama가 안 보이면 앱 실행, 모델 설치, 업데이트 상태부터 확인하면 됩니다.
+              로컬 실행기는 API 키 없이 바로 붙습니다. 최근 확인이 실패해도 마지막 정상 상태를 유지하면서 다시 확인합니다.
             </p>
-            <button className="ghost-button ghost-button--compact" onClick={() => void refreshBridgeHealth()} type="button">
-              로컬 상태 새로고침
-            </button>
           </div>
           <div className="provider-grid provider-grid--local">
             {localProviders.map((provider) => {
               const providerLabel = localProviderLabel(provider.provider)
               const isOllama = provider.provider === 'ollama'
-              const modelSummary =
+              const currentModelName =
                 provider.models.length > 0
-                  ? provider.models.map((item) => formatFriendlyModelName(item)).join(', ')
+                  ? formatFriendlyModelName(provider.models[0])
                   : isOllama
-                    ? '설치된 모델이 아직 없습니다.'
-                    : '사용 가능한 Codex 모델을 불러오지 못했습니다.'
+                    ? '최근 확인된 모델 없음'
+                    : '기본 모델 확인 대기 중'
+              const effectiveWarning =
+                provider.warning ??
+                (bridgeError ? '최근 로컬 상태 확인에 실패했습니다. 마지막 정상 상태를 표시 중입니다.' : null)
+              const effectiveLastError = provider.lastError ?? bridgeError
+              const statusMessage = effectiveWarning
+                ? effectiveLastError
+                  ? `${effectiveWarning} (${effectiveLastError})`
+                  : effectiveWarning
+                : effectiveLastError ?? '최근 경고 없음'
+              const lastCheckedLabel = provider.lastSuccessAt
+                ? `마지막 정상 확인 ${formatLocalProviderTime(provider.lastSuccessAt)}`
+                : provider.lastCheckedAt
+                  ? `마지막 확인 ${formatLocalProviderTime(provider.lastCheckedAt)}`
+                  : '확인 기록 없음'
 
               return (
                 <article key={provider.provider} className="provider-card provider-card--local">
@@ -520,33 +670,47 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
                       </span>
                       <div>
                         <h3>{providerLabel}</h3>
-                        <p className="settings-card__lead">{localProviderSummary(provider.provider, provider.detail)}</p>
+                        <p className="settings-card__lead">{localProviderSummary(provider)}</p>
                       </div>
                     </div>
-                    <span className={`chip ${provider.ready ? 'is-active' : 'chip--soft'}`}>
+                    <span className={`chip ${provider.ready && !provider.stale ? 'is-active' : 'chip--soft'}`}>
                       {localProviderStatusLabel(provider)}
                     </span>
                   </div>
                   <div className="settings-providerFlags chip-wrap">
-                    <span className={`chip ${provider.ready ? 'is-active' : 'chip--soft'}`}>
-                      {provider.ready ? '바로 사용 가능' : '확인 필요'}
+                    <span className={`chip ${provider.ready && !provider.stale ? 'is-active' : 'chip--soft'}`}>
+                      {provider.ready ? '사용 가능' : '확인 필요'}
                     </span>
                     <span className="chip chip--soft">{provider.models.length}개 모델</span>
                   </div>
                   <p className="provider-card__summary">{provider.detail}</p>
                   <div className="provider-card__surface">
-                    <strong>현재 모델</strong>
-                    <span>{modelSummary}</span>
+                    <strong>준비 상태</strong>
+                    <span>{localProviderStatusLabel(provider)}</span>
                   </div>
-                  {isOllama && !provider.ready ? (
-                    <div className="status-banner status-banner--warning">
-                      <Icon name="warning" size={16} />
-                      <span>
-                        지금은 로컬 Ollama가 바로 응답하지 않습니다.
-                        <small className="status-banner__subtle">업데이트 직후라면 10~20초 뒤 다시 새로고침하면 정상으로 바뀔 수 있습니다.</small>
-                      </span>
-                    </div>
-                  ) : null}
+                  <div className="provider-card__surface">
+                    <strong>현재 모델 수</strong>
+                    <span>{provider.models.length}개</span>
+                  </div>
+                  <div className="provider-card__surface">
+                    <strong>현재 모델명</strong>
+                    <span>{currentModelName}</span>
+                  </div>
+                  <div className="provider-card__surface">
+                    <strong>최근 경고</strong>
+                    <span>{statusMessage}</span>
+                  </div>
+                  <p className="settings-inlineMeta">{lastCheckedLabel}</p>
+                  <div className="settings-actionRow">
+                    <button
+                      className="ghost-button ghost-button--compact"
+                      disabled={isRefreshingLocalProviders}
+                      onClick={() => void handleRefreshLocalProviders()}
+                      type="button"
+                    >
+                      {isRefreshingLocalProviders ? '상태 확인 중' : '로컬 상태 새로고침'}
+                    </button>
+                  </div>
                 </article>
               )
             })}
@@ -562,9 +726,9 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
           title="1. 공식 API 공급자"
         >
           <div className="panel-card__header">
-            <p className="settings-card__lead">공급자별 키를 저장하고 무료 후보 탐색 상태를 바로 확인합니다.</p>
+            <p className="settings-card__lead">공급자별 키를 저장하고 직접 호출 가능한 상태인지 바로 확인합니다.</p>
             <button className="ghost-button ghost-button--compact" disabled={busyKey === 'all:refresh'} onClick={() => void refreshProviderCatalog()} type="button">
-              후보 새로고침
+              모델 목록 새로고침
             </button>
           </div>
           <div className="provider-grid provider-grid--official">
@@ -595,7 +759,7 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
                   <input checked={draft.enabled} onChange={(event) => updateDraft(provider.provider, { enabled: event.target.checked })} type="checkbox" />
                 </label>
                 <div className="settings-providerFlags chip-wrap">
-                  <span className="chip chip--soft">무료 후보 {provider.available_count}/{provider.candidate_count}</span>
+                  <span className="chip chip--soft">확인된 모델 {provider.available_count}/{provider.candidate_count}</span>
                   <span className="chip chip--soft">저장된 키 {provider.masked_key || '없음'}</span>
                 </div>
                 <div className="provider-card__flow">
@@ -606,35 +770,47 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
                     </span>
                   ))}
                 </div>
-                <div className="settings-grid">
-                  <label className="field field--full">
-                    <span>{provider.label} API 키</span>
-                    <input
-                      autoComplete="off"
-                      type="password"
-                      value={draft.apiKey}
-                      placeholder={provider.masked_key ? '새 키를 입력하면 교체됩니다.' : '공식 사이트에서 받은 키를 입력하세요.'}
-                      onChange={(event) => updateDraft(provider.provider, { apiKey: event.target.value })}
-                    />
-                    <small className="field__hint">
-                      {providerInputHint(provider.provider)} 브라우저에는 마스킹된 상태만 보입니다.
-                    </small>
-                  </label>
-                  <label className="field field--full">
-                    <span>기본 후보 목록</span>
-                    <textarea
-                      rows={4}
-                      value={draft.candidateModelsText}
-                      placeholder="모델 ID를 줄바꿈으로 입력하거나 비워 두세요."
-                      onChange={(event) => updateDraft(provider.provider, { candidateModelsText: event.target.value })}
-                    />
-                  </label>
+                <div className="provider-card__surface">
+                  <strong>최근 상태</strong>
+                  <span>{providerRecentStatus(provider)}</span>
                 </div>
-                <div className="settings-actionRow">
-                  <button className="primary-button" disabled={busyKey === `${provider.provider}:save`} onClick={() => void saveProviderConfig(provider.provider)} type="button">저장</button>
-                  <button className="ghost-button" disabled={busyKey === `${provider.provider}:test`} onClick={() => void runProviderTest(provider.provider)} type="button">연결 테스트</button>
-                  <button className="ghost-button" disabled={busyKey === `${provider.provider}:refresh`} onClick={() => void refreshProviderCatalog(provider.provider)} type="button">이 공급자 새로고침</button>
-                </div>
+                <p className="settings-inlineMeta">{providerRecentCheckedLabel(provider)}</p>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void saveProviderConfig(provider.provider)
+                  }}
+                >
+                  <div className="settings-grid">
+                    <label className="field field--full">
+                      <span>{provider.label} API 키</span>
+                      <input
+                        autoComplete="off"
+                        type="password"
+                        value={draft.apiKey}
+                        placeholder={provider.masked_key ? '새 키를 입력하면 교체됩니다.' : '공식 사이트에서 받은 키를 입력하세요.'}
+                        onChange={(event) => updateDraft(provider.provider, { apiKey: event.target.value })}
+                      />
+                      <small className="field__hint">
+                        {providerInputHint(provider.provider)} 브라우저에는 마스킹된 상태만 보입니다.
+                      </small>
+                    </label>
+                    <label className="field field--full">
+                      <span>자주 쓰는 모델 ID</span>
+                      <textarea
+                        rows={4}
+                        value={draft.candidateModelsText}
+                        placeholder="자주 쓸 모델 ID를 줄바꿈으로 입력하거나 비워 두세요."
+                        onChange={(event) => updateDraft(provider.provider, { candidateModelsText: event.target.value })}
+                      />
+                    </label>
+                  </div>
+                  <div className="settings-actionRow">
+                    <button className="primary-button" disabled={busyKey === `${provider.provider}:save`} type="submit">저장</button>
+                    <button className="ghost-button" disabled={busyKey === `${provider.provider}:test`} onClick={() => void runProviderTest(provider.provider)} type="button">연결 테스트</button>
+                    <button className="ghost-button" disabled={busyKey === `${provider.provider}:refresh`} onClick={() => void refreshProviderCatalog(provider.provider)} type="button">이 공급자 모델 새로고침</button>
+                  </div>
+                </form>
               </article>
             )
           })}
@@ -645,115 +821,110 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
       <section className="settings-card">
         <DisclosureSection
           className="settings-disclosure"
-          defaultOpen={false}
-          summary="자동 무료 최상, 코딩 최상, 빠른 응답, 수동 선택"
-          title="2. 무료 라우팅 정책"
+          defaultOpen
+          summary="선택한 공급자와 모델이 공식 API 실행기의 기본 대상이 됩니다."
+          title="2. 공식 API 실행 대상"
         >
           <div className="panel-card__header">
-            <p className="settings-card__lead">자동 모드는 검증된 무료 후보를 점수 순으로 시도하고, 실패하면 다음 후보로 넘어갑니다.</p>
-            <span className="chip chip--soft">{aiSettings ? routingModeLabel(aiSettings.routing_mode) : '불러오는 중'}</span>
+            <p className="settings-card__lead">채팅과 오케스트레이션에서 공식 API를 고르면 여기 저장한 공급자와 모델을 그대로 사용합니다.</p>
+            <span className={`chip ${selectedOfficialProviderState?.enabled && selectedOfficialProviderState?.configured ? 'is-active' : 'chip--soft'}`}>
+              {selectedOfficialProviderState?.label ?? '공급자 선택'}
+            </span>
           </div>
-          <div className="settings-modeGrid">
-          {aiSettings?.available_modes.map((mode) => (
+          <div className="settings-grid">
+            <label className="field">
+              <span>공급자</span>
+              <select
+                value={officialProviderDraft}
+                onChange={(event) => setOfficialProviderDraft(event.target.value as AiProviderId)}
+              >
+                {OFFICIAL_PROVIDER_ORDER.map((provider) => (
+                  <option key={provider} value={provider}>
+                    {providerDescription(provider)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field field--full">
+              <span>모델 ID</span>
+              <input
+                value={officialModelDraft}
+                placeholder="예: openai/gpt-4.1-mini"
+                onChange={(event) => setOfficialModelDraft(event.target.value)}
+              />
+              <small className="field__hint">
+                저장하면 공식 API 에이전트와 오케스트레이션이 이 모델을 기본으로 사용합니다.
+              </small>
+            </label>
+          </div>
+          <div className="settings-providerFlags chip-wrap">
+            <span className={`chip ${selectedOfficialProviderState?.enabled ? 'is-active' : 'chip--soft'}`}>
+              공급자 {selectedOfficialProviderState?.enabled ? '활성' : '비활성'}
+            </span>
+            <span className={`chip ${selectedOfficialProviderState?.configured ? 'is-active' : 'chip--soft'}`}>
+              키 {selectedOfficialProviderState?.configured ? '연결됨' : '미설정'}
+            </span>
+            <span className="chip chip--soft">
+              현재 기본 {aiSettings?.manual_model ? formatFriendlyModelName(aiSettings.manual_model) : '없음'}
+            </span>
+          </div>
+          <div className="provider-card__surface">
+            <strong>최근 상태</strong>
+            <span>
+              {selectedOfficialProviderState
+                ? providerRecentStatus(selectedOfficialProviderState)
+                : '공급자 정보를 아직 불러오지 못했습니다.'}
+            </span>
+          </div>
+          <p className="settings-inlineMeta">
+            {selectedOfficialProviderState
+              ? providerRecentCheckedLabel(selectedOfficialProviderState)
+              : '공급자 확인 기록 없음'}
+          </p>
+          <div className="settings-actionRow">
             <button
-              key={mode.id}
-              className={`settings-modeCard ${aiSettings.routing_mode === mode.id ? 'is-selected' : ''}`}
-              onClick={() => void updateRoutingMode(mode.id)}
+              className="primary-button"
+              disabled={busyKey === 'official-target'}
+              onClick={() => void saveOfficialTarget(officialProviderDraft, officialModelDraft)}
               type="button"
             >
-              <strong>{mode.label}</strong>
-              <small>{mode.description}</small>
+              기본 대상 저장
             </button>
-          ))}
-        </div>
-        <div className="settings-routePreview">
-          <div>
-            <span className="settings-routePreview__label">현재 1순위 후보</span>
-            <strong>
-              {topCandidate
-                ? `${topCandidate.provider_label ?? topCandidate.provider} · ${formatFriendlyModelName(topCandidate.display_name)}`
-                : '아직 후보가 없습니다'}
-            </strong>
+            <button
+              className="ghost-button"
+              disabled={busyKey === `${officialProviderDraft}:refresh`}
+              onClick={() => void refreshProviderCatalog(officialProviderDraft)}
+              type="button"
+            >
+              선택 공급자 모델 새로고침
+            </button>
           </div>
-          {topCandidate ? (
-            <div className="chip-wrap">
-              <span className="chip chip--soft">품질 {topCandidate.quality_score}</span>
-              <span className="chip chip--soft">추론 {topCandidate.reasoning_score}</span>
-              <span className="chip chip--soft">코딩 {topCandidate.coding_score}</span>
-              <span className="chip chip--soft">속도 {topCandidate.speed_score}</span>
-              <span className="chip chip--soft">안정성 {topCandidate.stability_score}</span>
-              <span className="chip chip--soft">점수 {topCandidate.score ?? '-'}</span>
-            </div>
-          ) : null}
-        </div>
-        <div className="status-banner status-banner--info">
-          <Icon name="check" size={16} />
-          <span>자동 무료 모드는 검증된 무료 후보를 점수 순서로 시도하고, 실패하면 다음 후보로 자동 폴백합니다.</span>
-        </div>
-          {aiSettings?.routing_mode === 'manual' ? (
+          {selectedOfficialModelChoices.length > 0 ? (
             <div className="settings-apiTargetGrid">
-            {manualCandidates.map((candidate) => (
-              <button
-                key={`${candidate.provider}:${candidate.model_id}`}
-                className={`settings-apiTarget ${
-                  aiSettings.manual_provider === candidate.provider && aiSettings.manual_model === candidate.model_id ? 'is-selected' : ''
-                }`}
-                onClick={() => void updateManualCandidate(candidate.provider, candidate.model_id)}
-                type="button"
-              >
-                <strong>{formatFriendlyModelName(candidate.display_name)}</strong>
-                <small>{candidate.provider_label ?? candidate.provider}</small>
-              </button>
-            ))}
+              {selectedOfficialModelChoices.map((candidate) => (
+                <button
+                  key={`${candidate.provider}:${candidate.model_id}`}
+                  className={`settings-apiTarget ${
+                    officialProviderDraft === candidate.provider && officialModelDraft === candidate.model_id
+                      ? 'is-selected'
+                      : ''
+                  }`}
+                  onClick={() => {
+                    setOfficialProviderDraft(candidate.provider)
+                    setOfficialModelDraft(candidate.model_id)
+                  }}
+                  type="button"
+                >
+                  <strong>{formatFriendlyModelName(candidate.display_name)}</strong>
+                  <small>{candidate.model_id}</small>
+                </button>
+              ))}
             </div>
-          ) : null}
-        </DisclosureSection>
-      </section>
-
-      <section className="settings-card">
-        <DisclosureSection
-          className="settings-disclosure"
-          defaultOpen={false}
-          summary="후보 점수, 최근 상태, 제외 여부"
-          title="3. 무료 후보 관리"
-        >
-          <div className="panel-card__header">
-          <h2>무료 후보 관리</h2>
-          <span className="chip chip--soft">{aiModels.length}개</span>
-        </div>
-        {aiModels.length > 0 ? (
-          <div className="settings-modelCatalog">
-            {aiModels.map((model) => (
-              <article key={`${model.provider}:${model.model_id}`} className="settings-modelCard">
-                <div className="settings-modelCard__header">
-                  <div>
-                    <strong>{formatFriendlyModelName(model.display_name)}</strong>
-                    <small>{model.provider_label ?? model.provider} · {model.model_id}</small>
-                  </div>
-                  <span className={`chip ${model.verified_available && !model.excluded ? 'is-active' : 'chip--soft'}`}>
-                    {model.excluded ? '제외됨' : model.verified_available ? '검증됨' : '미검증'}
-                  </span>
-                </div>
-                <div className="chip-wrap">
-                  <span className="chip chip--soft">품질 {model.quality_score}</span>
-                  <span className="chip chip--soft">추론 {model.reasoning_score}</span>
-                  <span className="chip chip--soft">코딩 {model.coding_score}</span>
-                  <span className="chip chip--soft">속도 {model.speed_score}</span>
-                </div>
-                {model.last_error ? <p className="settings-inlineMeta">{model.last_error}</p> : null}
-                <div className="settings-actionRow">
-                  <button className={model.excluded ? 'primary-button' : 'ghost-button'} onClick={() => void toggleCandidateExclusion(model)} type="button">
-                    {model.excluded ? '제외 해제' : '이 후보 제외'}
-                  </button>
-                  <span className="settings-inlineMeta">
-                    {model.last_checked_at ? `마지막 검증 ${model.last_checked_at}` : '검증 기록 없음'}
-                  </span>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <EmptyState title="무료 후보가 아직 없습니다" description="공급자 키를 저장하고 연결 테스트를 실행하면 이 목록이 채워집니다." />
+          ) : (
+            <EmptyState
+              title="바로 고를 모델이 아직 없습니다"
+              description="위 공급자 카드에서 연결 테스트나 모델 새로고침을 실행하면 빠른 선택 목록이 채워집니다."
+            />
           )}
         </DisclosureSection>
       </section>
@@ -762,7 +933,7 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
         <DisclosureSection
           className="settings-disclosure"
           defaultOpen={false}
-          summary="채팅에 실제로 노출되는 Codex, 공식 무료 라우터, Ollama"
+          summary="채팅에 실제로 노출되는 Codex, 공식 API, Ollama"
           title="4. 채팅 에이전트"
         >
         <div className="settings-card__side">
@@ -826,7 +997,12 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
               {activeManagedAgent.provider === 'official-router' ? (
                 <div className="status-banner status-banner--info">
                   <Icon name="check" size={16} />
-                  <span>공식 무료 라우터는 저장된 API 키만 사용하고, 무료 후보 중 점수가 가장 높은 모델부터 자동 시도합니다.</span>
+                  <span>
+                    공식 API 에이전트는 위에서 저장한 공급자와 모델을 그대로 사용합니다.
+                    {aiSettings?.manual_provider && aiSettings?.manual_model
+                      ? ` 현재 대상은 ${providerDescription(aiSettings.manual_provider)} · ${aiSettings.manual_model} 입니다.`
+                      : ''}
+                  </span>
                 </div>
               ) : null}
               <div className="settings-grid">
@@ -850,7 +1026,7 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
                   <span>모델</span>
                   <input
                     readOnly={activeManagedAgent.provider === 'official-router'}
-                    value={activeManagedAgent.provider === 'official-router' ? routingModeLabel(aiSettings?.routing_mode ?? 'auto-best-free') : activeManagedAgent.model}
+                    value={activeManagedAgent.model}
                     onChange={(event) => updateAgent(activeManagedAgent.id, { model: event.target.value })}
                   />
                 </label>
@@ -889,7 +1065,7 @@ export function SettingsPage({ onNavigate }: { onNavigate: (page: PageId) => voi
       <PageIntro
         title="설정"
         icon="settings"
-        description="실행기 확인, 공식 API 공급자 연결, 무료 후보 라우팅 정책을 한 화면에서 관리합니다."
+        description="실행기 상태, 공식 API 공급자 연결, 기본 모델 대상을 한 화면에서 관리합니다."
       />
       <div className="tab-row">
         {settingsTabs.map((tab) => (

@@ -87,7 +87,7 @@ function mergeCandidateRows(seedRows, dynamicRows, providerCredential) {
       excluded: existing?.excluded ?? false,
       last_checked_at: existing?.last_checked_at ?? null,
       last_error: existing?.last_error ?? '',
-      notes: existing?.notes ?? '사용자 지정 무료 후보',
+      notes: existing?.notes ?? '사용자 지정 모델',
       source: existing?.source ?? 'custom',
     })
   }
@@ -95,26 +95,49 @@ function mergeCandidateRows(seedRows, dynamicRows, providerCredential) {
   return [...merged.values()]
 }
 
-function fallbackReasonFromError(normalizedError) {
+function fallbackReasonFromError(normalizedError, routingMode = 'auto') {
+  if (routingMode === 'manual') {
+    switch (normalizedError.type) {
+      case 'rate_limit':
+        return '선택한 공식 API의 요청 한도에 걸렸습니다.'
+      case 'billing':
+        return '선택한 공식 API 계정 한도 또는 결제 상태를 확인해 주세요.'
+      case 'permission':
+        return '선택한 공식 API의 권한 또는 키 설정을 확인해 주세요.'
+      case 'timeout':
+        return '선택한 공식 API 응답 시간이 초과되었습니다.'
+      case 'network':
+        return '선택한 공식 API에 연결하지 못했습니다.'
+      case 'upstream':
+        return '선택한 공식 API 서버에서 오류를 반환했습니다.'
+      case 'model_unavailable':
+        return '선택한 모델을 현재 공급자에서 사용할 수 없습니다.'
+      case 'empty':
+        return '선택한 공식 API가 빈 응답을 반환했습니다.'
+      default:
+        return '선택한 공식 API 호출이 실패했습니다.'
+    }
+  }
+
   switch (normalizedError.type) {
     case 'rate_limit':
-      return '요청 한도에 걸려 다음 무료 후보로 넘깁니다.'
+      return '요청 한도에 걸려 다음 자동 후보로 넘깁니다.'
     case 'billing':
-      return '무료 한도 또는 과금 제한으로 다음 후보로 넘깁니다.'
+      return '과금 또는 계정 한도로 다음 자동 후보로 넘깁니다.'
     case 'permission':
-      return '권한 문제로 다음 무료 후보로 넘깁니다.'
+      return '권한 문제로 다음 자동 후보로 넘깁니다.'
     case 'timeout':
-      return '응답이 늦어서 다음 무료 후보를 시도합니다.'
+      return '응답이 늦어서 다음 자동 후보를 시도합니다.'
     case 'network':
-      return '네트워크 오류로 다음 무료 후보를 시도합니다.'
+      return '네트워크 오류로 다음 자동 후보를 시도합니다.'
     case 'upstream':
-      return '공급자 서버 오류로 다음 무료 후보를 시도합니다.'
+      return '공급자 서버 오류로 다음 자동 후보를 시도합니다.'
     case 'model_unavailable':
-      return '현재 키에서 이 모델을 쓸 수 없어 다음 후보를 시도합니다.'
+      return '현재 키에서 이 모델을 쓸 수 없어 다음 자동 후보를 시도합니다.'
     case 'empty':
-      return '스트리밍이 시작되지 않아 다음 후보를 시도합니다.'
+      return '스트리밍이 시작되지 않아 다음 자동 후보를 시도합니다.'
     default:
-      return '호출이 실패해 다음 무료 후보를 시도합니다.'
+      return '호출이 실패해 다음 자동 후보를 시도합니다.'
   }
 }
 
@@ -122,17 +145,17 @@ function createAvailableModes() {
   return [
     {
       id: 'auto-best-free',
-      label: '자동 무료 최상',
+      label: '자동 최적',
       description: '품질과 추론을 먼저 봅니다.',
     },
     {
       id: 'auto-best-free-coding',
-      label: '자동 무료 코딩 최상',
+      label: '자동 코딩 우선',
       description: '코딩과 안정성을 더 높게 봅니다.',
     },
     {
       id: 'auto-best-free-fast',
-      label: '자동 무료 빠른 응답',
+      label: '자동 빠른 응답',
       description: '속도와 즉시 사용 가능성을 우선합니다.',
     },
     {
@@ -245,8 +268,8 @@ export function createAiRouter({
         enabled: credential.enabled,
         status: credential.configured ? 'configured' : 'missing',
         detail: credential.configured
-          ? '키를 저장했습니다. 연결 테스트를 하면 무료 후보를 검증합니다.'
-          : 'API 키를 저장하면 무료 후보를 검증합니다.',
+          ? '키를 저장했습니다. 연결 테스트를 하면 직접 호출 가능한 모델을 확인합니다.'
+          : 'API 키를 저장하면 직접 호출 가능한 모델을 확인합니다.',
         candidate_count: rows.length,
         available_count: 0,
         checked_at: null,
@@ -336,9 +359,9 @@ export function createAiRouter({
         : 'missing',
       detail: credential.configured
         ? verifiedRows.some((item) => item.verified_available)
-          ? '무료 후보를 검증했고 지금 바로 사용할 수 있습니다.'
-          : '키는 저장됐지만 지금 바로 쓸 수 있는 무료 후보를 찾지 못했습니다.'
-        : 'API 키를 저장하면 무료 후보를 검증합니다.',
+          ? '직접 호출 가능한 모델을 확인했고 지금 바로 사용할 수 있습니다.'
+          : '키는 저장됐지만 지금 바로 쓸 수 있는 모델을 찾지 못했습니다.'
+        : 'API 키를 저장하면 직접 호출 가능한 모델을 확인합니다.',
       candidate_count: verifiedRows.length,
       available_count: verifiedRows.filter((item) => item.verified_available).length,
       checked_at: nowIso(),
@@ -362,7 +385,7 @@ export function createAiRouter({
     return credentials.map((item) => ({
       ...item,
       status: statuses.get(item.provider)?.status ?? 'missing',
-      detail: statuses.get(item.provider)?.detail ?? 'API 키를 저장하면 무료 후보를 검증합니다.',
+      detail: statuses.get(item.provider)?.detail ?? 'API 키를 저장하면 직접 호출 가능한 모델을 확인합니다.',
       available_count: statuses.get(item.provider)?.available_count ?? 0,
       candidate_count: statuses.get(item.provider)?.candidate_count ?? 0,
       checked_at: statuses.get(item.provider)?.checked_at ?? null,
@@ -406,17 +429,56 @@ export function createAiRouter({
     const failureMap = storage.getRecentFailureCounts()
     const weights = getRoutingWeights(projectRoot, mode)
 
-    let models = storage.listModels({ includeExcluded: false }).filter((item) => {
+    const allModels = storage.listModels({ includeExcluded: false })
+    let models = allModels.filter((item) => {
       const provider = providerMap.get(item.provider)
       return Boolean(provider?.enabled && provider?.configured && item.free_candidate)
     })
 
     if (mode === 'manual') {
-      if (manualProvider) {
-        models = models.filter((item) => item.provider === normalizeProviderId(manualProvider))
+      const normalizedProvider = manualProvider ? normalizeProviderId(manualProvider) : null
+      const normalizedModel = typeof manualModel === 'string' ? manualModel.trim() : ''
+
+      if (normalizedProvider) {
+        models = models.filter((item) => item.provider === normalizedProvider)
       }
-      if (manualModel) {
-        models = models.filter((item) => item.model_id === manualModel)
+      if (normalizedModel) {
+        models = models.filter((item) => item.model_id === normalizedModel)
+      }
+
+      if (normalizedProvider && normalizedModel && models.length === 0) {
+        const provider = providerMap.get(normalizedProvider)
+        const storedCandidate = allModels.find(
+          (item) => item.provider === normalizedProvider && item.model_id === normalizedModel,
+        )
+
+        if (provider?.enabled && provider?.configured) {
+          models = [
+            {
+              provider: normalizedProvider,
+              model_id: normalizedModel,
+              display_name: storedCandidate?.display_name ?? normalizedModel,
+              free_candidate: storedCandidate?.free_candidate ?? false,
+              verified_available: storedCandidate?.verified_available ?? true,
+              supports_streaming: storedCandidate?.supports_streaming ?? true,
+              supports_tools: storedCandidate?.supports_tools ?? false,
+              supports_vision: storedCandidate?.supports_vision ?? false,
+              quality_score: storedCandidate?.quality_score ?? 80,
+              reasoning_score: storedCandidate?.reasoning_score ?? 80,
+              coding_score: storedCandidate?.coding_score ?? 80,
+              speed_score: storedCandidate?.speed_score ?? 80,
+              stability_score: storedCandidate?.stability_score ?? 80,
+              priority: storedCandidate?.priority ?? 20,
+              excluded: false,
+              last_checked_at: storedCandidate?.last_checked_at ?? null,
+              last_error: storedCandidate?.last_error ?? '',
+              notes:
+                storedCandidate?.notes ??
+                '수동 직접 실행용 모델',
+              source: storedCandidate?.source ?? 'manual-direct',
+            },
+          ]
+        }
       }
     }
 
@@ -474,13 +536,13 @@ export function createAiRouter({
       storage.updateProviderTestResult(normalizedProvider, {
         last_test_at: nowIso(),
         last_test_status: 'failed',
-        last_test_message: '무료 후보는 보이지만 현재 키로 바로 호출되는 모델을 찾지 못했습니다.',
+        last_test_message: '현재 키로 바로 호출되는 모델을 찾지 못했습니다.',
       })
       return {
         ok: false,
         provider: normalizedProvider,
         status: 'no-free-available',
-        message: '무료 후보는 보이지만 현재 키로 바로 호출되는 모델을 찾지 못했습니다.',
+        message: '현재 키로 바로 호출되는 모델을 찾지 못했습니다.',
       }
     }
 
@@ -547,7 +609,11 @@ export function createAiRouter({
     const candidates = preview.candidates
 
     if (candidates.length === 0) {
-      throw new Error('활성화된 공급자에서 지금 호출 가능한 무료 후보를 찾지 못했습니다.')
+      throw new Error(
+        routingMode === 'manual'
+          ? '선택한 공식 API 공급자 또는 모델을 바로 호출하지 못했습니다. 설정에서 공급자 연결과 모델 ID를 확인해 주세요.'
+          : '활성화된 공급자에서 지금 호출 가능한 모델을 찾지 못했습니다.',
+      )
     }
 
     storage.upsertChatSession({
@@ -670,8 +736,8 @@ export function createAiRouter({
           error_message: null,
           status_code: null,
           latency_ms: Date.now() - new Date(startedAt).getTime(),
-          fallback_reason:
-            index === 0 ? null : '이전 무료 후보 실패 후 자동 폴백으로 성공했습니다.',
+            fallback_reason:
+              index === 0 ? null : '이전 자동 후보 실패 후 자동 폴백으로 성공했습니다.',
           score_at_selection: candidate.score,
         })
         break
@@ -693,7 +759,7 @@ export function createAiRouter({
           error_message: normalizedError.message,
           status_code: normalizedError.statusCode,
           latency_ms: Date.now() - new Date(startedAt).getTime(),
-          fallback_reason: fallbackReasonFromError(normalizedError),
+          fallback_reason: fallbackReasonFromError(normalizedError, routingMode),
           score_at_selection: candidate.score,
         })
 
@@ -705,7 +771,7 @@ export function createAiRouter({
           error_type: normalizedError.type,
           error_message: normalizedError.message,
           status_code: normalizedError.statusCode,
-          fallback_reason: fallbackReasonFromError(normalizedError),
+          fallback_reason: fallbackReasonFromError(normalizedError, routingMode),
         })
       }
     }
@@ -713,7 +779,11 @@ export function createAiRouter({
     storage.insertAttemptLogs(attemptLogs)
 
     if (!finalResponse) {
-      throw new Error('모든 무료 후보 호출이 실패했습니다.')
+      throw new Error(
+        routingMode === 'manual'
+          ? '선택한 공식 API 호출이 실패했습니다.'
+          : '모든 자동 후보 호출이 실패했습니다.',
+      )
     }
 
     const assistantMessageId = `msg-${randomUUID()}`
@@ -786,8 +856,8 @@ export function createAiRouter({
         enabled: saved.enabled,
         status: saved.configured ? 'configured' : 'missing',
         detail: saved.configured
-          ? '키를 저장했습니다. 연결 테스트를 하면 무료 후보를 검증합니다.'
-          : 'API 키를 저장하면 무료 후보를 검증합니다.',
+          ? '키를 저장했습니다. 연결 테스트를 하면 직접 호출 가능한 모델을 확인합니다.'
+          : 'API 키를 저장하면 직접 호출 가능한 모델을 확인합니다.',
         candidate_count: candidateCount,
         available_count: availableCount,
         checked_at: nowIso(),

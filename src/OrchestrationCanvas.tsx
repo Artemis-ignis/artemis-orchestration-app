@@ -35,6 +35,7 @@ type OrchestrationCanvasProps = {
   signalCount: number
   activityCount: number
   taskDraft: string
+  sessionTask: string
   recentPrompt: string
   messageCount: number
   latestExecution: LatestExecution | null
@@ -80,44 +81,54 @@ function normalizeModelLabel(value: string) {
 
 function compactModelLabel(value: string) {
   const normalized = normalizeModelLabel(value)
+  const normalizedWithoutSuffix = normalized.replace(/:free$/i, '')
 
   if (!normalized) {
     return '모델 없음'
   }
 
-  if (/gemma4-e4b-uncensored-q4fast/i.test(normalized)) {
+  if (/gemma4-e4b-uncensored-q4fast/i.test(normalizedWithoutSuffix)) {
     return 'gemma4 E4B'
   }
 
-  if (/gpt-5\.4/i.test(normalized)) {
+  if (/gpt-5\.4/i.test(normalizedWithoutSuffix)) {
     return 'GPT-5.4'
   }
 
-  if (/auto-best-free/i.test(normalized)) {
-    return '공식 무료'
+  if (/deepseek\/deepseek-r1/i.test(normalizedWithoutSuffix)) {
+    return 'DeepSeek R1'
   }
 
-  if (/auto-code-free/i.test(normalized)) {
+  if (/qwen\/qwen3-30b-a3b/i.test(normalizedWithoutSuffix)) {
+    return 'Qwen3 30B'
+  }
+
+  if (/auto-best-free/i.test(normalizedWithoutSuffix)) {
+    return '공식 API'
+  }
+
+  if (/auto-code-free/i.test(normalizedWithoutSuffix)) {
     return '코딩 무료'
   }
 
-  if (/auto-fast-free/i.test(normalized)) {
+  if (/auto-fast-free/i.test(normalizedWithoutSuffix)) {
     return '빠른 무료'
   }
 
-  if (/gemini/i.test(normalized)) {
+  if (/gemini/i.test(normalizedWithoutSuffix)) {
     return 'Gemini'
   }
 
-  if (/claude/i.test(normalized)) {
+  if (/claude/i.test(normalizedWithoutSuffix)) {
     return 'Claude'
   }
 
-  if (/openrouter/i.test(normalized)) {
+  if (/openrouter/i.test(normalizedWithoutSuffix)) {
     return 'OpenRouter'
   }
 
-  const tail = normalized.split(/[/:]/).filter(Boolean).at(-1) ?? normalized
+  const tail =
+    normalizedWithoutSuffix.split('/').filter(Boolean).at(-1) ?? normalizedWithoutSuffix
   return tail.length > 12 ? `${tail.slice(0, 12)}…` : tail
 }
 
@@ -128,7 +139,7 @@ function providerLabel(value: string) {
     case 'codex':
       return 'Codex CLI'
     case 'official-router':
-      return '공식 라우터'
+      return '공식 API'
     case 'openai-compatible':
       return 'OpenAI 호환'
     case 'anthropic':
@@ -229,6 +240,7 @@ function createFlowModel({
   signalCount,
   activityCount,
   taskDraft,
+  sessionTask,
   recentPrompt,
   messageCount,
   latestExecution,
@@ -239,10 +251,11 @@ function createFlowModel({
   const activeTools = tools.filter((item) => item.enabled)
   const latestRunsByAgent = latestRunMap(sessionRuns)
   const hasDraft = Boolean(taskDraft.trim())
+  const hasSessionTask = Boolean(sessionTask.trim())
   const hasRecentPrompt = Boolean(recentPrompt.trim())
   const hasSession = sessionRuns.length > 0
   const sessionRunning = sessionRuns.some((run) => run.status === 'running')
-  const shouldExpandFlow = hasDraft || sessionRunning
+  const shouldExpandFlow = hasDraft || hasSession || hasSessionTask
   const route = routeSummary({
     sessionRuns,
     bridgeError,
@@ -297,9 +310,9 @@ function createFlowModel({
       target: 'hub',
       targetHandle: 'in-left',
       type: 'smoothstep',
-      animated: hasDraft,
+      animated: hasDraft || hasSession,
       markerEnd: { type: MarkerType.ArrowClosed },
-      className: `orchestration-flow__edge is-${hasDraft ? 'running' : 'ready'}`,
+      className: `orchestration-flow__edge is-${hasDraft || hasSession ? 'running' : 'ready'}`,
     },
   ]
 
@@ -504,7 +517,7 @@ function createFlowModel({
     })
   }
 
-  if (sessionRunning && signalCount > 0) {
+  if (hasSession && signalCount > 0) {
     nodes.push({
       id: 'signals',
       type: 'orchestration',
@@ -535,7 +548,7 @@ function createFlowModel({
     })
   }
 
-  if (sessionRunning && activeTools.length > 0) {
+  if (hasSession && activeTools.length > 0) {
     nodes.push({
       id: 'tools',
       type: 'orchestration',
@@ -566,7 +579,7 @@ function createFlowModel({
     })
   }
 
-  if (sessionRunning) {
+  if (hasSession) {
     nodes.push(
       {
         id: 'files',
@@ -826,6 +839,7 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
     signalCount,
     activityCount,
     taskDraft,
+    sessionTask,
     recentPrompt,
     messageCount,
     latestExecution,
@@ -848,6 +862,7 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
         signalCount,
         activityCount,
         taskDraft,
+        sessionTask,
         recentPrompt,
         messageCount,
         latestExecution,
@@ -864,6 +879,7 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
       signalCount,
       activityCount,
       taskDraft,
+      sessionTask,
       recentPrompt,
       messageCount,
       latestExecution,

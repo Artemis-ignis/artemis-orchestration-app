@@ -44,9 +44,11 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
     setWorkspaceSystemEntriesVisible,
   } = useArtemisApp()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const previousWorkspaceRootPathRef = useRef('')
   const [query, setQuery] = useState('')
   const [folderName, setFolderName] = useState('')
   const [rootInput, setRootInput] = useState('')
+  const [pendingDeletePath, setPendingDeletePath] = useState<string | null>(null)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [selectedFileContent, setSelectedFileContent] = useState('')
   const [selectedFileOriginalContent, setSelectedFileOriginalContent] = useState('')
@@ -91,6 +93,34 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
     setPreviewError(null)
   }, [selectedPath, workspaceEntries])
 
+  useEffect(() => {
+    if (!workspaceRootPath) {
+      previousWorkspaceRootPathRef.current = ''
+      return
+    }
+
+    setRootInput((current) => {
+      if (!current.trim() || current === previousWorkspaceRootPathRef.current) {
+        return workspaceRootPath
+      }
+
+      return current
+    })
+    previousWorkspaceRootPathRef.current = workspaceRootPath
+  }, [workspaceRootPath])
+
+  useEffect(() => {
+    if (!pendingDeletePath) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      setPendingDeletePath(null)
+    }, 4_000)
+
+    return () => window.clearTimeout(timer)
+  }, [pendingDeletePath])
+
   const visibleItems = useMemo(() => {
     const keyword = deferredQuery.trim().toLowerCase()
 
@@ -110,6 +140,7 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
 
   const handleOpenFile = useCallback(
     async (relativePath: string) => {
+      setPendingDeletePath(null)
       setSelectedPath(relativePath)
       setPreviewError(null)
       setPreviewLoading(true)
@@ -143,6 +174,7 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
   const handleOpenEntry = useCallback(
     async (relativePath: string, kind: 'file' | 'folder') => {
       if (kind === 'folder') {
+        setPendingDeletePath(null)
         setSelectedPath(null)
         setSelectedFileMeta(null)
         setSelectedFileContent('')
@@ -279,6 +311,12 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
         <div className="status-banner status-banner--info">
           <Icon name="warning" size={16} />
           <span>앱 안에서 삭제한 항목은 즉시 로컬 파일시스템에 반영됩니다. 삭제 보호 항목은 안전상 비활성으로 유지됩니다.</span>
+        </div>
+      ) : null}
+      {pendingDeletePath ? (
+        <div className="status-banner status-banner--warning">
+          <Icon name="warning" size={16} />
+          <span>삭제 버튼을 한 번 더 눌러야 실제 삭제가 진행됩니다.</span>
         </div>
       ) : null}
 
@@ -518,10 +556,16 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
                         if (!item.deletable) {
                           return
                         }
+                        if (pendingDeletePath !== item.relativePath) {
+                          setPendingDeletePath(item.relativePath)
+                          return
+                        }
                         if (!window.confirm(`${item.name}을(를) 삭제하시겠습니까?`)) {
+                          setPendingDeletePath(null)
                           return
                         }
                         await deleteWorkspaceEntry(item.relativePath)
+                        setPendingDeletePath(null)
                         if (selectedPath === item.relativePath) {
                           setSelectedPath(null)
                           setSelectedFileMeta(null)
@@ -532,7 +576,7 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
                       }}
                       type="button"
                     >
-                      삭제
+                      {pendingDeletePath === item.relativePath ? '삭제 확인' : '삭제'}
                     </button>
                   </div>
                 </div>
@@ -632,10 +676,16 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
                       if (!selectedFileMeta.deletable) {
                         return
                       }
+                      if (pendingDeletePath !== selectedFileMeta.path) {
+                        setPendingDeletePath(selectedFileMeta.path)
+                        return
+                      }
                       if (!window.confirm(`${selectedFileMeta.name}을(를) 삭제하시겠습니까?`)) {
+                        setPendingDeletePath(null)
                         return
                       }
                       await deleteWorkspaceEntry(selectedFileMeta.path)
+                      setPendingDeletePath(null)
                       setSelectedPath(null)
                       setSelectedFileMeta(null)
                       setSelectedFileContent('')
@@ -644,7 +694,7 @@ export function FilesPage({ onNavigate }: { onNavigate: (page: PageId) => void }
                     }}
                     type="button"
                   >
-                    삭제
+                    {pendingDeletePath === selectedFileMeta.path ? '삭제 확인' : '삭제'}
                   </button>
                 </div>
               </div>

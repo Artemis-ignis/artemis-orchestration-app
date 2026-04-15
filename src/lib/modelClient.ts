@@ -12,6 +12,11 @@ export type ProviderStatus = {
   ready: boolean
   models: string[]
   detail: string
+  warning?: string | null
+  lastError?: string | null
+  stale?: boolean
+  lastCheckedAt?: string | null
+  lastSuccessAt?: string | null
 }
 
 export type BridgeHealth = {

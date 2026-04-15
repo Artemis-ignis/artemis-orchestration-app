@@ -137,6 +137,8 @@ const signalTranslationInFlight = new Set()
 const signalFeedCache = new Map()
 let cachedSkillCatalog = { generatedAt: '', items: [] }
 let cachedSkillCatalogExpiresAt = 0
+let lastSuccessfulOllamaStatus = null
+let pendingOllamaStatusPromise = null
 const SIGNAL_FETCH_TIMEOUT_MS = 8_000
 const SIGNAL_TRANSLATION_TIMEOUT_MS = 28_000
 const PER_SIGNAL_TRANSLATION_TIMEOUT_MS = 15_000
@@ -145,6 +147,7 @@ const SIGNAL_CACHE_TTL_MS = 45_000
 const EXECUTION_TIMEOUT_MS = 240_000
 const SIGNAL_CODEX_TRANSLATION_MODEL = 'gpt-5.4-mini'
 const OLLAMA_LOCAL_MODEL = 'gemma4-E4B-uncensored-q4fast:latest'
+const OLLAMA_HEALTH_TIMEOUT_MS = Number(process.env.OLLAMA_HEALTH_TIMEOUT_MS ?? 4_000)
 const PUBLIC_INQUIRY_DIRECTORY = path.join(process.cwd(), 'output', 'public-inquiries')
 const PUBLIC_ACCOUNT_DIRECTORY = path.join(process.cwd(), 'output', 'public-accounts')
 const PUBLIC_ACCOUNT_FILE = path.join(PUBLIC_ACCOUNT_DIRECTORY, 'accounts.json')
@@ -1107,13 +1110,21 @@ async function translateSignalItem(item, translationModel) {
 }
 
 async function getOllamaTags() {
-  const response = await fetch(`${OLLAMA_URL}/api/tags`)
+  const response = await fetchWithTimeout(
+    `${stripTrailingSlash(OLLAMA_URL)}/api/tags`,
+    undefined,
+    OLLAMA_HEALTH_TIMEOUT_MS,
+  )
 
   if (!response.ok) {
     throw new Error(`Ollama 연결에 실패했습니다. (${response.status})`)
   }
 
-  const data = await response.json()
+  const data = await raceWithTimeout(
+    response.json(),
+    OLLAMA_HEALTH_TIMEOUT_MS,
+    'Ollama 모델 목록 응답 시간이 초과되었습니다.',
+  )
   return Array.isArray(data.models) ? data.models.map((item) => item.name) : []
 }
 
@@ -1123,6 +1134,114 @@ function selectPreferredOllamaModel(models = []) {
   }
 
   return models.find((item) => item === OLLAMA_LOCAL_MODEL) ?? null
+}
+
+function orderOllamaModels(models = []) {
+  if (!Array.isArray(models)) {
+    return []
+  }
+
+  const normalized = models.filter((item) => typeof item === 'string' && item.trim())
+  const preferred = selectPreferredOllamaModel(normalized)
+
+  if (!preferred) {
+    return normalized
+  }
+
+  return [preferred, ...normalized.filter((item) => item !== preferred)]
+}
+
+function sanitizeStatusDetail(value, fallback) {
+  if (typeof value !== 'string') {
+    return fallback
+  }
+
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  return normalized || fallback
+}
+
+function createOllamaStatusSnapshot({
+  available,
+  ready,
+  models,
+  detail,
+  warning = null,
+  lastError = null,
+  stale = false,
+  lastCheckedAt = null,
+  lastSuccessAt = null,
+}) {
+  return {
+    provider: 'ollama',
+    available,
+    ready,
+    models,
+    detail,
+    warning,
+    lastError,
+    stale,
+    lastCheckedAt,
+    lastSuccessAt,
+  }
+}
+
+async function getOllamaStatus() {
+  if (pendingOllamaStatusPromise) {
+    return pendingOllamaStatusPromise
+  }
+
+  pendingOllamaStatusPromise = (async () => {
+    const checkedAt = new Date().toISOString()
+
+    try {
+      const models = orderOllamaModels(await getOllamaTags())
+      const ready = models.length > 0
+      const snapshot = createOllamaStatusSnapshot({
+        available: true,
+        ready,
+        models,
+        detail: ready
+          ? `Ollama ${models[0]} 모델을 사용할 수 있습니다.`
+          : 'Ollama 서버에는 설치된 모델이 없습니다.',
+        lastCheckedAt: checkedAt,
+        lastSuccessAt: checkedAt,
+      })
+
+      lastSuccessfulOllamaStatus = snapshot
+      return snapshot
+    } catch (error) {
+      const lastError = sanitizeStatusDetail(
+        error instanceof Error ? error.message : 'Ollama 상태를 확인하지 못했습니다.',
+        'Ollama 상태를 확인하지 못했습니다.',
+      )
+
+      if (lastSuccessfulOllamaStatus) {
+        return {
+          ...lastSuccessfulOllamaStatus,
+          warning: '최근 확인에 실패해 마지막 정상 상태를 표시 중입니다.',
+          lastError,
+          stale: true,
+          lastCheckedAt: checkedAt,
+        }
+      }
+
+      return createOllamaStatusSnapshot({
+        available: false,
+        ready: false,
+        models: [],
+        detail: 'Ollama 상태를 확인하지 못했습니다.',
+        warning: '최근 확인에 실패했습니다.',
+        lastError,
+        stale: false,
+        lastCheckedAt: checkedAt,
+        lastSuccessAt: null,
+      })
+    } finally {
+      pendingOllamaStatusPromise = null
+    }
+  })()
+
+  return pendingOllamaStatusPromise
 }
 
 function spawnProcess(command, args, options = {}) {
@@ -1602,18 +1721,29 @@ async function runOpenAiCompatible({ prompt, messages, settings, agent, enabledT
 }
 
 async function getHealth() {
-  const [ollamaModelsResult, codexStatusResult] = await Promise.allSettled([
-    getOllamaTags(),
+  const [ollamaStatusResult, codexStatusResult] = await Promise.allSettled([
+    getOllamaStatus(),
     getCodexStatus(),
   ])
-
-  const ollamaModels =
-    ollamaModelsResult.status === 'fulfilled' ? ollamaModelsResult.value : []
-  const ollamaModel = selectPreferredOllamaModel(ollamaModels)
-  const ollamaErrorDetail =
-    ollamaModelsResult.status === 'rejected' && ollamaModelsResult.reason instanceof Error
-      ? ollamaModelsResult.reason.message
-      : null
+  const ollama =
+    ollamaStatusResult.status === 'fulfilled'
+      ? ollamaStatusResult.value
+      : createOllamaStatusSnapshot({
+          available: false,
+          ready: false,
+          models: [],
+          detail: 'Ollama 상태를 확인하지 못했습니다.',
+          warning: '최근 확인에 실패했습니다.',
+          lastError: sanitizeStatusDetail(
+            ollamaStatusResult.reason instanceof Error
+              ? ollamaStatusResult.reason.message
+              : 'Ollama 상태를 확인하지 못했습니다.',
+            'Ollama 상태를 확인하지 못했습니다.',
+          ),
+          stale: false,
+          lastCheckedAt: new Date().toISOString(),
+          lastSuccessAt: lastSuccessfulOllamaStatus?.lastSuccessAt ?? null,
+        })
   const codex =
     codexStatusResult.status === 'fulfilled'
       ? codexStatusResult.value
@@ -1623,21 +1753,18 @@ async function getHealth() {
     ok: true,
     defaultProvider: 'auto',
     providers: [
-      {
-        provider: 'ollama',
-        available: Boolean(ollamaModel),
-        ready: Boolean(ollamaModel),
-        models: ollamaModel ? [ollamaModel] : [],
-        detail: ollamaModel
-          ? 'Ollama ' + ollamaModel + ' 모델을 사용할 수 있습니다.'
-          : ollamaErrorDetail || '사용 가능한 Ollama 모델이 없습니다.',
-      },
+      ollama,
       {
         provider: 'codex',
         available: codex.available,
         ready: codex.ready,
         models: ['gpt-5.4', 'gpt-5.4-mini'],
         detail: codex.detail,
+        warning: null,
+        lastError: null,
+        stale: false,
+        lastCheckedAt: null,
+        lastSuccessAt: null,
       },
     ],
   }

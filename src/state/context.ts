@@ -77,6 +77,13 @@ export type ArtemisContextValue = {
   markInsight: (insightId: string, status: InsightItem['status']) => void
   updateSettings: (patch: Partial<RuntimeState['settings']>) => void
   selectChatModel: (provider: 'ollama' | 'codex', model: string) => void
+  setOrchestrationDraft: (text: string) => void
+  setOrchestrationSelection: (agentIds: string[]) => void
+  startOrchestrationSession: (payload: {
+    startedAt: string
+    task: string
+    agentIds: string[]
+  }) => void
   addApiKey: (label: string, key: string, presetId: ApiKeyTargetPresetId) => void
   removeApiKey: (keyId: string) => void
   setActiveAgent: (agentId: string) => void

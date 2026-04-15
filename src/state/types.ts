@@ -192,6 +192,14 @@ export type SettingsState = {
   bridgeUrl: string
 }
 
+export type OrchestrationState = {
+  draftTask: string
+  selectedAgentIds: string[]
+  sessionStartedAt: string | null
+  sessionAgentIds: string[]
+  sessionTask: string
+}
+
 export type RuntimeState = {
   chats: {
     activeThreadId: string
@@ -221,6 +229,7 @@ export type RuntimeState = {
   }
   settings: SettingsState
   apiKeys: ApiKeyItem[]
+  orchestration: OrchestrationState
 }
 
 export type EngineArtifact = {

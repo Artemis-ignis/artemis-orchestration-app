@@ -19,10 +19,9 @@ export function buildInitialAgents() {
 
   const officialRouterAgent = buildAgentFromPreset('official-router', {
     id: 'agent-router',
-    name: '공식 무료 라우터',
-    role: '자동 라우팅 에이전트',
-    description:
-      'OpenRouter, NVIDIA Build, Gemini Developer API의 무료 후보를 점수 순서로 고르고 실패 시 자동으로 다음 후보로 넘깁니다.',
+    name: '공식 API',
+    role: '공식 API 에이전트',
+    description: 'OpenRouter, NVIDIA Build, Gemini 중 하나를 고르고 원하는 모델로 바로 실행합니다.',
   })
 
   const ollamaAgent = buildAgentFromPreset('ollama-local', {
@@ -70,7 +69,8 @@ export function createDefaultState(): RuntimeState {
       items: [],
     },
     agents: {
-      activeAgentId: initialAgents.find((agent) => agent.id === 'agent-ollama')?.id ?? initialAgents[0].id,
+      activeAgentId:
+        initialAgents.find((agent) => agent.id === 'agent-ollama')?.id ?? initialAgents[0].id,
       items: initialAgents,
       runs: [],
     },
@@ -80,11 +80,10 @@ export function createDefaultState(): RuntimeState {
       tone: '차분하고 실무적인 개인 비서',
       responseStyle: '결론부터 간결하게',
       userName: '마스터',
-      userRole: '프로덕트 오너',
+      userRole: '프로젝트 오너',
       organization: 'Artemis Workspace',
       interests: ['AI 오케스트레이션', '개발 자동화'],
-      customInstructions:
-        '항상 한국어로 답하고, 실행 가능한 결과와 다음 조치를 먼저 제시합니다.',
+      customInstructions: '항상 한국어로 답하고 실행 가능한 결과와 다음 조치를 먼저 제시합니다.',
       theme: 'dark',
       language: '한국어',
       timezone: 'Asia/Seoul',
@@ -95,5 +94,12 @@ export function createDefaultState(): RuntimeState {
       bridgeUrl: 'http://127.0.0.1:4174',
     },
     apiKeys: [],
+    orchestration: {
+      draftTask: '',
+      selectedAgentIds: [],
+      sessionStartedAt: null,
+      sessionAgentIds: [],
+      sessionTask: '',
+    },
   }
 }
