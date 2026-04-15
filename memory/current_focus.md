@@ -22,6 +22,7 @@
 - Settings shows a dedicated local runtime section for `Ollama 로컬` and `Codex CLI`.
 - `/api/health` now returns local runtime timestamps plus stale/error fields instead of dropping Ollama state on transient failures.
 - Settings keeps the last confirmed local runtime state when local health refresh fails, and the Ollama card still shows model count, current model, and the latest warning/error.
+- The temporary duplicated comment block from the local-runtime hotfix has been removed from `SettingsPage.tsx`.
 - The orchestration canvas supports pan and zoom again.
 - The pre-run orchestration flow is now reduced to `입력 -> 병렬 허브 -> 출력`.
 - When a task is typed into orchestration, the selected models expand into parallel worker blocks.

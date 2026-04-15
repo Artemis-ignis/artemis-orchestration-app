@@ -46,3 +46,4 @@
 - Reworked the local runtime cards in settings so the section never disappears and the Ollama card always shows readiness, model count, current model, latest warning/error, and a working refresh button.
 - Verified in headless Playwright that a forced `/api/health` failure no longer collapses the local runtime card to `0개 모델`.
 - Regenerated `docs/screenshots/settings.png` so the public settings screenshot matches the new stable local-runtime UI.
+- Removed the temporary duplicated commented block left in `src/pages/SettingsPage.tsx` after the hotfix so the file is smaller and easier to maintain.
