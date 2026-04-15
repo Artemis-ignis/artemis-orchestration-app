@@ -13,6 +13,7 @@
 - Keep settings understandable: local runtimes first, official providers second.
 - Keep orchestration interactive and execution-first instead of decorative.
 - Keep the Hermes-style Codex workflow files usable for future sessions.
+- Keep the premium UI shell consistent across chat, files, settings, and orchestration.
 
 ## Latest Confirmed State
 
@@ -44,6 +45,17 @@
 - Orchestration progress logs were cleaned up so live status text is readable Korean instead of mojibake.
 - Public screenshots were regenerated after the flow changes and no longer expose absolute workspace paths.
 - The public settings screenshot was regenerated after the local runtime stability fix.
+- The premium shell branch now has a second UI pass focused on consistency instead of one-off styling:
+  - `SettingsPage.tsx` was reduced to a tab shell, and the models tab moved into `src/features/settings/SettingsModelsPane.tsx`.
+  - `SettingsProfilePane.tsx` and `SettingsPreferencesPane.tsx` were rewritten with cleaner copy and calmer panel hierarchy.
+  - Chat now shortens visible workspace context to a folder label instead of exposing a full absolute path in the idle workspace card and bottom context rail.
+  - Chat idle state now uses a proper hero block plus a quieter side context panel instead of looking like a large empty void.
+  - Files now uses a wider split pane, clearer hover states, a more intentional empty inspector panel, and a collapsed root-path card so absolute local paths do not dominate the main workspace by default.
+  - Orchestration now gives the canvas more breathing room and keeps the control rail visually quieter and sticky on desktop.
+  - Settings cards now use flatter, more consistent surface rules and reduced nested-card noise.
+  - Desktop, tablet, and mobile screenshots were re-reviewed from the premium shell branch after the second pass.
+  - `docs/screenshots` and `public/marketing` now use the refreshed premium-shell captures for chat, files, settings, and orchestration.
+  - A tracked-text scan for the literal local workspace path and username returned no matches before preparing the branch for push.
 
 ## Next Checks
 
@@ -55,6 +67,8 @@
 - Revisit provider preflight detail strings stored in bridge state so stale saved status text also loses the legacy free-candidate wording at the API level.
 - Decide later whether the chat workspace-write hint should become prompt-aware instead of always showing for non-Codex models when a workspace is connected.
 - Decide later whether the sidebar itself should collapse secondary menus by default; this pass reduced density but did not change the navigation model yet.
+- Decide later whether the files root-path editor should get a collapsed display mode so long local absolute paths stop dominating the toolbar on smaller widths.
+- Split `CrewPages.tsx` further if another chat-focused pass is scheduled; the chat page now uses extracted sections but the file is still large.
 
 ## 2026-04-15 Follow-up
 

@@ -2,6 +2,35 @@
 
 ## 2026-04-15
 
+### Premium UI shell follow-up
+
+- Continued the UI-only redesign work on the dedicated `feat/premium-ui-shell` worktree without mixing in the non-UI bridge and signals changes from the other branch.
+- Replaced `src/pages/SettingsPage.tsx` with a small tab-shell page and moved the entire models/runtime/provider section into `src/features/settings/SettingsModelsPane.tsx`.
+- Rewrote `src/features/settings/SettingsProfilePane.tsx` and `src/features/settings/SettingsPreferencesPane.tsx` so the copy and field hierarchy match the premium control-room UI language.
+- Refined the design system with calmer interaction rules:
+  - removed the lift-on-hover motion from shared buttons and chips,
+  - added disabled-state consistency in `base.css`,
+  - flattened settings/runtime/provider panels further.
+- Improved chat idle UX:
+  - shortened visible workspace context to a folder label,
+  - added a proper hero surface for the empty conversation state,
+  - kept the route/model/status summary visible without overwhelming the page.
+- Improved files UX:
+  - widened the browser/inspector split,
+  - added clearer list hover feedback,
+  - made the empty inspector area feel like an intentional product state,
+  - replaced the always-visible absolute root-path input with a collapsed root summary card plus an explicit edit mode.
+- Improved orchestration UX:
+  - increased canvas emphasis,
+  - reduced right-rail visual weight,
+  - made the control rail sticky on desktop so the graph stays the hero surface.
+- Re-ran desktop, tablet, and mobile Playwright screenshots after the second pass and confirmed that:
+  - settings now reads as one system instead of stacked legacy cards,
+  - chat idle state no longer feels like an unfinished blank workspace,
+  - files and orchestration match the same shell, spacing, and panel language.
+- Refreshed `docs/screenshots/chat.png`, `files.png`, `settings.png`, `orchestration.png` and the matching `public/marketing/workspace-*.png` assets from the latest reviewed premium-shell captures.
+- Ran a tracked-text privacy scan for the literal local workspace path, username, and obvious key prefixes before preparing the branch for publish; no tracked text matches were found for the local path or username.
+
 ### Orchestration flow and readiness fix
 
 - Replaced the noisy orchestration graph with an execution-first flow that keeps only `input`, `parallel hub`, selected workers, and one `result` node.

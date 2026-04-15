@@ -1,7 +1,7 @@
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 import { Icon, type IconName } from '../../icons'
 
-type Tone = 'default' | 'accent' | 'success' | 'warning' | 'danger' | 'muted'
+type Tone = 'default' | 'accent' | 'success' | 'warning' | 'danger' | 'muted' | 'info' | 'error'
 
 export function PageHeader({
   eyebrow,
@@ -228,6 +228,43 @@ export function EmptyStateCard({
             </button>
           ) : null}
         </div>
+      ) : null}
+    </div>
+  )
+}
+
+export function NoticeBanner({
+  tone = 'default',
+  icon,
+  title,
+  children,
+  action,
+}: {
+  tone?: Tone
+  icon?: IconName
+  title?: string
+  children: ReactNode
+  action?: {
+    label: string
+    onClick: () => void
+  }
+}) {
+  const resolvedIcon =
+    icon ?? (tone === 'danger' ? 'warning' : tone === 'warning' ? 'warning' : 'spark')
+
+  return (
+    <div className={`ui-notice ui-notice--${tone}`}>
+      <div className="ui-notice__icon" aria-hidden="true">
+        <Icon name={resolvedIcon} size={16} />
+      </div>
+      <div className="ui-notice__copy">
+        {title ? <strong>{title}</strong> : null}
+        <span>{children}</span>
+      </div>
+      {action ? (
+        <button className="ghost-button ghost-button--compact" onClick={action.onClick} type="button">
+          {action.label}
+        </button>
       ) : null}
     </div>
   )

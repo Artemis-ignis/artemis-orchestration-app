@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Icon } from './icons'
 import {
   EmptyStateCard,
+  NoticeBanner,
   PageHeader,
   PanelCard,
   SectionHeader,
@@ -15,6 +16,7 @@ export {
   EmptyStateCard as PrimitiveEmptyState,
   PageHeader as PrimitivePageHeader,
   PanelCard,
+  NoticeBanner,
   SectionHeader,
   SplitPane,
   StatCard,

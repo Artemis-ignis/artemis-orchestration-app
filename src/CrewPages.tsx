@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { chatPromptCards, type PageId } from './crewData'
+import type { PageId } from './crewData'
 import { getAgentPreset } from './lib/agentCatalog'
 import {
   fetchAiProviders,
@@ -18,6 +18,7 @@ import {
   type AiStreamMetaEvent,
 } from './lib/aiRoutingClient'
 import { formatDate, formatFriendlyModelName, providerLabel } from './crewPageHelpers'
+import { ChatAlertStack, ChatIdlePanel, ChatStatusSummary } from './features/chat/ChatSections'
 import { Icon } from './icons'
 import { useArtemisApp } from './state/context'
 import type { AgentItem } from './state/types'
@@ -257,6 +258,31 @@ function resolveOfficialProviderId(baseUrl: string) {
 
 function chatAgentChoiceLabel(agent: AgentItem) {
   return formatFriendlyModelName(agent.model)
+}
+
+function getWorkspaceDisplayLabel(currentPath?: string | null, absolutePath?: string | null) {
+  if (currentPath?.trim()) {
+    return currentPath.trim()
+  }
+
+  if (!absolutePath?.trim()) {
+    return '작업 폴더 미연결'
+  }
+
+  const segments = absolutePath.split(/[\\/]+/).filter(Boolean)
+  return segments[segments.length - 1] ?? absolutePath
+}
+
+function getWorkspaceDisplayMeta(currentPath?: string | null, absolutePath?: string | null) {
+  if (currentPath?.trim()) {
+    return '현재 열린 폴더를 기준으로 파일 읽기와 수정 요청이 이어집니다.'
+  }
+
+  if (absolutePath?.trim()) {
+    return '연결된 루트 폴더를 기준으로 파일 작업이 이어집니다.'
+  }
+
+  return '설정 또는 파일 화면에서 작업 폴더를 연결하면 파일 기반 작업을 바로 이어갈 수 있습니다.'
 }
 
 function chatAgentSecondaryLabel(agent: AgentItem) {
@@ -636,8 +662,9 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
     <section className="page page--chat page--chat-modern">
       <header className="chat-topbar">
         <div className="chat-topbar__copy">
+          <span className="ui-status-pill ui-status-pill--muted">대화 작업면</span>
           <h1>채팅</h1>
-          <p>한 줄로 지시하면 바로 이어서 답하고, 선택한 모델 상태도 바로 보여줍니다.</p>
+          <p>현재 연결된 실행기를 바로 고르고, 같은 작업면 안에서 상태와 대화를 함께 봅니다.</p>
         </div>
         <div className="chat-topbar__actions">
           <div className="model-menu" ref={menuRef}>
@@ -758,52 +785,25 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
         </div>
       </header>
 
-      {chatStatusItems.length > 0 ? (
-        <div className="chat-statusRail">
-          {chatStatusItems.map((item) => (
-            <article key={item.key} className={`chat-statusTile chat-statusTile--${item.tone}`}>
-              <div className="chat-statusTile__copy">
-                <strong>{item.tone === 'info' ? '현재 상태' : item.tone === 'error' ? '오류' : '확인 필요'}</strong>
-                <span>{item.text}</span>
-              </div>
-              {item.actionLabel && item.actionPage ? (
-                <button
-                  className="ghost-button ghost-button--compact"
-                  onClick={() => {
-                    if (item.actionPage) {
-                      onNavigate(item.actionPage)
-                    }
-                  }}
-                  type="button"
-                >
-                  {item.actionLabel}
-                </button>
-              ) : null}
-            </article>
-          ))}
-        </div>
-      ) : null}
+      <ChatStatusSummary
+        currentModelName={currentModelName}
+        currentRouteLabel={currentRouteLabel}
+        readyCount={bridgeHealth?.providers.filter((item) => item.ready).length ?? 0}
+        threadCount={state.chats.threads.length}
+      />
+
+      <ChatAlertStack items={chatStatusItems} onNavigate={onNavigate} />
 
       <div className="chat-surface">
         <div className={`chat-surface__body ${isIdleState ? 'chat-surface__body--idle' : ''}`}>
           {isIdleState ? (
-            <div className="chat-empty-state">
-              <h2>바로 시작하세요.</h2>
-              <p>작업을 한 문장으로 적으면 바로 이어서 답합니다.</p>
-              <div className="chat-empty-state__actions chat-empty-state__actions--compact chip-wrap">
-                {chatPromptCards.map((item) => (
-                  <button
-                    key={item.title}
-                    className="chip chat-empty-chip"
-                    onClick={() => setComposerText(item.description)}
-                    title={item.description}
-                    type="button"
-                  >
-                    <span>{item.title}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <ChatIdlePanel
+              currentModelName={currentModelName}
+              currentRouteLabel={currentRouteLabel}
+              onPickPrompt={setComposerText}
+              workspaceLabel={getWorkspaceDisplayLabel(workspaceCurrentPath, workspaceAbsolutePath)}
+              workspaceMeta={getWorkspaceDisplayMeta(workspaceCurrentPath, workspaceAbsolutePath)}
+            />
           ) : null}
 
           <div
@@ -945,6 +945,23 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
           </div>
         </form>
       </div>
+
+      {!isIdleState ? (
+        <section className="ui-panel ui-panel--muted chat-contextPanel">
+          <div className="ui-toolbar">
+            <div className="chat-contextPanel__copy">
+              <strong>작업 흐름</strong>
+              <span>대화는 현재 모델과 작업 폴더 기준으로 이어집니다.</span>
+            </div>
+            <div className="chip-wrap">
+              <span className="ui-status-pill ui-status-pill--muted">{currentRouteLabel}</span>
+              <span className="ui-status-pill ui-status-pill--muted">
+                {getWorkspaceDisplayLabel(workspaceCurrentPath, workspaceAbsolutePath)}
+              </span>
+            </div>
+          </div>
+        </section>
+      ) : null}
     </section>
   )
 }

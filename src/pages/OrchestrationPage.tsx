@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { PageId } from '../crewData'
 import { fetchAiProviders, type AiProviderState } from '../lib/aiRoutingClient'
-import { DisclosureSection, EmptyState, PageIntro } from '../crewPageShared'
+import { PageIntro } from '../crewPageShared'
+import { executionProviderLabel } from '../crewPageHelpers'
 import {
-  changeTypeLabel,
-  executionProviderLabel,
-  formatDate,
-  formatFriendlyModelName,
-} from '../crewPageHelpers'
-import { Icon } from '../icons'
+  OrchestrationAlerts,
+  OrchestrationControls,
+  OrchestrationDetails,
+  OrchestrationResultCard,
+  OrchestrationResultsPanel,
+  OrchestrationStage,
+} from '../features/orchestration/OrchestrationSections'
 import { OrchestrationCanvas } from '../OrchestrationCanvas'
 import type { AgentItem, AgentRun } from '../state/types'
 import { useArtemisApp } from '../state/context'
@@ -44,21 +46,6 @@ function runningHint(provider: string) {
   return '스트리밍 가능한 공급자는 생성 중 로그와 함께 응답이 순차적으로 갱신됩니다.'
 }
 
-function summarizeWorkspaceLabel(workspaceCurrentPath?: string, workspaceAbsolutePath?: string) {
-  const resolved = workspaceCurrentPath || workspaceAbsolutePath
-
-  if (!resolved) {
-    return '연결 필요'
-  }
-
-  if (!workspaceCurrentPath || workspaceCurrentPath === workspaceAbsolutePath) {
-    return '루트 작업 폴더'
-  }
-
-  const segments = workspaceCurrentPath.split(/[\\/]/).filter(Boolean)
-  return segments.at(-1) || '현재 작업 폴더'
-}
-
 function canAgentUseApiKey(agent: AgentItem, apiKeyIds: Set<string>) {
   if (agent.provider === 'openai-compatible' || agent.provider === 'anthropic') {
     return Boolean(agent.apiKeyId && apiKeyIds.has(agent.apiKeyId))
@@ -87,7 +74,6 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     state,
     startOrchestrationSession,
     workspaceAbsolutePath,
-    workspaceCurrentPath,
     workspaceError,
   } = useArtemisApp()
   const [aiProviders, setAiProviders] = useState<AiProviderState[]>([])
@@ -108,7 +94,6 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     .reverse()
     .find((message) => message.role === 'master')
   const latestAgentExecution = latestExecution?.source === 'agent' ? latestExecution : null
-  const workspaceLabel = summarizeWorkspaceLabel(workspaceCurrentPath, workspaceAbsolutePath)
   const latestChangedFiles = latestAgentExecution?.workspace.changedFiles ?? []
   const enabledAgentIds = useMemo(() => new Set(enabledAgents.map((agent) => agent.id)), [enabledAgents])
   const effectiveSelectedAgentIds = useMemo(() => {
@@ -500,13 +485,6 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     workspaceError,
   ])
 
-  const executionWorkspaceLabel = latestAgentExecution
-    ? summarizeWorkspaceLabel(
-        latestAgentExecution.workspace.cwdRelativePath,
-        latestAgentExecution.workspace.cwdPath,
-      )
-    : workspaceLabel
-
   const toggleSelectedAgent = (agentId: string) => {
     const current = selectedAgentIds.filter((id) => enabledAgentIds.has(id))
     const base = current.length > 0 ? current : effectiveSelectedAgentIds
@@ -546,61 +524,37 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
         title="오케스트레이션"
       />
 
-      <section className="panel-card orchestration-stage orchestration-stage--single">
-        <div className="orchestration-stage__header orchestration-stage__header--compact">
-          <div>
-            <h2>병렬 실행 흐름</h2>
-            <p className="settings-card__lead">
-              실행 전에는 흐름만 보이고, 시작하면 선택한 모델 결과가 바로 아래에 쌓입니다.
-            </p>
-          </div>
-          <div className="orchestration-summary-bar">
-            <span className={`chip ${selectedAgents.length > 0 ? 'is-active' : 'chip--soft'}`}>
-              선택 {selectedAgents.length}개
-            </span>
-            <span className={`chip ${runnableSelectedAgents.length > 0 ? 'is-active' : 'chip--soft'}`}>
-              실행 {runnableSelectedAgents.length}개
-            </span>
-            <span className={`chip ${hasWorkspaceConnection ? 'is-active' : 'chip--soft'}`}>
-              {workspaceStatusLabel}
-            </span>
-          </div>
-        </div>
-
-        <div className="orchestration-stage__canvasShell">
-          <div className="orchestration-stage__canvas">
-            <OrchestrationCanvas
-              selectedAgents={selectedAgents}
-              agentStates={canvasAgentStates}
-              sessionRuns={sessionRuns}
-              taskDraft={task}
-              sessionTask={state.orchestration.sessionTask}
-              recentPrompt={latestMasterMessage?.text ?? ''}
-              bridgeError={bridgeError}
-              workspaceError={workspaceError}
-              requiresApiKey={skippedSelectedAgents.some((agent) => agentAvailability.get(agent.id)?.reason === 'API 키 필요')}
-              onNavigate={onNavigate}
-            />
-          </div>
-
-          <section className="orchestration-inline-dock orchestration-inline-dock--compact">
-            <div className="panel-card__header">
-              <h2>작업 실행</h2>
-              <span className="chip chip--soft">
-                {selectedAgents.length > 1 ? '병렬 모드' : '단일 모드'}
-              </span>
+      <OrchestrationStage
+        summary={{
+          selectedCount: selectedAgents.length,
+          runnableCount: runnableSelectedAgents.length,
+          workspaceStatusLabel,
+        }}
+        canvas={
+          <div className="orchestration-stage__canvasShell">
+            <div className="orchestration-stage__canvas">
+              <OrchestrationCanvas
+                selectedAgents={selectedAgents}
+                agentStates={canvasAgentStates}
+                sessionRuns={sessionRuns}
+                taskDraft={task}
+                sessionTask={state.orchestration.sessionTask}
+                recentPrompt={latestMasterMessage?.text ?? ''}
+                bridgeError={bridgeError}
+                workspaceError={workspaceError}
+                requiresApiKey={skippedSelectedAgents.some((agent) => agentAvailability.get(agent.id)?.reason === 'API 키 필요')}
+                onNavigate={onNavigate}
+              />
             </div>
-
-            <div className="orchestration-inline-dock__selection">
-              <div className="orchestration-inline-dock__selectionHeader">
-                <strong>이번에 돌릴 모델</strong>
-                <span>체크한 모델만 실행하고 결과 카드로 보여줍니다.</span>
-              </div>
+          </div>
+        }
+        controls={
+          <OrchestrationControls
+            enabledAgentToggles={
               <div className="orchestration-inline-dock__agentSwitch">
                 {enabledAgents.map((agent) => {
                   const availability = agentAvailability.get(agent.id)
                   const selected = effectiveSelectedAgentIds.includes(agent.id)
-
                   return (
                     <button
                       key={agent.id}
@@ -617,10 +571,9 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                   )
                 })}
               </div>
-            </div>
-
-            {visibleAgentStatusItems.length > 0 ? (
-              <div className="orchestration-statusGrid">
+            }
+            statusTiles={
+              <>
                 {visibleAgentStatusItems.map((item) => (
                   <article
                     key={item.id}
@@ -631,10 +584,9 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                     <p>{item.detail}</p>
                   </article>
                 ))}
-              </div>
-            ) : null}
-
-            <div className="orchestration-inline-dock__composer">
+              </>
+            }
+            taskField={
               <label className="field field--full orchestration-inline-dock__field">
                 <span>작업 지시</span>
                 <textarea
@@ -644,32 +596,10 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                   value={task}
                 />
               </label>
-
-              <div className="orchestration-inline-dock__actions">
-                {runnerAlerts.length > 0 ? (
-                  <div className="orchestration-inline-dock__statusList">
-                    {runnerAlerts.map((alert) => (
-                      <div key={alert.key} className={`status-banner status-banner--${alert.tone}`}>
-                        <Icon name={alert.tone === 'info' ? 'spark' : 'warning'} size={16} />
-                        <span>{alert.text}</span>
-                        {alert.actionLabel && alert.actionPage ? (
-                          <button
-                            className="ghost-button ghost-button--compact"
-                            onClick={() => {
-                              if (alert.actionPage) {
-                                onNavigate(alert.actionPage)
-                              }
-                            }}
-                            type="button"
-                          >
-                            {alert.actionLabel}
-                          </button>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-
+            }
+            actions={
+              <>
+                <OrchestrationAlerts alerts={runnerAlerts} onNavigate={onNavigate} />
                 <div className="orchestration-template-list orchestration-template-list--inline">
                   {taskTemplates.map((template) => (
                     <button
@@ -682,7 +612,6 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                     </button>
                   ))}
                 </div>
-
                 <button
                   className="primary-button orchestration-dock__submit"
                   disabled={!canRunTask}
@@ -693,198 +622,65 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                     ? `병렬 실행 중... ${latestRunElapsedLabel || ''}`.trim()
                     : `${Math.max(runnableSelectedAgents.length, 1)}개 모델 실행`}
                 </button>
-              </div>
-            </div>
-
-            <section className="orchestration-live-panel">
-              <div className="panel-card__header">
-                <h2>실행 결과</h2>
-                <span className={`chip ${sessionRunning ? 'is-active' : 'chip--soft'}`}>
-                  {sessionRunning ? '진행 중' : sessionHasResults ? '최근 세션' : '대기 중'}
-                </span>
-              </div>
-
-              {sessionRuns[0] ? (
-                <p className="orchestration-live-panel__hint">
-                  {runningHint(sessionRuns[0].provider)}
-                </p>
-              ) : (
-                <p className="orchestration-live-panel__hint">
-                  실행을 시작하면 각 모델 결과가 이 영역에 바로 나타납니다.
-                </p>
-              )}
-
-              {sessionHasResults ? (
-                <div className="orchestration-live-panel__cards">
-                  {sessionDisplayAgents.map((agent) => {
-                    const run = latestRunsByAgent.get(agent.id)
-                    const latestLog = run?.logs[run.logs.length - 1]
-                    const elapsedLabel =
-                      run && run.status === 'running'
-                        ? formatElapsedSeconds(
-                            Math.max(
-                              0,
-                              Math.floor((runClock - Date.parse(run.startedAt)) / 1000),
-                            ),
-                          )
-                        : ''
-
-                    return (
-                      <article key={agent.id} className="orchestration-run-card">
-                        <div className="orchestration-run-card__header">
-                          <div>
-                            <strong>{agent.name}</strong>
-                            <span>{executionProviderLabel(agent.provider)}</span>
-                          </div>
-                          <span className={`chip ${run?.status === 'running' ? 'is-active' : 'chip--soft'}`}>
-                            {run
-                              ? displayRunStatusLabel(run.status)
-                              : agentAvailability.get(agent.id)?.reason
-                                ? '제외됨'
-                                : '대기'}
-                          </span>
-                        </div>
-
-                        <div className="orchestration-run-card__meta">
-                          <span className="chip chip--soft">{formatFriendlyModelName(agent.model)}</span>
-                          {run ? <span className="chip chip--soft">{formatDate(run.startedAt)}</span> : null}
-                          {elapsedLabel ? <span className="chip chip--soft">{elapsedLabel}</span> : null}
-                        </div>
-
-                        <div className="orchestration-run-card__body">
-                          {run?.output
-                            ? run.output
-                            : latestLog?.message || '아직 이 모델의 결과가 도착하지 않았습니다.'}
-                        </div>
-
-                        {run?.logs.length ? (
-                          <div className="orchestration-run-card__logs">
-                            {run.logs.slice(-3).map((log) => (
-                              <div key={log.id} className={`run-log run-log--${log.level}`}>
-                                <span>{formatDate(log.createdAt)}</span>
-                                <p>{log.message}</p>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                      </article>
-                    )
-                  })}
-                </div>
-              ) : (
-                <EmptyState
-                  title="결과는 여기 쌓입니다"
-                  description="모델을 실행하면 각 결과와 최근 로그가 이 영역에 바로 추가됩니다."
-                />
-              )}
-            </section>
-          </section>
-        </div>
-      </section>
-
-      <DisclosureSection
-        className="disclosure--soft"
-        summary="최근 결과, 변경 파일, 병렬 실행 로그"
-        title="더보기"
-      >
-        <div className="orchestration-detail-grid">
-          <section className="panel-card">
-            <div className="panel-card__header">
-              <h2>선택 모델</h2>
-              <span className="chip">{selectedAgents.length}개</span>
-            </div>
-            <div className="chip-wrap">
-              {selectedAgents.map((agent) => (
-                <span key={agent.id} className="chip chip--soft">
-                  {agent.name}
-                </span>
-              ))}
-            </div>
-            <div className="stack-grid stack-grid--compact orchestration-detail-stats">
-              <div className="summary-row">
-                <span>구독 시그널</span>
-                <strong>{state.signals.items.filter((item) => item.subscribed).length}개</strong>
-              </div>
-              <div className="summary-row">
-                <span>활성 도구</span>
-                <strong>{activeTools.length}개</strong>
-              </div>
-            </div>
-          </section>
-
-          <section className="panel-card orchestration-detail-stack">
-            <div className="panel-card__header">
-              <h2>최근 결과와 로그</h2>
-              {sessionRuns[0] ? <span className="chip chip--soft">{sessionRuns[0].status}</span> : null}
-            </div>
-
-            {latestAgentExecution ? (
-              <>
-                <div className="summary-row">
-                  <span>최근 실제 실행</span>
-                  <strong>
-                    {executionProviderLabel(latestAgentExecution.provider)} ·{' '}
-                    {formatFriendlyModelName(latestAgentExecution.model)}
-                  </strong>
-                </div>
-                <div className="summary-row">
-                  <span>실행 폴더</span>
-                  <strong>{executionWorkspaceLabel}</strong>
-                </div>
-                <div className="chip-wrap">
-                  {latestChangedFiles.length > 0 ? (
-                    latestChangedFiles.slice(0, 6).map((item) => (
-                      <span
-                        key={`${item.changeType}:${item.relativePath}`}
-                        className="chip chip--soft"
-                      >
-                        {changeTypeLabel(item.changeType)} · {item.relativePath}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="chip chip--soft">변경 파일 없음</span>
-                  )}
-                  {latestAgentExecution.workspace.changeDetectionLimited ? (
-                    <span className="chip chip--soft">일부 변경만 표시</span>
-                  ) : null}
-                </div>
               </>
-            ) : (
-              <EmptyState
-                description="채팅이나 오케스트레이션을 한 번 실행하면 실제 결과와 변경 파일이 여기에 쌓입니다."
-                title="아직 실제 실행 기록이 없습니다"
-              />
-            )}
+            }
+          />
+        }
+      />
 
-            {sessionRuns.length > 0 ? (
-              <div className="stack-grid stack-grid--compact">
-                {sessionRuns.slice(0, 3).map((run) => (
-                  <article key={run.id} className="run-card">
-                    <div className="card-topline">
-                      <strong>{run.task}</strong>
-                      <small>{formatDate(run.startedAt)}</small>
-                    </div>
-                    <p>{run.output || '아직 결과가 기록되지 않았습니다.'}</p>
-                    <div className="run-card__logs">
-                      {run.logs.slice(-2).map((log) => (
-                        <div key={log.id} className={`run-log run-log--${log.level}`}>
-                          <span>{formatDate(log.createdAt)}</span>
-                          <p>{log.message}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                description="모델을 병렬 실행하면 최근 로그가 여기에 간단히 쌓입니다."
-                title="아직 실행 로그가 없습니다"
-              />
-            )}
-          </section>
-        </div>
-      </DisclosureSection>
+      <OrchestrationResultsPanel
+        hint={
+          sessionRuns[0]
+            ? runningHint(sessionRuns[0].provider)
+            : '실행을 시작하면 각 모델 결과가 이 영역에 바로 나타납니다.'
+        }
+        sessionHasResults={sessionHasResults}
+        sessionRunning={sessionRunning}
+        cards={
+          <div className="orchestration-live-panel__cards">
+            {sessionDisplayAgents.map((agent) => {
+              const run = latestRunsByAgent.get(agent.id)
+              const latestLog = run?.logs[run.logs.length - 1]
+              const elapsedLabel =
+                run && run.status === 'running'
+                  ? formatElapsedSeconds(
+                      Math.max(0, Math.floor((runClock - Date.parse(run.startedAt)) / 1000)),
+                    )
+                  : ''
+
+              return (
+                <OrchestrationResultCard
+                  key={agent.id}
+                  body={run?.output ? run.output : latestLog?.message || '아직 이 모델의 결과가 도착하지 않았습니다.'}
+                  elapsedLabel={elapsedLabel}
+                  logs={run?.logs.slice(-3)}
+                  model={agent.model}
+                  provider={executionProviderLabel(agent.provider)}
+                  startedAt={run?.startedAt}
+                  statusLabel={
+                    run
+                      ? displayRunStatusLabel(run.status)
+                      : agentAvailability.get(agent.id)?.reason
+                        ? '제외됨'
+                        : '대기'
+                  }
+                  title={agent.name}
+                />
+              )
+            })}
+          </div>
+        }
+      />
+
+      <OrchestrationDetails
+        activeToolCount={activeTools.length}
+        latestAgentExecution={latestAgentExecution}
+        latestChangedFiles={latestChangedFiles}
+        selectedAgents={selectedAgents}
+        sessionRuns={sessionRuns}
+        sessionStatus={sessionRuns[0]?.status}
+        signalCount={state.signals.items.filter((item) => item.subscribed).length}
+      />
     </section>
   )
 }
