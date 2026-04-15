@@ -20,16 +20,20 @@
 - `4174` bridge responds normally.
 - Ollama exposes only `gemma4-E4B-uncensored-q4fast:latest`.
 - Settings shows a dedicated local runtime section for `Ollama 로컬` and `Codex CLI`.
+- `/api/health` now returns local runtime timestamps plus stale/error fields instead of dropping Ollama state on transient failures.
+- Settings keeps the last confirmed local runtime state when local health refresh fails, and the Ollama card still shows model count, current model, and the latest warning/error.
 - The orchestration canvas supports pan and zoom again.
 - The pre-run orchestration flow is now reduced to `입력 -> 병렬 허브 -> 출력`.
 - When a task is typed into orchestration, the selected models expand into parallel worker blocks.
 - Public screenshots were regenerated after the flow change and no longer expose absolute workspace paths.
+- The public settings screenshot was regenerated after the local runtime stability fix.
 
 ## Next Checks
 
 - Keep orchestration labels readable without truncation.
 - Keep the official-router worker label short enough to scan at a glance.
 - Re-check screenshots whenever orchestration labels or workspace labels change.
+- Watch whether local-health warnings should eventually be separated from the shared app-wide `bridgeError` channel.
 - Revisit orchestration spacing only if the interactive layout regresses again.
 
 ## 2026-04-15 Follow-up

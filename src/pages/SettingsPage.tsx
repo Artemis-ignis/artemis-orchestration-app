@@ -17,6 +17,7 @@ import {
   type AiRoutingSettings,
 } from '../lib/aiRoutingClient'
 import { getAgentPreset } from '../lib/agentCatalog'
+import type { ProviderStatus } from '../lib/modelClient'
 import { formatFriendlyModelName } from '../crewPageHelpers'
 import { DisclosureSection, EmptyState, PageIntro } from '../crewPageShared'
 import { Icon } from '../icons'
@@ -25,11 +26,16 @@ import type { AgentCapability, AgentPresetId } from '../state/types'
 
 const MANAGED_AGENT_PRESETS: AgentPresetId[] = ['official-router', 'codex-cli', 'ollama-local']
 const OFFICIAL_PROVIDER_ORDER: AiProviderId[] = ['openrouter', 'nvidia-build', 'gemini']
+const LOCAL_PROVIDER_ORDER = ['ollama', 'codex'] as const
 
 type ProviderDraft = {
   enabled: boolean
   apiKey: string
   candidateModelsText: string
+}
+
+type LocalProviderCard = ProviderStatus & {
+  provider: (typeof LOCAL_PROVIDER_ORDER)[number]
 }
 
 function isDocScreenshotMode() {
@@ -92,22 +98,72 @@ function localProviderIconName(provider: 'ollama' | 'codex'): 'spark' | 'agent' 
   return provider === 'ollama' ? 'spark' : 'agent'
 }
 
-function localProviderSummary(provider: 'ollama' | 'codex', detail: string) {
-  if (provider === 'ollama') {
-    return detail.includes('사용할 수 있습니다.')
-      ? '내 PC의 작은 로컬 모델을 바로 채팅과 오케스트레이션에 붙입니다.'
-      : 'Ollama 앱, 모델 설치, 업데이트 상태를 먼저 확인해야 합니다.'
+function formatLocalProviderTime(value?: string | null) {
+  if (!value) {
+    return '기록 없음'
   }
 
-  return detail.includes('Logged in')
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString('ko-KR', {
+        hour12: false,
+      })
+}
+
+function localProviderSummary(provider: LocalProviderCard) {
+  if (provider.provider === 'ollama') {
+    if (provider.ready && provider.stale) {
+      return '최근 확인은 실패했지만 마지막으로 확인된 Ollama 모델 상태를 유지 중입니다.'
+    }
+
+    if (provider.ready) {
+      return '로컬 Ollama 모델을 바로 채팅과 오케스트레이션에 붙입니다.'
+    }
+
+    if (provider.available) {
+      return 'Ollama 서버는 보이지만 바로 쓸 모델 상태를 다시 확인해야 합니다.'
+    }
+
+    return 'Ollama 앱 실행과 모델 목록 확인이 필요합니다.'
+  }
+
+  return provider.ready
     ? '로컬 Codex CLI가 실제 파일 수정과 코드 작업을 처리합니다.'
     : 'Codex CLI 로그인 또는 준비 상태를 다시 확인해야 합니다.'
 }
 
-function localProviderStatusLabel(provider: { available: boolean; ready: boolean }) {
+function localProviderStatusLabel(provider: {
+  available: boolean
+  ready: boolean
+  stale?: boolean
+}) {
+  if (provider.ready && provider.stale) return '마지막 정상 상태'
   if (provider.ready) return '준비 완료'
   if (provider.available) return '부분 준비'
   return '미연결'
+}
+
+function buildFallbackLocalProvider(
+  provider: (typeof LOCAL_PROVIDER_ORDER)[number],
+  bridgeError: string | null,
+): LocalProviderCard {
+  const isOllama = provider === 'ollama'
+
+  return {
+    provider,
+    available: false,
+    ready: false,
+    models: isOllama ? [] : ['gpt-5.4', 'gpt-5.4-mini'],
+    detail: isOllama
+      ? '로컬 Ollama 상태를 아직 확인하지 못했습니다.'
+      : 'Codex CLI 상태를 아직 확인하지 못했습니다.',
+    warning: bridgeError ? '최근 확인에 실패했습니다.' : '상태 확인 전입니다.',
+    lastError: bridgeError,
+    stale: Boolean(bridgeError),
+    lastCheckedAt: null,
+    lastSuccessAt: null,
+  }
 }
 
 function providerAutoSummary(provider: AiProviderId) {
@@ -283,6 +339,7 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
   const [providerDrafts, setProviderDrafts] = useState<Record<string, ProviderDraft>>({})
   const [aiError, setAiError] = useState<string | null>(null)
   const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [isRefreshingLocalProviders, setIsRefreshingLocalProviders] = useState(false)
   const docScreenshotMode = useMemo(() => isDocScreenshotMode(), [])
 
   const managedAgents = useMemo(
@@ -292,19 +349,30 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
   const activeManagedAgent =
     (activeAgent && MANAGED_AGENT_PRESETS.includes(activeAgent.preset) ? activeAgent : null) ?? managedAgents[0] ?? null
   const topCandidate = aiPreview?.candidates[0] ?? null
-  const readyLocalProviders = bridgeHealth?.providers.filter((item) => item.ready).length ?? 0
   const localProviders = useMemo(
-    () =>
-      ((bridgeHealth?.providers ?? []).filter(
-        (item) => item.provider === 'ollama' || item.provider === 'codex',
-      ) as Array<{
-        provider: 'ollama' | 'codex'
-        available: boolean
-        ready: boolean
-        models: string[]
-        detail: string
-      }>),
-    [bridgeHealth],
+    () => {
+      const providerMap = new Map(
+        (bridgeHealth?.providers ?? [])
+          .filter(
+            (item): item is LocalProviderCard =>
+              item.provider === 'ollama' || item.provider === 'codex',
+          )
+          .map((item) => [item.provider, item]),
+      )
+
+      return LOCAL_PROVIDER_ORDER.map(
+        (provider) => providerMap.get(provider) ?? buildFallbackLocalProvider(provider, bridgeError),
+      )
+    },
+    [bridgeError, bridgeHealth],
+  )
+  const readyLocalProviders = useMemo(
+    () => localProviders.filter((item) => item.ready).length,
+    [localProviders],
+  )
+  const showingCachedLocalState = useMemo(
+    () => localProviders.some((item) => item.stale),
+    [localProviders],
   )
   const manualCandidates = useMemo(
     () =>
@@ -338,6 +406,15 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
       ).length,
     [visibleAiProviders],
   )
+
+  const handleRefreshLocalProviders = useCallback(async () => {
+    setIsRefreshingLocalProviders(true)
+    try {
+      await refreshBridgeHealth()
+    } finally {
+      setIsRefreshingLocalProviders(false)
+    }
+  }, [refreshBridgeHealth])
 
   const loadAiState = useCallback(async () => {
     try {
@@ -454,16 +531,6 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
         <p className="settings-card__lead">
           무료 후보도 공식 API 키는 필요합니다. 키 저장 후 테스트를 통과한 후보만 자동 무료 라우팅에 들어갑니다.
         </p>
-        <div className="settings-explainGrid">
-          <article className="settings-explainCard">
-            <strong>키를 넣으면 바로 되는 일</strong>
-            <p>해당 공급자의 무료 후보를 실제로 호출해 보고, 통과한 모델만 자동 후보 목록에 넣습니다.</p>
-          </article>
-          <article className="settings-explainCard">
-            <strong>자동이 아닌 것</strong>
-            <p>키를 넣는다고 유료 모델을 멋대로 고르지 않습니다. 무료 후보가 없으면 그 공급자는 건너뜁니다.</p>
-          </article>
-        </div>
         <div className="settings-summary-strip">
           <span className={`chip ${readyLocalProviders > 0 ? 'is-active' : 'chip--soft'}`}>로컬 실행기 {readyLocalProviders}개</span>
           <span className={`chip ${readyOfficialProviders > 0 ? 'is-active' : 'chip--soft'}`}>공식 공급자 {readyOfficialProviders}개 준비</span>
@@ -479,10 +546,26 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
         <div className="settings-actionRow">
           <button className="primary-button" onClick={() => onNavigate('chat')} type="button">채팅 열기</button>
           <button className="ghost-button" onClick={() => onNavigate('agents')} type="button">오케스트레이션 보기</button>
-          <button className="ghost-button" onClick={() => void refreshBridgeHealth()} type="button">로컬 상태 새로고침</button>
+          <button
+            className="ghost-button"
+            disabled={isRefreshingLocalProviders}
+            onClick={() => void handleRefreshLocalProviders()}
+            type="button"
+          >
+            {isRefreshingLocalProviders ? '로컬 상태 확인 중' : '로컬 상태 새로고침'}
+          </button>
         </div>
         {aiError ? <div className="status-banner status-banner--error"><Icon name="warning" size={16} /><span>{aiError}</span></div> : null}
-        {bridgeError ? <div className="status-banner status-banner--warning"><Icon name="warning" size={16} /><span>{bridgeError}</span></div> : null}
+        {bridgeError ? (
+          <div className="status-banner status-banner--warning">
+            <Icon name="warning" size={16} />
+            <span>
+              {showingCachedLocalState
+                ? `최근 로컬 상태 확인에 실패했습니다. 마지막 정상 상태를 유지 중입니다. ${bridgeError}`
+                : bridgeError}
+            </span>
+          </div>
+        ) : null}
       </section>
 
       <section className="settings-card">
@@ -494,22 +577,33 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
         >
           <div className="panel-card__header">
             <p className="settings-card__lead">
-              로컬 실행기는 API 키 없이 바로 붙습니다. Ollama가 안 보이면 앱 실행, 모델 설치, 업데이트 상태부터 확인하면 됩니다.
+              로컬 실행기는 API 키 없이 바로 붙습니다. 최근 확인이 실패해도 마지막 정상 상태를 유지하면서 다시 확인합니다.
             </p>
-            <button className="ghost-button ghost-button--compact" onClick={() => void refreshBridgeHealth()} type="button">
-              로컬 상태 새로고침
-            </button>
           </div>
           <div className="provider-grid provider-grid--local">
             {localProviders.map((provider) => {
               const providerLabel = localProviderLabel(provider.provider)
               const isOllama = provider.provider === 'ollama'
-              const modelSummary =
+              const currentModelName =
                 provider.models.length > 0
-                  ? provider.models.map((item) => formatFriendlyModelName(item)).join(', ')
+                  ? formatFriendlyModelName(provider.models[0])
                   : isOllama
-                    ? '설치된 모델이 아직 없습니다.'
-                    : '사용 가능한 Codex 모델을 불러오지 못했습니다.'
+                    ? '최근 확인된 모델 없음'
+                    : '기본 모델 확인 대기 중'
+              const effectiveWarning =
+                provider.warning ??
+                (bridgeError ? '최근 로컬 상태 확인에 실패했습니다. 마지막 정상 상태를 표시 중입니다.' : null)
+              const effectiveLastError = provider.lastError ?? bridgeError
+              const statusMessage = effectiveWarning
+                ? effectiveLastError
+                  ? `${effectiveWarning} (${effectiveLastError})`
+                  : effectiveWarning
+                : effectiveLastError ?? '최근 경고 없음'
+              const lastCheckedLabel = provider.lastSuccessAt
+                ? `마지막 정상 확인 ${formatLocalProviderTime(provider.lastSuccessAt)}`
+                : provider.lastCheckedAt
+                  ? `마지막 확인 ${formatLocalProviderTime(provider.lastCheckedAt)}`
+                  : '확인 기록 없음'
 
               return (
                 <article key={provider.provider} className="provider-card provider-card--local">
@@ -520,35 +614,122 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
                       </span>
                       <div>
                         <h3>{providerLabel}</h3>
-                        <p className="settings-card__lead">{localProviderSummary(provider.provider, provider.detail)}</p>
+                        <p className="settings-card__lead">{localProviderSummary(provider)}</p>
                       </div>
                     </div>
-                    <span className={`chip ${provider.ready ? 'is-active' : 'chip--soft'}`}>
+                    <span className={`chip ${provider.ready && !provider.stale ? 'is-active' : 'chip--soft'}`}>
                       {localProviderStatusLabel(provider)}
                     </span>
                   </div>
                   <div className="settings-providerFlags chip-wrap">
-                    <span className={`chip ${provider.ready ? 'is-active' : 'chip--soft'}`}>
-                      {provider.ready ? '바로 사용 가능' : '확인 필요'}
+                    <span className={`chip ${provider.ready && !provider.stale ? 'is-active' : 'chip--soft'}`}>
+                      {provider.ready ? '사용 가능' : '확인 필요'}
                     </span>
                     <span className="chip chip--soft">{provider.models.length}개 모델</span>
                   </div>
                   <p className="provider-card__summary">{provider.detail}</p>
                   <div className="provider-card__surface">
-                    <strong>현재 모델</strong>
-                    <span>{modelSummary}</span>
+                    <strong>준비 상태</strong>
+                    <span>{localProviderStatusLabel(provider)}</span>
                   </div>
-                  {isOllama && !provider.ready ? (
-                    <div className="status-banner status-banner--warning">
-                      <Icon name="warning" size={16} />
-                      <span>
-                        지금은 로컬 Ollama가 바로 응답하지 않습니다.
-                        <small className="status-banner__subtle">업데이트 직후라면 10~20초 뒤 다시 새로고침하면 정상으로 바뀔 수 있습니다.</small>
-                      </span>
-                    </div>
-                  ) : null}
+                  <div className="provider-card__surface">
+                    <strong>현재 모델 수</strong>
+                    <span>{provider.models.length}개</span>
+                  </div>
+                  <div className="provider-card__surface">
+                    <strong>현재 모델명</strong>
+                    <span>{currentModelName}</span>
+                  </div>
+                  <div className="provider-card__surface">
+                    <strong>최근 경고</strong>
+                    <span>{statusMessage}</span>
+                  </div>
+                  <p className="settings-inlineMeta">{lastCheckedLabel}</p>
+                  <div className="settings-actionRow">
+                    <button
+                      className="ghost-button ghost-button--compact"
+                      disabled={isRefreshingLocalProviders}
+                      onClick={() => void handleRefreshLocalProviders()}
+                      type="button"
+                    >
+                      {isRefreshingLocalProviders ? '상태 확인 중' : '로컬 상태 새로고침'}
+                    </button>
+                  </div>
                 </article>
               )
+              /*
+              const providerLabel = localProviderLabel(provider.provider)
+              const isOllama = provider.provider === 'ollama'
+              const currentModelName =
+                provider.models.length > 0
+                  ? formatFriendlyModelName(provider.models[0])
+                  : isOllama
+                    ? '최근 확인된 모델 없음'
+                    : '기본 모델 확인 대기 중'
+              const statusMessage = provider.warning
+                ? provider.lastError
+                  ? `${provider.warning} (${provider.lastError})`
+                  : provider.warning
+                : provider.lastError ?? '최근 경고 없음'
+              const lastCheckedLabel = provider.lastSuccessAt
+                ? `마지막 정상 확인 ${formatLocalProviderTime(provider.lastSuccessAt)}`
+                : provider.lastCheckedAt
+                  ? `마지막 확인 ${formatLocalProviderTime(provider.lastCheckedAt)}`
+                  : '확인 기록 없음'
+
+              return (
+                <article key={provider.provider} className="provider-card provider-card--local">
+                  <div className="provider-card__head">
+                    <div className="provider-card__identity">
+                      <span className={`provider-card__icon provider-card__icon--${provider.provider}`}>
+                        <Icon name={localProviderIconName(provider.provider)} size={16} />
+                      </span>
+                      <div>
+                        <h3>{providerLabel}</h3>
+                        <p className="settings-card__lead">{localProviderSummary(provider)}</p>
+                      </div>
+                    </div>
+                    <span className={`chip ${provider.ready && !provider.stale ? 'is-active' : 'chip--soft'}`}>
+                      {localProviderStatusLabel(provider)}
+                    </span>
+                  </div>
+                  <div className="settings-providerFlags chip-wrap">
+                    <span className={`chip ${provider.ready && !provider.stale ? 'is-active' : 'chip--soft'}`}>
+                      {provider.ready ? '사용 가능' : '확인 필요'}
+                    </span>
+                    <span className="chip chip--soft">{provider.models.length}개 모델</span>
+                  </div>
+                  <p className="provider-card__summary">{provider.detail}</p>
+                  <div className="provider-card__surface">
+                    <strong>준비 상태</strong>
+                    <span>{localProviderStatusLabel(provider)}</span>
+                  </div>
+                  <div className="provider-card__surface">
+                    <strong>현재 모델 수</strong>
+                    <span>{provider.models.length}개</span>
+                  </div>
+                  <div className="provider-card__surface">
+                    <strong>현재 모델명</strong>
+                    <span>{currentModelName}</span>
+                  </div>
+                  <div className="provider-card__surface">
+                    <strong>최근 경고</strong>
+                    <span>{statusMessage}</span>
+                  </div>
+                  <p className="settings-inlineMeta">{lastCheckedLabel}</p>
+                  <div className="settings-actionRow">
+                    <button
+                      className="ghost-button ghost-button--compact"
+                      disabled={isRefreshingLocalProviders}
+                      onClick={() => void handleRefreshLocalProviders()}
+                      type="button"
+                    >
+                      {isRefreshingLocalProviders ? '상태 확인 중' : '로컬 상태 새로고침'}
+                    </button>
+                  </div>
+                </article>
+              )
+              */
             })}
           </div>
         </DisclosureSection>

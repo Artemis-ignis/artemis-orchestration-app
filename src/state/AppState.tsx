@@ -227,6 +227,16 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
   )
   const [workspaceLoading, setWorkspaceLoading] = useState(false)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
+
+  const applyBridgeHealthSuccess = (nextHealth: BridgeHealth) => {
+    setBridgeHealth(nextHealth)
+    setBridgeError(null)
+  }
+
+  const applyBridgeHealthFailure = (error: unknown, fallbackMessage: string) => {
+    setBridgeError(error instanceof Error ? error.message : fallbackMessage)
+  }
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       saveRuntimeState(state)
@@ -409,13 +419,9 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
   const refreshBridgeHealth = async () => {
     try {
       const nextHealth = await fetchBridgeHealth(state.settings.bridgeUrl)
-      setBridgeHealth(nextHealth)
-      setBridgeError(null)
+      applyBridgeHealthSuccess(nextHealth)
     } catch (error) {
-      setBridgeHealth(null)
-      setBridgeError(
-        error instanceof Error ? error.message : '모델 브리지 상태를 확인하지 못했습니다.',
-      )
+      applyBridgeHealthFailure(error, '모델 브리지 상태를 확인하지 못했습니다.')
     }
   }
 
@@ -447,15 +453,9 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       }
 
       if (healthResult.status === 'fulfilled') {
-        setBridgeHealth(healthResult.value)
-        setBridgeError(null)
+        applyBridgeHealthSuccess(healthResult.value)
       } else {
-        setBridgeHealth(null)
-        setBridgeError(
-          healthResult.reason instanceof Error
-            ? healthResult.reason.message
-            : '초기 연결 상태를 준비하지 못했습니다.',
-        )
+        applyBridgeHealthFailure(healthResult.reason, '초기 연결 상태를 준비하지 못했습니다.')
       }
 
       if (skillResult.status === 'fulfilled') {

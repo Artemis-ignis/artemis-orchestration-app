@@ -37,3 +37,12 @@
 - Resynced `public/marketing/workspace-chat.png`, `workspace-files.png`, and `workspace-orchestration.png` from the latest safe screenshots.
 - Re-scanned tracked text files for the literal local workspace path and found no remaining plain-text leaks.
 - Added a dedicated doc-screenshot mode for settings so saved provider keys and personal connection state are not rendered into public screenshots.
+
+### Local runtime health hardening
+
+- Added an explicit Ollama health timeout in `local-bridge/server.mjs` and applied it to the `/api/tags` response body parse as well.
+- Cached the last successful Ollama runtime snapshot so `/api/health` can return the last confirmed model state with `warning`, `lastError`, `stale`, and timestamp fields instead of collapsing to an empty model list.
+- Changed the frontend bridge-health refresh path to preserve the last confirmed `bridgeHealth` state and update only `bridgeError` on refresh/bootstrap failures.
+- Reworked the local runtime cards in settings so the section never disappears and the Ollama card always shows readiness, model count, current model, latest warning/error, and a working refresh button.
+- Verified in headless Playwright that a forced `/api/health` failure no longer collapses the local runtime card to `0개 모델`.
+- Regenerated `docs/screenshots/settings.png` so the public settings screenshot matches the new stable local-runtime UI.
