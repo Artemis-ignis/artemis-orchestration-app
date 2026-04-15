@@ -38,6 +38,10 @@
 - Orchestration now shows the official worker as the real saved model label (`DeepSeek R1` in the current setup) instead of collapsing to `free`.
 - Orchestration progress logs were cleaned up so live status text is readable Korean instead of mojibake.
 - The settings quick-pick list now keeps the current official model plus saved custom model ids visible first, so custom OpenRouter entries such as `openrouter/elephant-alpha` no longer disappear behind the top-8 cutoff.
+- Settings now starts with a compact overview card row, keeps `로컬 실행기 상태` and `기본 공식 모델` frontmost, and leaves provider-key editing collapsed by default so the page is less step-heavy.
+- Chat now uses a compact status rail instead of stacking multiple warning/info banners before the conversation surface.
+- Orchestration now keeps a permanent `실행 결과` area visible even before the first run, so users can see where results will appear without guessing.
+- Orchestration now shows per-model readiness as compact status tiles instead of repeating full-width banners.
 - Public screenshots were regenerated after the flow change and no longer expose absolute workspace paths.
 - The public settings screenshot was regenerated after the local runtime stability fix.
 
@@ -50,6 +54,7 @@
 - Revisit orchestration spacing only if the interactive layout regresses again.
 - Revisit provider preflight detail strings stored in bridge state so stale saved status text also loses the legacy free-candidate wording at the API level.
 - Decide later whether the chat workspace-write hint should become prompt-aware instead of always showing for non-Codex models when a workspace is connected.
+- Decide later whether the sidebar itself should collapse secondary menus by default; this pass reduced density but did not change the navigation model yet.
 
 ## 2026-04-15 Follow-up
 

@@ -189,14 +189,6 @@ function providerInputHint(provider: AiProviderId) {
   }
 }
 
-function providerFlowSteps(provider: AiProviderId) {
-  return [
-    '키 저장',
-    `${provider === 'gemini' ? 'Gemini' : provider === 'nvidia-build' ? 'NVIDIA' : 'OpenRouter'} 연결 테스트`,
-    '원하는 모델 ID 지정',
-  ]
-}
-
 function providerStatusLabel(provider: AiProviderState) {
   if (!provider.enabled) return '비활성'
   if (!provider.configured) return '미설정'
@@ -378,8 +370,6 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
     setActiveAgent,
     state,
     updateAgent,
-    workspaceAbsolutePath,
-    workspaceRootPath,
   } = useArtemisApp()
   const [aiProviders, setAiProviders] = useState<AiProviderState[]>([])
   const [aiModels, setAiModels] = useState<AiModelCatalogEntry[]>([])
@@ -459,8 +449,18 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
       ).length,
     [visibleAiProviders],
   )
+  const enabledOfficialProviders = useMemo(
+    () => visibleAiProviders.filter((item) => item.enabled).length,
+    [visibleAiProviders],
+  )
   const selectedOfficialProviderState =
     visibleAiProviders.find((item) => item.provider === officialProviderDraft) ?? null
+  const currentOfficialTargetLabel = aiSettings?.manual_model
+    ? formatFriendlyModelName(aiSettings.manual_model)
+    : '미설정'
+  const currentOfficialTargetDetail = aiSettings?.manual_provider
+    ? providerDescription(aiSettings.manual_provider)
+    : '공급자 선택 필요'
   const selectedOfficialPinnedModels = useMemo(
     () =>
       parseModelListInput(providerDrafts[officialProviderDraft]?.candidateModelsText ?? ''),
@@ -642,23 +642,32 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
     <div className="stack-grid">
       <section className="settings-card settings-card--compact">
         <div className="panel-card__header">
-          <h2>AI 공급자 설정</h2>
+          <h2>핵심 설정</h2>
           <span className="chip is-active">서버 암호화 저장</span>
         </div>
         <p className="settings-card__lead">
-          공식 공급자 연결과 기본 모델 지정만 남겼습니다. 저장된 공급자와 모델로 바로 실행됩니다.
+          자주 확인하는 상태만 위에 남겼습니다. 키 저장과 상세 편집은 아래에서 필요할 때만 펼치면 됩니다.
         </p>
-        <div className="settings-summary-strip">
-          <span className={`chip ${readyLocalProviders > 0 ? 'is-active' : 'chip--soft'}`}>로컬 실행기 {readyLocalProviders}개</span>
-          <span className={`chip ${readyOfficialProviders > 0 ? 'is-active' : 'chip--soft'}`}>공식 공급자 {readyOfficialProviders}개 준비</span>
-          <span className={`chip ${workspaceAbsolutePath || workspaceRootPath ? 'is-active' : 'chip--soft'}`}>
-            작업 폴더 {workspaceAbsolutePath || workspaceRootPath ? '연결됨' : '미연결'}
-          </span>
-        </div>
-        <div className="settings-ruleStrip">
-          <div className="settings-ruleCard"><strong>1. 키 저장</strong><span>키는 서버에서만 복호화합니다.</span></div>
-          <div className="settings-ruleCard"><strong>2. 연결 확인</strong><span>공급자별 연결 상태와 최근 오류를 바로 봅니다.</span></div>
-          <div className="settings-ruleCard"><strong>3. 모델 지정</strong><span>원하는 모델 ID를 고정해서 채팅과 오케스트레이션에 씁니다.</span></div>
+        <div className="settings-overviewGrid">
+          <article className="settings-overviewCard">
+            <span className="settings-overviewCard__label">로컬 실행기</span>
+            <strong>{readyLocalProviders} / {localProviders.length} 준비</strong>
+            <p>
+              {showingCachedLocalState
+                ? '최근 확인이 실패해도 마지막 정상 상태를 유지합니다.'
+                : 'Ollama와 Codex 상태를 바로 확인할 수 있습니다.'}
+            </p>
+          </article>
+          <article className="settings-overviewCard">
+            <span className="settings-overviewCard__label">공식 API</span>
+            <strong>{readyOfficialProviders} / {enabledOfficialProviders || OFFICIAL_PROVIDER_ORDER.length} 연결</strong>
+            <p>공급자 키 저장과 연결 테스트는 아래 한 구역으로 모았습니다.</p>
+          </article>
+          <article className="settings-overviewCard">
+            <span className="settings-overviewCard__label">기본 공식 모델</span>
+            <strong>{currentOfficialTargetLabel}</strong>
+            <p>{currentOfficialTargetDetail}</p>
+          </article>
         </div>
         <div className="settings-actionRow">
           <button className="primary-button" onClick={() => onNavigate('chat')} type="button">채팅 열기</button>
@@ -689,12 +698,12 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
         <DisclosureSection
           className="settings-disclosure"
           defaultOpen
-          summary="Ollama와 Codex의 실제 로컬 준비 상태를 먼저 확인합니다."
-          title="0. 로컬 실행기"
+          summary="Ollama와 Codex 상태만 빠르게 확인"
+          title="로컬 실행기 상태"
         >
           <div className="panel-card__header">
             <p className="settings-card__lead">
-              로컬 실행기는 API 키 없이 바로 붙습니다. 최근 확인이 실패해도 마지막 정상 상태를 유지하면서 다시 확인합니다.
+              로컬 실행기는 API 키 없이 바로 붙습니다. 실패하더라도 마지막 정상 상태를 유지하면서 다시 확인합니다.
             </p>
           </div>
           <div className="provider-grid provider-grid--local">
@@ -782,9 +791,9 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
       <section className="settings-card">
         <DisclosureSection
           className="settings-disclosure"
-          defaultOpen
-          summary="OpenRouter, NVIDIA Build, Gemini 공식 키 저장과 연결 테스트"
-          title="1. 공식 API 공급자"
+          defaultOpen={false}
+          summary="공급자 키 저장과 연결 테스트"
+          title="공식 API 키와 연결"
         >
           <div className="panel-card__header">
             <p className="settings-card__lead">공급자별 키를 저장하고 직접 호출 가능한 상태인지 바로 확인합니다.</p>
@@ -822,14 +831,6 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
                 <div className="settings-providerFlags chip-wrap">
                   <span className="chip chip--soft">확인된 모델 {provider.available_count}/{provider.candidate_count}</span>
                   <span className="chip chip--soft">저장된 키 {provider.masked_key || '없음'}</span>
-                </div>
-                <div className="provider-card__flow">
-                  {providerFlowSteps(provider.provider).map((step, index) => (
-                    <span key={step} className="provider-card__step">
-                      <strong>{index + 1}</strong>
-                      <span>{step}</span>
-                    </span>
-                  ))}
                 </div>
                 <div className="provider-card__surface">
                   <strong>최근 상태</strong>
@@ -883,8 +884,8 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
         <DisclosureSection
           className="settings-disclosure"
           defaultOpen
-          summary="선택한 공급자와 모델이 공식 API 실행기의 기본 대상이 됩니다."
-          title="2. 공식 API 실행 대상"
+          summary="채팅과 오케스트레이션이 공통으로 쓰는 대상"
+          title="기본 공식 모델"
         >
           <div className="panel-card__header">
             <p className="settings-card__lead">채팅과 오케스트레이션에서 공식 API를 고르면 여기 저장한 공급자와 모델을 그대로 사용합니다.</p>
@@ -994,8 +995,8 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
         <DisclosureSection
           className="settings-disclosure"
           defaultOpen={false}
-          summary="채팅에 실제로 노출되는 Codex, 공식 API, Ollama"
-          title="4. 채팅 에이전트"
+          summary="채팅 메뉴에 실제로 노출되는 모델"
+          title="채팅 에이전트"
         >
         <div className="settings-card__side">
           <div className="panel-card__header">
@@ -1126,7 +1127,7 @@ export function SettingsPage({ onNavigate }: { onNavigate: (page: PageId) => voi
       <PageIntro
         title="설정"
         icon="settings"
-        description="실행기 상태, 공식 API 공급자 연결, 기본 모델 대상을 한 화면에서 관리합니다."
+        description="자주 쓰는 상태와 모델만 위에 두고, 세부 연결과 편집은 아래에서 필요할 때만 펼칩니다."
       />
       <div className="tab-row">
         {settingsTabs.map((tab) => (

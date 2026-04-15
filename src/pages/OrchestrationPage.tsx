@@ -427,6 +427,71 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     ],
     [],
   )
+  const runnerAlerts = useMemo(() => {
+    const alerts: Array<{
+      key: string
+      tone: 'info' | 'warning' | 'error'
+      text: string
+      actionLabel?: string
+      actionPage?: PageId
+    }> = []
+
+    if (sessionHasResults) {
+      alerts.push({
+        key: 'session-summary',
+        tone: sessionErrorCount > 0 ? 'warning' : 'info',
+        text: `최근 실행 · 성공 ${sessionSuccessCount} · 실패 ${sessionErrorCount} · 실행 중 ${sessionRunningCount}${sessionSkippedCount > 0 ? ` · 제외 ${sessionSkippedCount}` : ''}`,
+      })
+    }
+
+    if (bridgeError) {
+      alerts.push({
+        key: 'bridge-error',
+        tone: 'error',
+        text: bridgeError,
+        actionLabel: '설정 열기',
+        actionPage: 'settings',
+      })
+    }
+
+    if (workspaceError) {
+      alerts.push({
+        key: 'workspace-error',
+        tone: 'warning',
+        text: workspaceError,
+        actionLabel: '내 파일 열기',
+        actionPage: 'files',
+      })
+    } else if (!hasWorkspaceConnection) {
+      alerts.push({
+        key: 'workspace-missing',
+        tone: 'warning',
+        text: '작업 폴더가 연결되지 않아 실제 실행을 시작할 수 없습니다.',
+        actionLabel: '내 파일 열기',
+        actionPage: 'files',
+      })
+    }
+
+    if (skippedSelectedAgents.length > 0) {
+      alerts.push({
+        key: 'skipped-agents',
+        tone: 'warning',
+        text: `${skippedSelectedAgents.length}개 모델은 아직 연결이 덜 끝나 이번 실행에서 제외됩니다.`,
+      })
+    }
+
+    return alerts
+  }, [
+    bridgeError,
+    hasWorkspaceConnection,
+    sessionErrorCount,
+    sessionHasResults,
+    sessionRunningCount,
+    sessionSkippedCount,
+    sessionSuccessCount,
+    skippedSelectedAgents.length,
+    workspaceError,
+  ])
 
   const executionWorkspaceLabel = latestAgentExecution
     ? summarizeWorkspaceLabel(
@@ -469,7 +534,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   return (
     <section className="page">
       <PageIntro
-        description="채팅은 단일, 오케스트레이션은 여러 모델을 병렬로 돌려 결과를 비교합니다."
+        description="같은 지시를 여러 실행기에 동시에 보내고, 결과를 한 화면에서 바로 비교합니다."
         icon="agent"
         title="오케스트레이션"
       />
@@ -477,9 +542,9 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       <section className="panel-card orchestration-stage orchestration-stage--single">
         <div className="orchestration-stage__header orchestration-stage__header--compact">
           <div>
-            <h2>실행 흐름 개요</h2>
+            <h2>병렬 실행 흐름</h2>
             <p className="settings-card__lead">
-              실행 전엔 단순 흐름만 보이고, 실행하면 선택한 모델 블록이 병렬로 생성됩니다.
+              실행 전에는 흐름만 보이고, 시작하면 선택한 모델 결과가 바로 아래에 쌓입니다.
             </p>
           </div>
           <div className="orchestration-summary-bar">
@@ -525,17 +590,10 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
               </span>
             </div>
 
-            <div className="orchestration-inline-dock__meta">
-              <span className="chip chip--soft">{workspaceStatusLabel}</span>
-              <span className="chip chip--soft">
-                최근 입력 {latestMasterMessage ? '있음' : '없음'}
-              </span>
-            </div>
-
             <div className="orchestration-inline-dock__selection">
               <div className="orchestration-inline-dock__selectionHeader">
-                <strong>이번 실행 모델</strong>
-                <span>선택한 모델만 병렬 블록으로 생성됩니다.</span>
+                <strong>이번에 돌릴 모델</strong>
+                <span>체크한 모델만 실행하고 결과 카드로 보여줍니다.</span>
               </div>
               <div className="orchestration-inline-dock__agentSwitch">
                 {enabledAgents.map((agent) => {
@@ -557,23 +615,25 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                     </button>
                   )
                 })}
-	              </div>
-	            </div>
+              </div>
+            </div>
 
-	            {visibleAgentStatusItems.length > 0 ? (
-	              <div className="stack-grid stack-grid--compact">
-	                {visibleAgentStatusItems.map((item) => (
-	                  <div key={item.id} className={`status-banner status-banner--${item.tone}`}>
-	                    <Icon name="warning" size={16} />
-	                    <span>
-	                      {item.label} · {item.summary} · {item.detail}
-	                    </span>
-	                  </div>
-	                ))}
-	              </div>
-	            ) : null}
+            {visibleAgentStatusItems.length > 0 ? (
+              <div className="orchestration-statusGrid">
+                {visibleAgentStatusItems.map((item) => (
+                  <article
+                    key={item.id}
+                    className={`orchestration-statusTile orchestration-statusTile--${item.tone}`}
+                  >
+                    <strong>{item.label}</strong>
+                    <span>{item.summary}</span>
+                    <p>{item.detail}</p>
+                  </article>
+                ))}
+              </div>
+            ) : null}
 
-	            <div className="orchestration-inline-dock__composer">
+            <div className="orchestration-inline-dock__composer">
               <label className="field field--full orchestration-inline-dock__field">
                 <span>작업 지시</span>
                 <textarea
@@ -584,70 +644,28 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                 />
               </label>
 
-	              <div className="orchestration-inline-dock__actions">
-	                {sessionHasResults ? (
-	                  <div
-	                    className={`status-banner ${
-	                      sessionErrorCount > 0 ? 'status-banner--warning' : 'status-banner--info'
-	                    }`}
-	                  >
-	                    <Icon name="warning" size={16} />
-	                    <span>
-	                      최근 실행 요약 · 성공 {sessionSuccessCount} · 실패 {sessionErrorCount} · 실행 중{' '}
-	                      {sessionRunningCount}
-	                      {sessionSkippedCount > 0 ? ` · 제외 ${sessionSkippedCount}` : ''}
-	                    </span>
-	                  </div>
-	                ) : null}
-
-	                {bridgeError ? (
-	                  <div className="status-banner status-banner--error">
-                    <Icon name="warning" size={16} />
-                    <span>{bridgeError}</span>
-                    <button
-                      className="ghost-button ghost-button--compact"
-                      onClick={() => onNavigate('settings')}
-                      type="button"
-                    >
-                      설정 열기
-                    </button>
-                  </div>
-                ) : null}
-
-                {workspaceError ? (
-                  <div className="status-banner status-banner--warning">
-                    <Icon name="warning" size={16} />
-                    <span>{workspaceError}</span>
-                    <button
-                      className="ghost-button ghost-button--compact"
-                      onClick={() => onNavigate('files')}
-                      type="button"
-                    >
-                      내 파일 열기
-                    </button>
-                  </div>
-                ) : null}
-
-                {!workspaceError && !hasWorkspaceConnection ? (
-                  <div className="status-banner status-banner--warning">
-                    <Icon name="warning" size={16} />
-                    <span>작업 폴더가 연결되지 않아 실제 실행을 시작할 수 없습니다.</span>
-                    <button
-                      className="ghost-button ghost-button--compact"
-                      onClick={() => onNavigate('files')}
-                      type="button"
-                    >
-                      내 파일 열기
-                    </button>
-                  </div>
-                ) : null}
-
-                {skippedSelectedAgents.length > 0 ? (
-                  <div className="status-banner status-banner--warning">
-                    <Icon name="warning" size={16} />
-                    <span>
-                      {skippedSelectedAgents.length}개 모델은 연결이 덜 끝나 이번 실행에서 제외됩니다.
-                    </span>
+              <div className="orchestration-inline-dock__actions">
+                {runnerAlerts.length > 0 ? (
+                  <div className="orchestration-inline-dock__statusList">
+                    {runnerAlerts.map((alert) => (
+                      <div key={alert.key} className={`status-banner status-banner--${alert.tone}`}>
+                        <Icon name={alert.tone === 'info' ? 'spark' : 'warning'} size={16} />
+                        <span>{alert.text}</span>
+                        {alert.actionLabel && alert.actionPage ? (
+                          <button
+                            className="ghost-button ghost-button--compact"
+                            onClick={() => {
+                              if (alert.actionPage) {
+                                onNavigate(alert.actionPage)
+                              }
+                            }}
+                            type="button"
+                          >
+                            {alert.actionLabel}
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
                   </div>
                 ) : null}
 
@@ -672,26 +690,30 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                 >
                   {sessionRunning
                     ? `병렬 실행 중... ${latestRunElapsedLabel || ''}`.trim()
-                    : `${Math.max(runnableSelectedAgents.length, 1)}개 모델 병렬 실행`}
+                    : `${Math.max(runnableSelectedAgents.length, 1)}개 모델 실행`}
                 </button>
               </div>
             </div>
 
-            {sessionHasResults ? (
-              <section className="orchestration-live-panel">
-                <div className="panel-card__header">
-                  <h2>실시간 결과</h2>
-                  <span className={`chip ${sessionRunning ? 'is-active' : 'chip--soft'}`}>
-                    {sessionRunning ? '병렬 생성 중' : '최근 세션'}
-                  </span>
-                </div>
+            <section className="orchestration-live-panel">
+              <div className="panel-card__header">
+                <h2>실행 결과</h2>
+                <span className={`chip ${sessionRunning ? 'is-active' : 'chip--soft'}`}>
+                  {sessionRunning ? '진행 중' : sessionHasResults ? '최근 세션' : '대기 중'}
+                </span>
+              </div>
 
-                {sessionRuns[0] ? (
-                  <p className="orchestration-live-panel__hint">
-                    {runningHint(sessionRuns[0].provider)}
-                  </p>
-                ) : null}
+              {sessionRuns[0] ? (
+                <p className="orchestration-live-panel__hint">
+                  {runningHint(sessionRuns[0].provider)}
+                </p>
+              ) : (
+                <p className="orchestration-live-panel__hint">
+                  실행을 시작하면 각 모델 결과가 이 영역에 바로 나타납니다.
+                </p>
+              )}
 
+              {sessionHasResults ? (
                 <div className="orchestration-live-panel__cards">
                   {sessionDisplayAgents.map((agent) => {
                     const run = latestRunsByAgent.get(agent.id)
@@ -717,8 +739,8 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                             {run
                               ? displayRunStatusLabel(run.status)
                               : agentAvailability.get(agent.id)?.reason
-                                ? '?쒖쇅??'
-                                : '?湲?'}
+                                ? '제외됨'
+                                : '대기'}
                           </span>
                         </div>
 
@@ -748,8 +770,13 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                     )
                   })}
                 </div>
-              </section>
-            ) : null}
+              ) : (
+                <EmptyState
+                  title="결과는 여기 쌓입니다"
+                  description="모델을 실행하면 각 결과와 최근 로그가 이 영역에 바로 추가됩니다."
+                />
+              )}
+            </section>
           </section>
         </div>
       </section>

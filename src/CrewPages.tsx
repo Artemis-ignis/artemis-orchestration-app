@@ -500,6 +500,70 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
       detail: chatAgentChoiceLabel(selectedAgent),
     }
   }, [selectedAgent, selectedOfficialProviderStatus, aiProviderError, selectedModel, selectedLocalProviderStatus])
+  const chatStatusItems = useMemo(() => {
+    const items: Array<{
+      key: string
+      tone: 'info' | 'warning' | 'error'
+      text: string
+      actionLabel?: string
+      actionPage?: PageId
+    }> = []
+
+    if (selectedAgentNeedsKey) {
+      items.push({
+        key: 'needs-key',
+        tone: 'warning',
+        text: '이 모델은 설정에서 API 키를 연결해야 바로 사용할 수 있습니다.',
+        actionLabel: '설정 열기',
+        actionPage: 'settings',
+      })
+    } else if (selectedAgentUnavailable) {
+      items.push({
+        key: 'agent-unavailable',
+        tone: 'warning',
+        text:
+          selectedAgent?.provider === 'official-router'
+            ? aiProviderError ?? '공식 API 공급자 또는 모델 설정을 먼저 확인해 주세요.'
+            : '선택한 로컬 실행기가 아직 준비되지 않았습니다. 설정에서 상태를 확인해 주세요.',
+        actionLabel: '상태 확인',
+        actionPage: 'settings',
+      })
+    } else if (selectedAgentStatus) {
+      items.push({
+        key: 'agent-status',
+        tone: selectedAgentStatus.tone,
+        text: `${selectedAgentStatus.summary}. ${selectedAgentStatus.detail}`,
+      })
+    }
+
+    if (selectedAgent && !selectedAgentSupportsWorkspaceWrite && (workspaceAbsolutePath || workspaceCurrentPath)) {
+      items.push({
+        key: 'workspace-write-hint',
+        tone: 'info',
+        text: '실제 로컬 파일 수정이 목적이면 채팅 모델을 Codex CLI로 선택해 주세요.',
+      })
+    }
+
+    if (bridgeError) {
+      items.push({
+        key: 'bridge-error',
+        tone: 'error',
+        text: bridgeError,
+      })
+    }
+
+    return items
+  }, [
+    aiProviderError,
+    bridgeError,
+    selectedAgent,
+    selectedAgentNeedsKey,
+    selectedAgentStatus,
+    selectedAgentSupportsWorkspaceWrite,
+    selectedAgentUnavailable,
+    workspaceAbsolutePath,
+    workspaceCurrentPath,
+  ])
 
   useEffect(() => {
     const viewport = threadViewportRef.current
@@ -573,7 +637,7 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
       <header className="chat-topbar">
         <div className="chat-topbar__copy">
           <h1>채팅</h1>
-          <p>질문을 남기면 바로 이어서 답합니다.</p>
+          <p>한 줄로 지시하면 바로 이어서 답하고, 선택한 모델 상태도 바로 보여줍니다.</p>
         </div>
         <div className="chat-topbar__actions">
           <div className="model-menu" ref={menuRef}>
@@ -694,50 +758,29 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
         </div>
       </header>
 
-      {selectedAgentNeedsKey ? (
-        <div className="status-banner status-banner--warning">
-          <Icon name="warning" size={16} />
-          <span>이 모델은 설정에서 API 키를 연결해야 바로 사용할 수 있습니다.</span>
-          <button className="ghost-button" onClick={() => onNavigate('settings')} type="button">
-            설정 열기
-          </button>
-        </div>
-      ) : null}
-
-      {selectedAgentUnavailable ? (
-        <div className="status-banner status-banner--warning">
-          <Icon name="warning" size={16} />
-          <span>
-            {selectedAgent?.provider === 'official-router'
-              ? aiProviderError ?? '공식 API 공급자 또는 모델 설정을 먼저 확인해 주세요.'
-              : '선택한 로컬 실행기가 아직 준비되지 않았습니다. 설정에서 상태를 확인해 주세요.'}
-          </span>
-          <button className="ghost-button" onClick={() => onNavigate('settings')} type="button">
-            상태 확인
-          </button>
-        </div>
-      ) : null}
-
-      {selectedAgentStatus && !selectedAgentNeedsKey && !selectedAgentUnavailable ? (
-        <div className={`status-banner status-banner--${selectedAgentStatus.tone}`}>
-          <Icon name={selectedAgentStatus.tone === 'info' ? 'spark' : 'warning'} size={16} />
-          <span>
-            {selectedAgentStatus.summary}. {selectedAgentStatus.detail}
-          </span>
-        </div>
-      ) : null}
-
-      {selectedAgent && !selectedAgentSupportsWorkspaceWrite && (workspaceAbsolutePath || workspaceCurrentPath) ? (
-        <div className="status-banner status-banner--info">
-          <Icon name="warning" size={16} />
-          <span>실제 로컬 파일 수정이 목적이면 채팅 모델을 Codex CLI로 선택해 주세요.</span>
-        </div>
-      ) : null}
-
-      {bridgeError ? (
-        <div className="status-banner status-banner--error">
-          <Icon name="warning" size={16} />
-          <span>{bridgeError}</span>
+      {chatStatusItems.length > 0 ? (
+        <div className="chat-statusRail">
+          {chatStatusItems.map((item) => (
+            <article key={item.key} className={`chat-statusTile chat-statusTile--${item.tone}`}>
+              <div className="chat-statusTile__copy">
+                <strong>{item.tone === 'info' ? '현재 상태' : item.tone === 'error' ? '오류' : '확인 필요'}</strong>
+                <span>{item.text}</span>
+              </div>
+              {item.actionLabel && item.actionPage ? (
+                <button
+                  className="ghost-button ghost-button--compact"
+                  onClick={() => {
+                    if (item.actionPage) {
+                      onNavigate(item.actionPage)
+                    }
+                  }}
+                  type="button"
+                >
+                  {item.actionLabel}
+                </button>
+              ) : null}
+            </article>
+          ))}
         </div>
       ) : null}
 

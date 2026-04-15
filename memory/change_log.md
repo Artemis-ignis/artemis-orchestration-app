@@ -19,6 +19,19 @@
   - orchestration shows `공식 API · 준비됨 · OpenRouter · deepseek/deepseek-r1:free`,
   - orchestration live logs now render readable Korean progress text.
 
+### UI/UX simplification pass
+
+- Reduced shell and page chrome by removing heavy card shadows from the main workspace surfaces and tightening the page intro hierarchy.
+- Reworked the settings models tab to start with three compact overview cards and short actions instead of a rule-strip plus multiple equally loud instruction blocks.
+- Renamed the settings disclosures to task-based titles and left `공식 API 키와 연결` collapsed by default so routine model selection is easier to scan.
+- Removed the provider step-flow strip from each official provider card and kept only the fields and status that affect real execution.
+- Reworked chat to show a compact status rail for readiness, warnings, and bridge errors instead of stacking multiple full-width banners ahead of the conversation.
+- Reworked orchestration to show compact per-model readiness tiles, group runner warnings into one status list, and keep a permanent `실행 결과` area visible before the first run.
+- Verified in Playwright that:
+  - settings renders 3 overview cards and keeps 2 disclosure sections collapsed on first open,
+  - orchestration shows compact model status tiles and a dedicated result area even before execution,
+  - chat renders the new status rail while keeping the conversation-first layout.
+
 ### Routing stability audit
 
 - Added stream idle-timeout handling in both the bridge SSE reader and the frontend SSE client.
