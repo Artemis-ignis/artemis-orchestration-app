@@ -81,44 +81,54 @@ function normalizeModelLabel(value: string) {
 
 function compactModelLabel(value: string) {
   const normalized = normalizeModelLabel(value)
+  const normalizedWithoutSuffix = normalized.replace(/:free$/i, '')
 
   if (!normalized) {
     return '모델 없음'
   }
 
-  if (/gemma4-e4b-uncensored-q4fast/i.test(normalized)) {
+  if (/gemma4-e4b-uncensored-q4fast/i.test(normalizedWithoutSuffix)) {
     return 'gemma4 E4B'
   }
 
-  if (/gpt-5\.4/i.test(normalized)) {
+  if (/gpt-5\.4/i.test(normalizedWithoutSuffix)) {
     return 'GPT-5.4'
   }
 
-  if (/auto-best-free/i.test(normalized)) {
-    return '공식 무료'
+  if (/deepseek\/deepseek-r1/i.test(normalizedWithoutSuffix)) {
+    return 'DeepSeek R1'
   }
 
-  if (/auto-code-free/i.test(normalized)) {
+  if (/qwen\/qwen3-30b-a3b/i.test(normalizedWithoutSuffix)) {
+    return 'Qwen3 30B'
+  }
+
+  if (/auto-best-free/i.test(normalizedWithoutSuffix)) {
+    return '공식 API'
+  }
+
+  if (/auto-code-free/i.test(normalizedWithoutSuffix)) {
     return '코딩 무료'
   }
 
-  if (/auto-fast-free/i.test(normalized)) {
+  if (/auto-fast-free/i.test(normalizedWithoutSuffix)) {
     return '빠른 무료'
   }
 
-  if (/gemini/i.test(normalized)) {
+  if (/gemini/i.test(normalizedWithoutSuffix)) {
     return 'Gemini'
   }
 
-  if (/claude/i.test(normalized)) {
+  if (/claude/i.test(normalizedWithoutSuffix)) {
     return 'Claude'
   }
 
-  if (/openrouter/i.test(normalized)) {
+  if (/openrouter/i.test(normalizedWithoutSuffix)) {
     return 'OpenRouter'
   }
 
-  const tail = normalized.split(/[/:]/).filter(Boolean).at(-1) ?? normalized
+  const tail =
+    normalizedWithoutSuffix.split('/').filter(Boolean).at(-1) ?? normalizedWithoutSuffix
   return tail.length > 12 ? `${tail.slice(0, 12)}…` : tail
 }
 
@@ -129,7 +139,7 @@ function providerLabel(value: string) {
     case 'codex':
       return 'Codex CLI'
     case 'official-router':
-      return '공식 라우터'
+      return '공식 API'
     case 'openai-compatible':
       return 'OpenAI 호환'
     case 'anthropic':

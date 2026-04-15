@@ -10,10 +10,7 @@ export function formatDate(value: string) {
 }
 
 export function formatRelative(value: string) {
-  const diffMinutes = Math.max(
-    0,
-    Math.round((Date.now() - new Date(value).getTime()) / 60_000),
-  )
+  const diffMinutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60_000))
 
   if (diffMinutes < 1) return '방금 전'
   if (diffMinutes < 60) return `${diffMinutes}분 전`
@@ -75,6 +72,8 @@ export function providerLabel(value: string) {
       return 'Ollama'
     case 'codex':
       return 'Codex CLI'
+    case 'official-router':
+      return '공식 API'
     case 'openai-compatible':
       return 'OpenAI 호환 API'
     case 'anthropic':
@@ -92,6 +91,8 @@ export function executionProviderLabel(value: string) {
       return 'Codex CLI'
     case 'ollama':
       return 'Ollama'
+    case 'official-router':
+      return '공식 API'
     case 'openai-compatible':
       return 'OpenAI 호환 API'
     case 'anthropic':
@@ -162,9 +163,7 @@ export function formatFriendlyModelName(model: string) {
       return 'gemma4 E4B uncensored q4fast'
     }
 
-    return normalized
-      .replace(/^gemma/i, 'gemma')
-      .replace(/:/g, ' ')
+    return normalized.replace(/^gemma/i, 'gemma').replace(/:/g, ' ')
   }
 
   return normalized

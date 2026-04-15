@@ -67,6 +67,14 @@ function canAgentUseApiKey(agent: AgentItem, apiKeyIds: Set<string>) {
   return true
 }
 
+function resolveOfficialProviderId(baseUrl: string) {
+  const normalized = baseUrl.trim().toLowerCase()
+  if (normalized === 'openrouter' || normalized === 'nvidia-build' || normalized === 'gemini') {
+    return normalized
+  }
+  return 'openrouter'
+}
+
 export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   const {
     activeAgent,
@@ -156,9 +164,6 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     }
   }, [needsOfficialProviders, state.settings.bridgeUrl])
 
-  const readyOfficialProviders = aiProviders.filter(
-    (item) => item.enabled && item.configured && (item.status === 'ready' || item.available_count > 0),
-  )
   const codexReady =
     bridgeHealth?.providers.find((item) => item.provider === 'codex')?.ready ?? false
   const ollamaReady =
@@ -189,8 +194,13 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       }
 
       if (agent.provider === 'official-router') {
-        const ready = readyOfficialProviders.length > 0
-        map.set(agent.id, { runnable: ready, reason: ready ? null : '공식 공급자 미준비' })
+        const providerState =
+          aiProviders.find((item) => item.provider === resolveOfficialProviderId(agent.baseUrl)) ?? null
+        const ready = Boolean(providerState?.enabled && providerState?.configured && agent.model.trim())
+        map.set(agent.id, {
+          runnable: ready,
+          reason: ready ? null : '공식 API 설정 확인 필요',
+        })
         return
       }
 
@@ -198,13 +208,11 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     })
 
     return map
-  }, [enabledAgents, apiKeyIds, ollamaReady, codexReady, readyOfficialProviders])
+  }, [enabledAgents, apiKeyIds, ollamaReady, codexReady, aiProviders])
 
   const selectedAgentStatusItems = useMemo(() => {
     const codexStatus = bridgeHealth?.providers.find((item) => item.provider === 'codex') ?? null
     const ollamaStatus = bridgeHealth?.providers.find((item) => item.provider === 'ollama') ?? null
-    const officialStatus =
-      readyOfficialProviders[0] ?? aiProviders.find((item) => item.enabled && item.configured) ?? null
 
     return selectedAgents.map((agent) => {
       if (agent.provider === 'codex') {
@@ -236,15 +244,20 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       }
 
       if (agent.provider === 'official-router') {
-        const ready = readyOfficialProviders.length > 0
+        const officialStatus =
+          aiProviders.find((item) => item.provider === resolveOfficialProviderId(agent.baseUrl)) ?? null
+        const ready = Boolean(officialStatus?.enabled && officialStatus?.configured && agent.model.trim())
         return {
           id: agent.id,
           tone: ready ? 'info' : officialStatus ? 'warning' : 'error',
           summary: ready ? '준비됨' : officialStatus ? '재확인 필요' : '미설정',
           detail:
+            (ready && officialStatus
+              ? `${officialStatus.label} · ${agent.model}`
+              : null) ||
             officialStatus?.last_test_message ||
             officialStatus?.detail ||
-            '활성화된 공식 무료 공급자가 없습니다.',
+            '공식 API 공급자를 아직 확인하지 못했습니다.',
           label: agent.name,
         }
       }
@@ -257,7 +270,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
         label: agent.name,
       }
     })
-  }, [selectedAgents, bridgeHealth, codexReady, ollamaReady, readyOfficialProviders, aiProviders])
+  }, [selectedAgents, bridgeHealth, codexReady, ollamaReady, aiProviders])
 
   const runnableSelectedAgents = useMemo(
     () => selectedAgents.filter((agent) => agentAvailability.get(agent.id)?.runnable),

@@ -11,10 +11,7 @@ import { chatPromptCards, type PageId } from './crewData'
 import { getAgentPreset } from './lib/agentCatalog'
 import {
   fetchAiProviders,
-  fetchAiSettings,
-  previewAiRoute,
   type AiProviderState,
-  type AiRoutePreview,
   type AiRoutingAttemptLog,
   type AiRoutingMessageMeta,
   type AiStreamAttemptEvent,
@@ -236,7 +233,7 @@ function chatAgentRouteLabel(agent: AgentItem) {
     case 'codex-cli':
       return 'Codex CLI'
     case 'official-router':
-      return '공식 무료 라우터'
+      return '공식 API'
     case 'openai-direct':
       return 'OpenAI API'
     case 'gemini-openai':
@@ -248,6 +245,14 @@ function chatAgentRouteLabel(agent: AgentItem) {
     default:
       return getAgentPreset(agent.preset).label
   }
+}
+
+function resolveOfficialProviderId(baseUrl: string) {
+  const normalized = baseUrl.trim().toLowerCase()
+  if (normalized === 'openrouter' || normalized === 'nvidia-build' || normalized === 'gemini') {
+    return normalized
+  }
+  return 'openrouter'
 }
 
 function chatAgentChoiceLabel(agent: AgentItem) {
@@ -278,8 +283,7 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   const threadViewportRef = useRef<HTMLDivElement | null>(null)
   const [openModelMenu, setOpenModelMenu] = useState(false)
   const [aiProviders, setAiProviders] = useState<AiProviderState[]>([])
-  const [aiRoutePreview, setAiRoutePreview] = useState<AiRoutePreview | null>(null)
-  const [aiRouteError, setAiRouteError] = useState<string | null>(null)
+  const [aiProviderError, setAiProviderError] = useState<string | null>(null)
   const [streamMeta, setStreamMeta] = useState<AiStreamMetaEvent | null>(null)
   const [streamAttempts, setStreamAttempts] = useState<LiveAttemptItem[]>([])
   const [streamedText, setStreamedText] = useState('')
@@ -336,40 +340,27 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
 
     if (!hasOfficialRouter) {
       setAiProviders([])
-      setAiRoutePreview(null)
-      setAiRouteError(null)
+      setAiProviderError(null)
       return
     }
 
-    const loadAiRoutingState = async () => {
+    const loadAiProviderState = async () => {
       try {
-        const [providers, settings] = await Promise.all([
-          fetchAiProviders(state.settings.bridgeUrl),
-          fetchAiSettings(state.settings.bridgeUrl),
-        ])
+        const providers = await fetchAiProviders(state.settings.bridgeUrl)
         if (!active) {
           return
         }
         setAiProviders(providers)
-        const preview = await previewAiRoute(state.settings.bridgeUrl, {
-          routing_mode: settings.routing_mode,
-          manual_provider: settings.manual_provider,
-          manual_model: settings.manual_model,
-        })
-        if (!active) {
-          return
-        }
-        setAiRoutePreview(preview)
-        setAiRouteError(null)
+        setAiProviderError(null)
       } catch (error) {
         if (!active) {
           return
         }
-        setAiRouteError(error instanceof Error ? error.message : '무료 후보 정보를 불러오지 못했습니다.')
+        setAiProviderError(error instanceof Error ? error.message : '공식 API 공급자 정보를 불러오지 못했습니다.')
       }
     }
 
-    void loadAiRoutingState()
+    void loadAiProviderState()
     return () => {
       active = false
     }
@@ -397,7 +388,6 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   const selectedModel =
     selectedAgent?.model ??
     (selectedProvider === 'codex' ? state.settings.codexModel : state.settings.ollamaModel)
-  const topPreviewCandidate = streamMeta?.top_candidate ?? aiRoutePreview?.candidates[0] ?? null
   const hasStreamFallback = streamAttempts.some(
     (attempt) =>
       ('success' in attempt && !attempt.success) ||
@@ -406,7 +396,7 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   )
   const currentModelName =
     selectedAgent?.provider === 'official-router'
-      ? topPreviewCandidate?.display_name ?? '자동 무료 최상'
+      ? formatFriendlyModelName(selectedModel || '모델 선택')
       : formatFriendlyModelName(selectedModel || '모델 선택')
   const currentRouteLabel = selectedAgent
     ? chatAgentRouteLabel(selectedAgent)
@@ -418,9 +408,14 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
       : selectedAgent?.provider === 'codex'
         ? bridgeHealth?.providers.find((item) => item.provider === 'codex') ?? null
         : null
-  const readyOfficialProviders = aiProviders.filter(
-    (item) => item.enabled && item.configured && (item.status === 'ready' || item.available_count > 0),
-  )
+  const selectedOfficialProviderId =
+    selectedAgent?.provider === 'official-router'
+      ? resolveOfficialProviderId(selectedAgent.baseUrl)
+      : null
+  const selectedOfficialProviderStatus =
+    selectedOfficialProviderId
+      ? aiProviders.find((item) => item.provider === selectedOfficialProviderId) ?? null
+      : null
   const isEmpty = visibleMessages.length === 0
   const isIdleState = isEmpty && !isGenerating
   const selectedAgentNeedsKey =
@@ -429,7 +424,9 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
     !selectedAgent.apiKeyId
   const selectedAgentUnavailable =
     selectedAgent?.provider === 'official-router'
-      ? readyOfficialProviders.length === 0
+      ? !selectedOfficialProviderStatus?.enabled ||
+        !selectedOfficialProviderStatus?.configured ||
+        !selectedModel?.trim()
       : selectedAgent?.provider === 'ollama'
       ? bridgeHealth?.providers.find((item) => item.provider === 'ollama')?.ready === false
       : selectedAgent?.provider === 'codex'
@@ -443,7 +440,7 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   const composerHint = selectedAgentNeedsKey
     ? '설정에서 API 키를 연결하세요.'
     : selectedAgent?.provider === 'official-router' && selectedAgentUnavailable
-      ? '설정에서 OpenRouter, NVIDIA Build, Gemini 중 하나 이상을 연결하세요.'
+      ? '설정에서 공식 API 공급자와 모델 ID를 확인하세요.'
     : selectedAgentUnavailable
       ? '선택한 실행기가 아직 준비되지 않았습니다.'
       : isGenerating
@@ -455,20 +452,22 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
     }
 
     if (selectedAgent.provider === 'official-router') {
-      if (readyOfficialProviders.length === 0) {
+      if (!selectedOfficialProviderStatus?.enabled || !selectedOfficialProviderStatus?.configured) {
         return {
           tone: 'warning' as const,
-          summary: '공식 무료 라우터 확인 필요',
-          detail: aiRouteError ?? '설정에서 OpenRouter, NVIDIA Build, Gemini 중 하나 이상을 연결해 주세요.',
+          summary: '공식 API 확인 필요',
+          detail:
+            aiProviderError ??
+            '설정에서 OpenRouter, NVIDIA Build, Gemini 중 사용할 공급자와 키를 먼저 확인해 주세요.',
         }
       }
 
       return {
         tone: 'info' as const,
-        summary: `무료 후보 ${readyOfficialProviders.length}개 준비`,
-        detail: topPreviewCandidate
-          ? `현재 우선 후보 ${topPreviewCandidate.provider_label} · ${topPreviewCandidate.display_name}`
-          : '검증된 무료 후보로 자동 라우팅됩니다.',
+        summary: `${selectedOfficialProviderStatus.label} 연결됨`,
+        detail: selectedModel?.trim()
+          ? `현재 모델 ${selectedModel}`
+          : selectedOfficialProviderStatus.last_test_message || '모델 ID를 입력해 주세요.',
       }
     }
 
@@ -500,7 +499,7 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
       summary: `${chatAgentRouteLabel(selectedAgent)} 준비됨`,
       detail: chatAgentChoiceLabel(selectedAgent),
     }
-  }, [selectedAgent, readyOfficialProviders.length, aiRouteError, topPreviewCandidate, selectedLocalProviderStatus])
+  }, [selectedAgent, selectedOfficialProviderStatus, aiProviderError, selectedModel, selectedLocalProviderStatus])
 
   useEffect(() => {
     const viewport = threadViewportRef.current
@@ -598,9 +597,12 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
               <div aria-label="채팅 모델 선택 메뉴" className="dropdown-menu" id={modelMenuId}>
                 {officialChatAgents.length > 0 ? (
                   <div className="dropdown-menu__group">
-                    <span className="dropdown-menu__title">공식 무료 API 라우터</span>
+                    <span className="dropdown-menu__title">공식 API</span>
                     {officialChatAgents.map((agent) => {
                       const isSelected = selectedAgent?.id === agent.id
+                      const providerStatus = aiProviders.find(
+                        (item) => item.provider === resolveOfficialProviderId(agent.baseUrl),
+                      )
 
                       return (
                         <button
@@ -616,7 +618,9 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
                             <strong>{chatAgentChoiceLabel(agent)}</strong>
                             <small>
                               {chatAgentSecondaryLabel(agent)}
-                              {readyOfficialProviders.length === 0 ? ' / 공급자 설정 필요' : ''}
+                              {!providerStatus?.enabled || !providerStatus?.configured
+                                ? ' / 공급자 설정 필요'
+                                : ''}
                             </small>
                           </span>
                           {isSelected ? <Icon name="check" size={16} /> : null}
@@ -705,7 +709,7 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
           <Icon name="warning" size={16} />
           <span>
             {selectedAgent?.provider === 'official-router'
-              ? aiRouteError ?? '공식 공급자가 아직 준비되지 않았습니다. 설정에서 연결 테스트를 먼저 확인해 주세요.'
+              ? aiProviderError ?? '공식 API 공급자 또는 모델 설정을 먼저 확인해 주세요.'
               : '선택한 로컬 실행기가 아직 준비되지 않았습니다. 설정에서 상태를 확인해 주세요.'}
           </span>
           <button className="ghost-button" onClick={() => onNavigate('settings')} type="button">
@@ -794,7 +798,7 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
                       <span className="message-card__badge">
                         {streamMeta?.top_candidate
                           ? `${streamMeta.top_candidate.provider_label} · ${streamMeta.top_candidate.display_name}`
-                          : '무료 후보 탐색 중'}
+                          : `${selectedOfficialProviderStatus?.label ?? '공식 API'} · ${selectedModel || '모델 확인 중'}`}
                       </span>
                     </div>
                     <span>실시간 스트리밍</span>
@@ -809,7 +813,7 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
                         </span>
                       ) : null}
                       {hasStreamFallback ? (
-                        <span>후보 전환 발생</span>
+                        <span>재시도 발생</span>
                       ) : null}
                     </div>
                   ) : null}

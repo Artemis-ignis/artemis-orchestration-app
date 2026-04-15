@@ -31,6 +31,12 @@ const LEGACY_OLLAMA_MODELS = new Set([
   'gemma4-e4b-fast:latest',
   'gemma4-e4b-fast',
 ])
+const LEGACY_OFFICIAL_ROUTING_MODELS = new Set([
+  'auto-best-free',
+  'auto-best-free-coding',
+  'auto-best-free-fast',
+  'manual',
+])
 const SUPPORTED_AGENT_PRESETS = new Set(['codex-cli', 'official-router', 'ollama-local'])
 const LEGACY_CLOUD_AGENT_PRESETS = new Set([
   'openai-direct',
@@ -233,6 +239,32 @@ function normalizeState(candidate: unknown): RuntimeState {
           preset: seed.preset,
           baseUrl: seed.baseUrl,
           model: OLLAMA_LOCAL_MODEL,
+          capabilities: seed.capabilities,
+        }
+      }
+
+      if (
+        item.id === 'agent-router' ||
+        item.provider === 'official-router' ||
+        item.preset === 'official-router'
+      ) {
+        return {
+          ...merged,
+          name: item.name || seed.name,
+          role: item.role || seed.role,
+          description: item.description || seed.description,
+          provider: seed.provider,
+          preset: seed.preset,
+          baseUrl:
+            typeof item.baseUrl === 'string' && item.baseUrl.trim()
+              ? item.baseUrl.trim()
+              : seed.baseUrl,
+          model:
+            typeof item.model === 'string' &&
+            item.model.trim() &&
+            !LEGACY_OFFICIAL_ROUTING_MODELS.has(item.model.trim())
+              ? item.model.trim()
+              : seed.model,
           capabilities: seed.capabilities,
         }
       }

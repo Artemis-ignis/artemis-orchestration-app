@@ -2,6 +2,22 @@
 
 ## 2026-04-15
 
+### Official API direct-mode cleanup
+
+- Removed the official free-routing UX from settings and kept only provider connection plus a saved default model target.
+- Changed the official managed agent copy, chat selector, orchestration status, and settings summaries from `공식 무료` / free-router wording to `공식 API` direct-call wording.
+- Synced the official managed agent from bridge AI settings during app bootstrap so a fresh browser session keeps the saved provider/model instead of falling back to the seed default.
+- Kept backend execution on `routing_mode: manual` and added a synthetic direct candidate path so typed model IDs can run even when they are not part of the stored candidate list.
+- Changed official execution failures to report `선택한 공식 API 호출이 실패했습니다.` and changed fallback copy from `무료 후보` to neutral `자동 후보` wording.
+- Fixed orchestration canvas labels so direct model ids like `deepseek/deepseek-r1:free` render as readable worker labels such as `DeepSeek R1` instead of collapsing to `free`.
+- Cleaned broken orchestration progress and routing log strings in `AppState.tsx` so live run cards now show readable Korean status text.
+- Verified in fresh Playwright browser sessions that:
+  - settings shows only direct provider/model controls for the official path,
+  - chat restores the saved official target on boot and shows it as `공식 API`,
+  - official chat failures now use the direct-call error copy,
+  - orchestration shows `공식 API · 준비됨 · OpenRouter · deepseek/deepseek-r1:free`,
+  - orchestration live logs now render readable Korean progress text.
+
 ### Routing stability audit
 
 - Added stream idle-timeout handling in both the bridge SSE reader and the frontend SSE client.

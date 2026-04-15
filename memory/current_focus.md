@@ -9,7 +9,7 @@
 
 ## Current Goals
 
-- Keep the official API router usable without turning the UI into a dashboard.
+- Keep the official API flow simple: connect provider, save one model, run it directly.
 - Keep settings understandable: local runtimes first, official providers second.
 - Keep orchestration interactive instead of decorative.
 - Keep the Hermes-style Codex workflow files usable for future sessions.
@@ -32,17 +32,22 @@
 - Files now keeps the connected workspace root path visible in the connect input instead of showing an empty field after the root is already attached.
 - Files delete actions now require an extra in-app confirmation click before the browser confirm dialog, reducing accidental local deletions from the list view.
 - Official provider cards now show a recent status line and are wrapped in real forms, removing the repeated password-without-form browser warnings on settings.
+- The old official free-routing UI is gone; settings now keeps only official provider connection plus a saved default model target.
+- A fresh browser session now pulls the saved official provider/model from bridge AI settings and applies it to the official API agent on boot.
+- Chat now shows the saved official target as `공식 API`, and official execution failures surface as `선택한 공식 API 호출이 실패했습니다.` instead of the old free-candidate failure copy.
+- Orchestration now shows the official worker as the real saved model label (`DeepSeek R1` in the current setup) instead of collapsing to `free`.
+- Orchestration progress logs were cleaned up so live status text is readable Korean instead of mojibake.
 - Public screenshots were regenerated after the flow change and no longer expose absolute workspace paths.
 - The public settings screenshot was regenerated after the local runtime stability fix.
 
 ## Next Checks
 
 - Keep orchestration labels readable without truncation.
-- Keep the official-router worker label short enough to scan at a glance.
+- Keep official direct-model labels short enough to scan at a glance.
 - Re-check screenshots whenever orchestration labels or workspace labels change.
 - Watch whether local-health warnings should eventually be separated from the shared app-wide `bridgeError` channel.
 - Revisit orchestration spacing only if the interactive layout regresses again.
-- Revisit official free-router preflight so stale provider checks do not still look "ready" before a new test.
+- Revisit provider preflight detail strings stored in bridge state so stale saved status text also loses the legacy free-candidate wording at the API level.
 - Decide later whether the chat workspace-write hint should become prompt-aware instead of always showing for non-Codex models when a workspace is connected.
 
 ## 2026-04-15 Follow-up
@@ -52,7 +57,7 @@
   - draft/running: parallel worker flow
 - The current worker labels verified in-browser are:
   - `GPT-5.4`
-  - `공식 무료`
+  - `DeepSeek R1`
   - `gemma4 E4B`
 - The latest public orchestration screenshot shows the parallel worker state instead of the old all-nodes-everywhere layout.
 - Public settings screenshots now use a dedicated doc-screenshot mode that strips saved provider state before capture.
