@@ -11,6 +11,7 @@
 - Changed official execution failures to report `선택한 공식 API 호출이 실패했습니다.` and changed fallback copy from `무료 후보` to neutral `자동 후보` wording.
 - Fixed orchestration canvas labels so direct model ids like `deepseek/deepseek-r1:free` render as readable worker labels such as `DeepSeek R1` instead of collapsing to `free`.
 - Cleaned broken orchestration progress and routing log strings in `AppState.tsx` so live run cards now show readable Korean status text.
+- Fixed the official target quick-pick grid so the current model and saved custom ids are always pinned first; `openrouter/elephant-alpha` now stays visible instead of getting dropped by the old top-8 ranked slice.
 - Verified in fresh Playwright browser sessions that:
   - settings shows only direct provider/model controls for the official path,
   - chat restores the saved official target on boot and shows it as `공식 API`,

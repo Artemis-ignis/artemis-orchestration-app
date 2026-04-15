@@ -37,6 +37,7 @@
 - Chat now shows the saved official target as `공식 API`, and official execution failures surface as `선택한 공식 API 호출이 실패했습니다.` instead of the old free-candidate failure copy.
 - Orchestration now shows the official worker as the real saved model label (`DeepSeek R1` in the current setup) instead of collapsing to `free`.
 - Orchestration progress logs were cleaned up so live status text is readable Korean instead of mojibake.
+- The settings quick-pick list now keeps the current official model plus saved custom model ids visible first, so custom OpenRouter entries such as `openrouter/elephant-alpha` no longer disappear behind the top-8 cutoff.
 - Public screenshots were regenerated after the flow change and no longer expose absolute workspace paths.
 - The public settings screenshot was regenerated after the local runtime stability fix.
 

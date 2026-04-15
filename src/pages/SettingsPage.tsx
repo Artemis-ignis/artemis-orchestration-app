@@ -254,6 +254,36 @@ function buildProviderDrafts(providers: AiProviderState[]) {
   }, {})
 }
 
+function parseModelListInput(value: string) {
+  return value
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function buildInlineModelChoice(provider: AiProviderId, modelId: string): AiModelCatalogEntry {
+  return {
+    provider,
+    model_id: modelId,
+    display_name: modelId,
+    free_candidate: false,
+    verified_available: false,
+    supports_streaming: true,
+    supports_tools: false,
+    supports_vision: false,
+    quality_score: 0,
+    reasoning_score: 0,
+    coding_score: 0,
+    speed_score: 0,
+    stability_score: 0,
+    priority: 0,
+    excluded: false,
+    last_checked_at: null,
+    last_error: '',
+    notes: '직접 입력한 모델',
+  }
+}
+
 function SettingsProfilePane() {
   const { state, updateSettings } = useArtemisApp()
   return (
@@ -431,12 +461,43 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
   )
   const selectedOfficialProviderState =
     visibleAiProviders.find((item) => item.provider === officialProviderDraft) ?? null
-  const selectedOfficialModelChoices = useMemo(
+  const selectedOfficialPinnedModels = useMemo(
     () =>
-      manualCandidates
-        .filter((item) => item.provider === officialProviderDraft)
-        .slice(0, 8),
-    [manualCandidates, officialProviderDraft],
+      parseModelListInput(providerDrafts[officialProviderDraft]?.candidateModelsText ?? ''),
+    [officialProviderDraft, providerDrafts],
+  )
+  const selectedOfficialModelChoices = useMemo(
+    () => {
+      const providerCandidates = manualCandidates.filter((item) => item.provider === officialProviderDraft)
+      const candidateMap = new Map(providerCandidates.map((item) => [item.model_id, item]))
+      const preferredIds = [
+        officialModelDraft.trim(),
+        ...selectedOfficialPinnedModels,
+      ].filter(Boolean)
+      const selected: AiModelCatalogEntry[] = []
+      const seen = new Set<string>()
+
+      preferredIds.forEach((modelId) => {
+        if (seen.has(modelId)) {
+          return
+        }
+
+        selected.push(candidateMap.get(modelId) ?? buildInlineModelChoice(officialProviderDraft, modelId))
+        seen.add(modelId)
+      })
+
+      providerCandidates.forEach((candidate) => {
+        if (seen.has(candidate.model_id)) {
+          return
+        }
+
+        selected.push(candidate)
+        seen.add(candidate.model_id)
+      })
+
+      return selected.slice(0, 12)
+    },
+    [manualCandidates, officialModelDraft, officialProviderDraft, selectedOfficialPinnedModels],
   )
 
   const handleRefreshLocalProviders = useCallback(async () => {
@@ -514,11 +575,11 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
     const draft = providerDrafts[provider]
     setBusyKey(`${provider}:save`)
     try {
-      await saveAiProvider(state.settings.bridgeUrl, provider, {
-        enabled: draft?.enabled ?? false,
-        apiKey: draft?.apiKey.trim() ? draft.apiKey.trim() : undefined,
-        candidateModels: (draft?.candidateModelsText ?? '').split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean),
-      })
+        await saveAiProvider(state.settings.bridgeUrl, provider, {
+          enabled: draft?.enabled ?? false,
+          apiKey: draft?.apiKey.trim() ? draft.apiKey.trim() : undefined,
+          candidateModels: parseModelListInput(draft?.candidateModelsText ?? ''),
+        })
       await loadAiState()
       updateDraft(provider, { apiKey: '' })
     } catch (error) {
