@@ -2,6 +2,19 @@
 
 ## 2026-04-15
 
+### Orchestration flow and readiness fix
+
+- Replaced the noisy orchestration graph with an execution-first flow that keeps only `input`, `parallel hub`, selected workers, and one `result` node.
+- Removed decorative side nodes such as memory, files, insights, activity, and merge branches from the main parallel canvas so the run path is easier to understand at a glance.
+- Added explicit canvas-side worker readiness input from `OrchestrationPage.tsx` so the graph can distinguish runtime availability from run history.
+- Changed worker badge resolution to separate real runtime readiness from execution history:
+  - connected runtime with no run -> `connected`
+  - connected runtime after a session exists but before that worker starts -> `execution standby`
+  - unavailable runtime -> `not ready`
+  - running, success, or error -> live run state
+- Fixed the Codex CLI worker so it no longer shows a misleading idle badge simply because no recent run object exists while the runtime is actually connected.
+- Verified in browser that the orchestration worker badges now render as `connected` for ready workers before execution, and that the simplified graph no longer looks like a decorative systems map.
+
 ### Official API direct-mode cleanup
 
 - Removed the official free-routing UX from settings and kept only provider connection plus a saved default model target.

@@ -89,7 +89,6 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     workspaceAbsolutePath,
     workspaceCurrentPath,
     workspaceError,
-    workspaceSummary,
   } = useArtemisApp()
   const [aiProviders, setAiProviders] = useState<AiProviderState[]>([])
   const [runClock, setRunClock] = useState(() => Date.now())
@@ -279,6 +278,14 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
 
   const skippedSelectedAgents = useMemo(
     () => selectedAgents.filter((agent) => !agentAvailability.get(agent.id)?.runnable),
+    [selectedAgents, agentAvailability],
+  )
+  const canvasAgentStates = useMemo(
+    () =>
+      selectedAgents.map((agent) => ({
+        id: agent.id,
+        ready: Boolean(agentAvailability.get(agent.id)?.runnable),
+      })),
     [selectedAgents, agentAvailability],
   )
 
@@ -564,17 +571,11 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
           <div className="orchestration-stage__canvas">
             <OrchestrationCanvas
               selectedAgents={selectedAgents}
+              agentStates={canvasAgentStates}
               sessionRuns={sessionRuns}
-              tools={state.tools.items}
-              filesCount={workspaceSummary.fileCount}
-              insightsCount={state.insights.items.length}
-              signalCount={state.signals.items.filter((item) => item.subscribed).length}
-              activityCount={state.activity.items.length}
               taskDraft={task}
               sessionTask={state.orchestration.sessionTask}
               recentPrompt={latestMasterMessage?.text ?? ''}
-              messageCount={state.chats.threads.find((thread) => thread.id === state.chats.activeThreadId)?.messages.length ?? 0}
-              latestExecution={latestAgentExecution}
               bridgeError={bridgeError}
               workspaceError={workspaceError}
               requiresApiKey={skippedSelectedAgents.some((agent) => agentAvailability.get(agent.id)?.reason === 'API 키 필요')}
