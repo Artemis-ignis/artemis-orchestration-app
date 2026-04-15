@@ -11,6 +11,7 @@
 
 - Keep the official API flow simple: connect provider, save one model, run it directly.
 - Keep settings understandable: local runtimes first, official providers second.
+- Keep the settings models/runtime pane split into maintainable sections instead of one giant file.
 - Keep orchestration interactive and execution-first instead of decorative.
 - Keep the Hermes-style Codex workflow files usable for future sessions.
 - Keep the premium UI shell consistent across chat, files, settings, and orchestration.
@@ -56,6 +57,14 @@
   - Desktop, tablet, and mobile screenshots were re-reviewed from the premium shell branch after the second pass.
   - `docs/screenshots` and `public/marketing` now use the refreshed premium-shell captures for chat, files, settings, and orchestration.
   - A tracked-text scan for the literal local workspace path and username returned no matches before preparing the branch for push.
+- The settings models/runtime tab is now split into focused section files:
+  - `SettingsOverviewSection.tsx`
+  - `SettingsLocalProvidersSection.tsx`
+  - `SettingsOfficialProvidersSection.tsx`
+  - `SettingsOfficialTargetSection.tsx`
+  - `SettingsManagedAgentsSection.tsx`
+  - shared helper logic in `settingsModelsShared.ts`
+- `SettingsModelsPane.tsx` is now a hook-and-state container instead of the place where all settings JSX lives.
 
 ## Next Checks
 
@@ -67,8 +76,8 @@
 - Revisit provider preflight detail strings stored in bridge state so stale saved status text also loses the legacy free-candidate wording at the API level.
 - Decide later whether the chat workspace-write hint should become prompt-aware instead of always showing for non-Codex models when a workspace is connected.
 - Decide later whether the sidebar itself should collapse secondary menus by default; this pass reduced density but did not change the navigation model yet.
-- Decide later whether the files root-path editor should get a collapsed display mode so long local absolute paths stop dominating the toolbar on smaller widths.
 - Split `CrewPages.tsx` further if another chat-focused pass is scheduled; the chat page now uses extracted sections but the file is still large.
+- Split the managed-agent settings section further only if agent editing grows again; it is smaller now but still one of the denser settings areas.
 
 ## 2026-04-15 Follow-up
 

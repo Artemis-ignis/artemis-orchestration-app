@@ -2,6 +2,20 @@
 
 ## 2026-04-15
 
+### Settings pane refactor and screenshot refresh
+
+- Split the settings models/runtime tab into dedicated UI-only sections so the premium shell branch no longer keeps all settings runtime/provider/agent JSX in one 1000-line file.
+- Added focused section files for:
+  - overview summary
+  - local runtime cards
+  - official provider cards
+  - default official target selection
+  - managed chat-agent editing
+- Moved shared provider/runtime labels, status copy, and model parsing helpers into `src/features/settings/settingsModelsShared.ts`.
+- Kept the settings screen behavior intact while making the main `SettingsModelsPane.tsx` a smaller state container.
+- Re-ran lint, build, backend router tests, and fresh Playwright captures after the split to confirm there was no UI regression.
+- Refreshed the public settings/files/chat/orchestration screenshots again from the latest reviewed premium-shell build so docs and marketing assets stay current.
+
 ### Premium UI shell follow-up
 
 - Continued the UI-only redesign work on the dedicated `feat/premium-ui-shell` worktree without mixing in the non-UI bridge and signals changes from the other branch.
