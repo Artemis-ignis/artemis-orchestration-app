@@ -270,6 +270,8 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
     setComposerText,
     state,
     uploadWorkspaceFiles,
+    workspaceAbsolutePath,
+    workspaceCurrentPath,
   } = useArtemisApp()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -410,6 +412,12 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
     ? chatAgentRouteLabel(selectedAgent)
     : providerLabel(selectedProvider as 'auto' | 'ollama' | 'codex')
   const selectedAgentSupportsWorkspaceWrite = selectedAgent?.provider === 'codex'
+  const selectedLocalProviderStatus =
+    selectedAgent?.provider === 'ollama'
+      ? bridgeHealth?.providers.find((item) => item.provider === 'ollama') ?? null
+      : selectedAgent?.provider === 'codex'
+        ? bridgeHealth?.providers.find((item) => item.provider === 'codex') ?? null
+        : null
   const readyOfficialProviders = aiProviders.filter(
     (item) => item.enabled && item.configured && (item.status === 'ready' || item.available_count > 0),
   )
@@ -441,6 +449,58 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
       : isGenerating
         ? '응답 생성 중'
         : ''
+  const selectedAgentStatus = useMemo(() => {
+    if (!selectedAgent) {
+      return null
+    }
+
+    if (selectedAgent.provider === 'official-router') {
+      if (readyOfficialProviders.length === 0) {
+        return {
+          tone: 'warning' as const,
+          summary: '공식 무료 라우터 확인 필요',
+          detail: aiRouteError ?? '설정에서 OpenRouter, NVIDIA Build, Gemini 중 하나 이상을 연결해 주세요.',
+        }
+      }
+
+      return {
+        tone: 'info' as const,
+        summary: `무료 후보 ${readyOfficialProviders.length}개 준비`,
+        detail: topPreviewCandidate
+          ? `현재 우선 후보 ${topPreviewCandidate.provider_label} · ${topPreviewCandidate.display_name}`
+          : '검증된 무료 후보로 자동 라우팅됩니다.',
+      }
+    }
+
+    if (selectedLocalProviderStatus) {
+      const detail =
+        selectedLocalProviderStatus.warning ||
+        selectedLocalProviderStatus.lastError ||
+        selectedLocalProviderStatus.detail
+
+      if (selectedLocalProviderStatus.ready && !selectedLocalProviderStatus.stale) {
+        return {
+          tone: 'info' as const,
+          summary: `${chatAgentRouteLabel(selectedAgent)} 연결됨`,
+          detail,
+        }
+      }
+
+      return {
+        tone: 'warning' as const,
+        summary: selectedLocalProviderStatus.stale
+          ? `${chatAgentRouteLabel(selectedAgent)} 최근 정상 상태 유지 중`
+          : `${chatAgentRouteLabel(selectedAgent)} 확인 필요`,
+        detail,
+      }
+    }
+
+    return {
+      tone: 'info' as const,
+      summary: `${chatAgentRouteLabel(selectedAgent)} 준비됨`,
+      detail: chatAgentChoiceLabel(selectedAgent),
+    }
+  }, [selectedAgent, readyOfficialProviders.length, aiRouteError, topPreviewCandidate, selectedLocalProviderStatus])
 
   useEffect(() => {
     const viewport = threadViewportRef.current
@@ -654,8 +714,17 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
         </div>
       ) : null}
 
-      {selectedAgent && !selectedAgentSupportsWorkspaceWrite ? (
-        <div className="status-banner status-banner--warning">
+      {selectedAgentStatus && !selectedAgentNeedsKey && !selectedAgentUnavailable ? (
+        <div className={`status-banner status-banner--${selectedAgentStatus.tone}`}>
+          <Icon name={selectedAgentStatus.tone === 'info' ? 'spark' : 'warning'} size={16} />
+          <span>
+            {selectedAgentStatus.summary}. {selectedAgentStatus.detail}
+          </span>
+        </div>
+      ) : null}
+
+      {selectedAgent && !selectedAgentSupportsWorkspaceWrite && (workspaceAbsolutePath || workspaceCurrentPath) ? (
+        <div className="status-banner status-banner--info">
           <Icon name="warning" size={16} />
           <span>실제 로컬 파일 수정이 목적이면 채팅 모델을 Codex CLI로 선택해 주세요.</span>
         </div>

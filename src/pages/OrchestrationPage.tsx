@@ -74,17 +74,22 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     bridgeError,
     latestExecution,
     runAgentTask,
+    setOrchestrationDraft,
+    setOrchestrationSelection,
     state,
+    startOrchestrationSession,
     workspaceAbsolutePath,
     workspaceCurrentPath,
     workspaceError,
     workspaceSummary,
   } = useArtemisApp()
-  const [task, setTask] = useState('')
   const [aiProviders, setAiProviders] = useState<AiProviderState[]>([])
   const [runClock, setRunClock] = useState(() => Date.now())
-  const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([])
-  const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null)
+  const task = state.orchestration.draftTask
+  const selectedAgentIds = state.orchestration.selectedAgentIds
+  const sessionStartedAt = state.orchestration.sessionStartedAt
+    ? Date.parse(state.orchestration.sessionStartedAt)
+    : null
 
   const enabledAgents = useMemo(
     () => state.agents.items.filter((item) => item.enabled),
@@ -195,6 +200,65 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     return map
   }, [enabledAgents, apiKeyIds, ollamaReady, codexReady, readyOfficialProviders])
 
+  const selectedAgentStatusItems = useMemo(() => {
+    const codexStatus = bridgeHealth?.providers.find((item) => item.provider === 'codex') ?? null
+    const ollamaStatus = bridgeHealth?.providers.find((item) => item.provider === 'ollama') ?? null
+    const officialStatus =
+      readyOfficialProviders[0] ?? aiProviders.find((item) => item.enabled && item.configured) ?? null
+
+    return selectedAgents.map((agent) => {
+      if (agent.provider === 'codex') {
+        return {
+          id: agent.id,
+          tone: codexReady ? 'info' : 'warning',
+          summary: codexReady ? '연결됨' : '확인 필요',
+          detail:
+            codexStatus?.warning ||
+            codexStatus?.lastError ||
+            codexStatus?.detail ||
+            'Codex CLI 상태를 아직 확인하지 못했습니다.',
+          label: agent.name,
+        }
+      }
+
+      if (agent.provider === 'ollama') {
+        return {
+          id: agent.id,
+          tone: ollamaReady ? 'info' : 'warning',
+          summary: ollamaReady ? '연결됨' : '확인 필요',
+          detail:
+            ollamaStatus?.warning ||
+            ollamaStatus?.lastError ||
+            ollamaStatus?.detail ||
+            'Ollama 상태를 아직 확인하지 못했습니다.',
+          label: agent.name,
+        }
+      }
+
+      if (agent.provider === 'official-router') {
+        const ready = readyOfficialProviders.length > 0
+        return {
+          id: agent.id,
+          tone: ready ? 'info' : officialStatus ? 'warning' : 'error',
+          summary: ready ? '준비됨' : officialStatus ? '재확인 필요' : '미설정',
+          detail:
+            officialStatus?.last_test_message ||
+            officialStatus?.detail ||
+            '활성화된 공식 무료 공급자가 없습니다.',
+          label: agent.name,
+        }
+      }
+
+      return {
+        id: agent.id,
+        tone: 'info',
+        summary: '준비됨',
+        detail: executionProviderLabel(agent.provider),
+        label: agent.name,
+      }
+    })
+  }, [selectedAgents, bridgeHealth, codexReady, ollamaReady, readyOfficialProviders, aiProviders])
+
   const runnableSelectedAgents = useMemo(
     () => selectedAgents.filter((agent) => agentAvailability.get(agent.id)?.runnable),
     [selectedAgents, agentAvailability],
@@ -205,15 +269,23 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     [selectedAgents, agentAvailability],
   )
 
-  const selectedAgentIdSet = useMemo(
-    () => new Set(effectiveSelectedAgentIds),
-    [effectiveSelectedAgentIds],
+  const sessionSelectedAgentIds = useMemo(
+    () =>
+      state.orchestration.sessionAgentIds.filter((id) =>
+        state.agents.items.some((agent) => agent.id === id),
+      ),
+    [state.orchestration.sessionAgentIds, state.agents.items],
+  )
+
+  const sessionAgentIdSet = useMemo(
+    () => new Set(sessionSelectedAgentIds),
+    [sessionSelectedAgentIds],
   )
 
   const sessionRuns = useMemo(() => {
     return state.agents.runs
       .filter((run) => {
-        if (!selectedAgentIdSet.has(run.agentId)) {
+        if (!sessionAgentIdSet.has(run.agentId)) {
           return false
         }
 
@@ -227,7 +299,12 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
         (left, right) =>
           Date.parse(right.finishedAt ?? right.startedAt) - Date.parse(left.finishedAt ?? left.startedAt),
       )
-  }, [state.agents.runs, selectedAgentIdSet, sessionStartedAt])
+  }, [state.agents.runs, sessionAgentIdSet, sessionStartedAt])
+
+  const sessionAgents = useMemo(
+    () => state.agents.items.filter((agent) => sessionAgentIdSet.has(agent.id)),
+    [state.agents.items, sessionAgentIdSet],
+  )
 
   const latestRunsByAgent = useMemo(() => {
     const map = new Map<string, AgentRun>()
@@ -238,6 +315,44 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     }
     return map
   }, [sessionRuns])
+
+  const visibleAgentStatusItems = useMemo(
+    () =>
+      selectedAgentStatusItems.map((item) => {
+        const run = latestRunsByAgent.get(item.id)
+        const latestLog = run?.logs[run.logs.length - 1]?.message
+
+        if (run?.status === 'running') {
+          return {
+            ...item,
+            summary: '실행 중',
+            detail: latestLog || item.detail,
+            tone: 'info',
+          }
+        }
+
+        if (run?.status === 'success') {
+          return {
+            ...item,
+            summary: '최근 완료',
+            detail: latestLog || item.detail,
+            tone: 'info',
+          }
+        }
+
+        if (run?.status === 'error') {
+          return {
+            ...item,
+            summary: '최근 실패',
+            detail: latestLog || run.output || item.detail,
+            tone: 'warning',
+          }
+        }
+
+        return item
+      }),
+    [selectedAgentStatusItems, latestRunsByAgent],
+  )
 
   const sessionRunning = sessionRuns.some((run) => run.status === 'running')
   const sessionHasResults = sessionRuns.length > 0
@@ -253,6 +368,11 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       )
     : 0
   const latestRunElapsedLabel = sessionRuns[0] ? formatElapsedSeconds(latestRunElapsedSeconds) : ''
+  const sessionDisplayAgents = sessionHasResults ? sessionAgents : runnableSelectedAgents
+  const sessionSuccessCount = sessionRuns.filter((run) => run.status === 'success').length
+  const sessionErrorCount = sessionRuns.filter((run) => run.status === 'error').length
+  const sessionRunningCount = sessionRuns.filter((run) => run.status === 'running').length
+  const sessionSkippedCount = Math.max(sessionDisplayAgents.length - sessionRuns.length, 0)
 
   useEffect(() => {
     if (!sessionRunning) {
@@ -274,7 +394,6 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     Boolean(task.trim()) &&
     runnableSelectedAgents.length > 0 &&
     !sessionRunning &&
-    !bridgeError &&
     !workspaceError &&
     hasWorkspaceConnection
 
@@ -304,19 +423,20 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     : workspaceLabel
 
   const toggleSelectedAgent = (agentId: string) => {
-    setSelectedAgentIds((previous) => {
-      const current = previous.filter((id) => enabledAgentIds.has(id))
-      const base = current.length > 0 ? current : effectiveSelectedAgentIds
+    const current = selectedAgentIds.filter((id) => enabledAgentIds.has(id))
+    const base = current.length > 0 ? current : effectiveSelectedAgentIds
 
-      if (base.includes(agentId)) {
-        if (base.length === 1) {
-          return base
-        }
-        return base.filter((id) => id !== agentId)
+    if (base.includes(agentId)) {
+      if (base.length === 1) {
+        setOrchestrationSelection(base)
+        return
       }
 
-      return [...base, agentId]
-    })
+      setOrchestrationSelection(base.filter((id) => id !== agentId))
+      return
+    }
+
+    setOrchestrationSelection([...base, agentId])
   }
 
   const runSelectedAgents = async () => {
@@ -325,9 +445,12 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       return
     }
 
-    setSessionStartedAt(Date.now())
+    startOrchestrationSession({
+      startedAt: new Date().toISOString(),
+      task: nextTask,
+      agentIds: selectedAgents.map((agent) => agent.id),
+    })
     await Promise.allSettled(runnableSelectedAgents.map((agent) => runAgentTask(agent.id, nextTask)))
-    setTask('')
   }
 
   return (
@@ -370,6 +493,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
               signalCount={state.signals.items.filter((item) => item.subscribed).length}
               activityCount={state.activity.items.length}
               taskDraft={task}
+              sessionTask={state.orchestration.sessionTask}
               recentPrompt={latestMasterMessage?.text ?? ''}
               messageCount={state.chats.threads.find((thread) => thread.id === state.chats.activeThreadId)?.messages.length ?? 0}
               latestExecution={latestAgentExecution}
@@ -420,23 +544,51 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                     </button>
                   )
                 })}
-              </div>
-            </div>
+	              </div>
+	            </div>
 
-            <div className="orchestration-inline-dock__composer">
+	            {visibleAgentStatusItems.length > 0 ? (
+	              <div className="stack-grid stack-grid--compact">
+	                {visibleAgentStatusItems.map((item) => (
+	                  <div key={item.id} className={`status-banner status-banner--${item.tone}`}>
+	                    <Icon name="warning" size={16} />
+	                    <span>
+	                      {item.label} · {item.summary} · {item.detail}
+	                    </span>
+	                  </div>
+	                ))}
+	              </div>
+	            ) : null}
+
+	            <div className="orchestration-inline-dock__composer">
               <label className="field field--full orchestration-inline-dock__field">
                 <span>작업 지시</span>
                 <textarea
-                  onChange={(event) => setTask(event.target.value)}
+                  onChange={(event) => setOrchestrationDraft(event.target.value)}
                   placeholder="예: AI 관련 소식을 요약해서 브리핑 문서로 정리해줘."
                   rows={3}
                   value={task}
                 />
               </label>
 
-              <div className="orchestration-inline-dock__actions">
-                {bridgeError ? (
-                  <div className="status-banner status-banner--error">
+	              <div className="orchestration-inline-dock__actions">
+	                {sessionHasResults ? (
+	                  <div
+	                    className={`status-banner ${
+	                      sessionErrorCount > 0 ? 'status-banner--warning' : 'status-banner--info'
+	                    }`}
+	                  >
+	                    <Icon name="warning" size={16} />
+	                    <span>
+	                      최근 실행 요약 · 성공 {sessionSuccessCount} · 실패 {sessionErrorCount} · 실행 중{' '}
+	                      {sessionRunningCount}
+	                      {sessionSkippedCount > 0 ? ` · 제외 ${sessionSkippedCount}` : ''}
+	                    </span>
+	                  </div>
+	                ) : null}
+
+	                {bridgeError ? (
+	                  <div className="status-banner status-banner--error">
                     <Icon name="warning" size={16} />
                     <span>{bridgeError}</span>
                     <button
@@ -491,7 +643,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                     <button
                       key={template.label}
                       className="chip orchestration-template"
-                      onClick={() => setTask(template.value)}
+                      onClick={() => setOrchestrationDraft(template.value)}
                       type="button"
                     >
                       {template.label}
@@ -528,7 +680,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                 ) : null}
 
                 <div className="orchestration-live-panel__cards">
-                  {runnableSelectedAgents.map((agent) => {
+                  {sessionDisplayAgents.map((agent) => {
                     const run = latestRunsByAgent.get(agent.id)
                     const latestLog = run?.logs[run.logs.length - 1]
                     const elapsedLabel =
@@ -549,7 +701,11 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                             <span>{executionProviderLabel(agent.provider)}</span>
                           </div>
                           <span className={`chip ${run?.status === 'running' ? 'is-active' : 'chip--soft'}`}>
-                            {displayRunStatusLabel(run?.status)}
+                            {run
+                              ? displayRunStatusLabel(run.status)
+                              : agentAvailability.get(agent.id)?.reason
+                                ? '?쒖쇅??'
+                                : '?湲?'}
                           </span>
                         </div>
 

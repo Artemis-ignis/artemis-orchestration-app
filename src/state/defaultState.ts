@@ -95,5 +95,12 @@ export function createDefaultState(): RuntimeState {
       bridgeUrl: 'http://127.0.0.1:4174',
     },
     apiKeys: [],
+    orchestration: {
+      draftTask: '',
+      selectedAgentIds: [],
+      sessionStartedAt: null,
+      sessionAgentIds: [],
+      sessionTask: '',
+    },
   }
 }

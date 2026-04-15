@@ -209,6 +209,36 @@ function providerStatusLabel(provider: AiProviderState) {
   return '설정됨'
 }
 
+function providerRecentStatus(provider: AiProviderState) {
+  if (provider.last_test_message) {
+    return provider.last_test_message
+  }
+
+  if (provider.detail) {
+    return provider.detail
+  }
+
+  if (provider.status === 'ready') {
+    return '연결 테스트를 통과했습니다.'
+  }
+
+  if (provider.configured) {
+    return '키는 저장되었고 연결 테스트를 기다리고 있습니다.'
+  }
+
+  return '아직 설정되지 않았습니다.'
+}
+
+function providerRecentCheckedLabel(provider: AiProviderState) {
+  const value = provider.last_test_at ?? provider.checked_at ?? provider.updated_at
+
+  if (!value) {
+    return '아직 연결 테스트 전'
+  }
+
+  return `마지막 확인 ${formatLocalProviderTime(value)}`
+}
+
 function routingModeLabel(mode: AiRoutingMode) {
   switch (mode) {
     case 'auto-best-free':
@@ -714,35 +744,47 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
                     </span>
                   ))}
                 </div>
-                <div className="settings-grid">
-                  <label className="field field--full">
-                    <span>{provider.label} API 키</span>
-                    <input
-                      autoComplete="off"
-                      type="password"
-                      value={draft.apiKey}
-                      placeholder={provider.masked_key ? '새 키를 입력하면 교체됩니다.' : '공식 사이트에서 받은 키를 입력하세요.'}
-                      onChange={(event) => updateDraft(provider.provider, { apiKey: event.target.value })}
-                    />
-                    <small className="field__hint">
-                      {providerInputHint(provider.provider)} 브라우저에는 마스킹된 상태만 보입니다.
-                    </small>
-                  </label>
-                  <label className="field field--full">
-                    <span>기본 후보 목록</span>
-                    <textarea
-                      rows={4}
-                      value={draft.candidateModelsText}
-                      placeholder="모델 ID를 줄바꿈으로 입력하거나 비워 두세요."
-                      onChange={(event) => updateDraft(provider.provider, { candidateModelsText: event.target.value })}
-                    />
-                  </label>
+                <div className="provider-card__surface">
+                  <strong>최근 상태</strong>
+                  <span>{providerRecentStatus(provider)}</span>
                 </div>
-                <div className="settings-actionRow">
-                  <button className="primary-button" disabled={busyKey === `${provider.provider}:save`} onClick={() => void saveProviderConfig(provider.provider)} type="button">저장</button>
-                  <button className="ghost-button" disabled={busyKey === `${provider.provider}:test`} onClick={() => void runProviderTest(provider.provider)} type="button">연결 테스트</button>
-                  <button className="ghost-button" disabled={busyKey === `${provider.provider}:refresh`} onClick={() => void refreshProviderCatalog(provider.provider)} type="button">이 공급자 새로고침</button>
-                </div>
+                <p className="settings-inlineMeta">{providerRecentCheckedLabel(provider)}</p>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void saveProviderConfig(provider.provider)
+                  }}
+                >
+                  <div className="settings-grid">
+                    <label className="field field--full">
+                      <span>{provider.label} API 키</span>
+                      <input
+                        autoComplete="off"
+                        type="password"
+                        value={draft.apiKey}
+                        placeholder={provider.masked_key ? '새 키를 입력하면 교체됩니다.' : '공식 사이트에서 받은 키를 입력하세요.'}
+                        onChange={(event) => updateDraft(provider.provider, { apiKey: event.target.value })}
+                      />
+                      <small className="field__hint">
+                        {providerInputHint(provider.provider)} 브라우저에는 마스킹된 상태만 보입니다.
+                      </small>
+                    </label>
+                    <label className="field field--full">
+                      <span>기본 후보 목록</span>
+                      <textarea
+                        rows={4}
+                        value={draft.candidateModelsText}
+                        placeholder="모델 ID를 줄바꿈으로 입력하거나 비워 두세요."
+                        onChange={(event) => updateDraft(provider.provider, { candidateModelsText: event.target.value })}
+                      />
+                    </label>
+                  </div>
+                  <div className="settings-actionRow">
+                    <button className="primary-button" disabled={busyKey === `${provider.provider}:save`} type="submit">저장</button>
+                    <button className="ghost-button" disabled={busyKey === `${provider.provider}:test`} onClick={() => void runProviderTest(provider.provider)} type="button">연결 테스트</button>
+                    <button className="ghost-button" disabled={busyKey === `${provider.provider}:refresh`} onClick={() => void refreshProviderCatalog(provider.provider)} type="button">이 공급자 새로고침</button>
+                  </div>
+                </form>
               </article>
             )
           })}

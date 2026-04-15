@@ -35,6 +35,7 @@ type OrchestrationCanvasProps = {
   signalCount: number
   activityCount: number
   taskDraft: string
+  sessionTask: string
   recentPrompt: string
   messageCount: number
   latestExecution: LatestExecution | null
@@ -229,6 +230,7 @@ function createFlowModel({
   signalCount,
   activityCount,
   taskDraft,
+  sessionTask,
   recentPrompt,
   messageCount,
   latestExecution,
@@ -239,10 +241,11 @@ function createFlowModel({
   const activeTools = tools.filter((item) => item.enabled)
   const latestRunsByAgent = latestRunMap(sessionRuns)
   const hasDraft = Boolean(taskDraft.trim())
+  const hasSessionTask = Boolean(sessionTask.trim())
   const hasRecentPrompt = Boolean(recentPrompt.trim())
   const hasSession = sessionRuns.length > 0
   const sessionRunning = sessionRuns.some((run) => run.status === 'running')
-  const shouldExpandFlow = hasDraft || sessionRunning
+  const shouldExpandFlow = hasDraft || hasSession || hasSessionTask
   const route = routeSummary({
     sessionRuns,
     bridgeError,
@@ -297,9 +300,9 @@ function createFlowModel({
       target: 'hub',
       targetHandle: 'in-left',
       type: 'smoothstep',
-      animated: hasDraft,
+      animated: hasDraft || hasSession,
       markerEnd: { type: MarkerType.ArrowClosed },
-      className: `orchestration-flow__edge is-${hasDraft ? 'running' : 'ready'}`,
+      className: `orchestration-flow__edge is-${hasDraft || hasSession ? 'running' : 'ready'}`,
     },
   ]
 
@@ -504,7 +507,7 @@ function createFlowModel({
     })
   }
 
-  if (sessionRunning && signalCount > 0) {
+  if (hasSession && signalCount > 0) {
     nodes.push({
       id: 'signals',
       type: 'orchestration',
@@ -535,7 +538,7 @@ function createFlowModel({
     })
   }
 
-  if (sessionRunning && activeTools.length > 0) {
+  if (hasSession && activeTools.length > 0) {
     nodes.push({
       id: 'tools',
       type: 'orchestration',
@@ -566,7 +569,7 @@ function createFlowModel({
     })
   }
 
-  if (sessionRunning) {
+  if (hasSession) {
     nodes.push(
       {
         id: 'files',
@@ -826,6 +829,7 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
     signalCount,
     activityCount,
     taskDraft,
+    sessionTask,
     recentPrompt,
     messageCount,
     latestExecution,
@@ -848,6 +852,7 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
         signalCount,
         activityCount,
         taskDraft,
+        sessionTask,
         recentPrompt,
         messageCount,
         latestExecution,
@@ -864,6 +869,7 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
       signalCount,
       activityCount,
       taskDraft,
+      sessionTask,
       recentPrompt,
       messageCount,
       latestExecution,

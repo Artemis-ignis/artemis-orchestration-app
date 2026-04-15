@@ -47,3 +47,28 @@
 - Verified in headless Playwright that a forced `/api/health` failure no longer collapses the local runtime card to `0개 모델`.
 - Regenerated `docs/screenshots/settings.png` so the public settings screenshot matches the new stable local-runtime UI.
 - Removed the temporary duplicated commented block left in `src/pages/SettingsPage.tsx` after the hotfix so the file is smaller and easier to maintain.
+
+### Orchestration state persistence
+
+- Added a dedicated `orchestration` state slice so the current draft, selected model set, and latest orchestration session survive page navigation and reloads.
+- Changed orchestration session filtering to use the persisted session start time and session agent ids instead of component-local state.
+- Kept the orchestration canvas expanded for the latest session and preserved the output/result nodes after execution completes.
+- Stopped blocking a new orchestration run only because an old `bridgeError` banner still exists from the last failed provider.
+- Added inline selected-model status banners plus a recent-session summary so the page shows which model connected, completed, failed, or is still running without opening another menu.
+- Verified in headless Playwright that:
+  - running a 3-model orchestration shows live result cards,
+  - the official free router failure is visible inline instead of hiding the rest of the run,
+  - leaving `#/agents` for `#/settings` and coming back keeps the latest session visible.
+
+### Service usability pass
+
+- Added a chat status banner for the currently selected model so the user can see whether Ollama, Codex CLI, or the official free router is actually ready before sending a message.
+- Downgraded the non-Codex workspace-write hint in chat from warning tone to info tone and only show it when a workspace is actually connected.
+- Synced the files-page root-path input with the connected workspace root so the current path remains visible and reusable.
+- Added a second in-app delete confirmation step on the files page before the browser confirm dialog, reducing accidental destructive clicks in the list and preview panes.
+- Wrapped each official provider card in settings with a real form so password inputs no longer trigger DOM warnings and Enter can submit the save action.
+- Added a recent-status line plus last-check timestamp to each official provider card so users can tell what was actually tested and when.
+- Verified in headless Playwright that:
+  - chat shows the selected-model readiness banner,
+  - files shows the connected root path in the input and changes delete buttons to `삭제 확인` on first click,
+  - settings no longer emits password-without-form console warnings and shows recent provider status details.

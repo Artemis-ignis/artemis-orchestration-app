@@ -759,6 +759,11 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
     updateSettings: (patch) => dispatch({ type: 'UPDATE_SETTINGS', patch }),
     selectChatModel: (provider, model) =>
       dispatch({ type: 'SELECT_CHAT_MODEL', provider, model }),
+    setOrchestrationDraft: (text) => dispatch({ type: 'SET_ORCHESTRATION_DRAFT', text }),
+    setOrchestrationSelection: (agentIds) =>
+      dispatch({ type: 'SET_ORCHESTRATION_SELECTION', agentIds }),
+    startOrchestrationSession: ({ startedAt, task, agentIds }) =>
+      dispatch({ type: 'START_ORCHESTRATION_SESSION', startedAt, task, agentIds }),
     addApiKey: (label, key, presetId) => dispatch({ type: 'ADD_API_KEY', label, key, presetId }),
     removeApiKey: (keyId) => dispatch({ type: 'REMOVE_API_KEY', keyId }),
     setActiveAgent: (agentId) => dispatch({ type: 'SET_ACTIVE_AGENT', agentId }),

@@ -81,6 +81,7 @@ function normalizeState(candidate: unknown): RuntimeState {
   const signals = isRecord(candidate.signals) ? candidate.signals : null
   const agents = isRecord(candidate.agents) ? candidate.agents : null
   const settings = isRecord(candidate.settings) ? candidate.settings : null
+  const orchestration = isRecord(candidate.orchestration) ? candidate.orchestration : null
 
   const next: RuntimeState = {
     ...fallback,
@@ -152,6 +153,24 @@ function normalizeState(candidate: unknown): RuntimeState {
             : fallback.settings.activeTab,
     },
     apiKeys: [],
+    orchestration: {
+      ...fallback.orchestration,
+      ...(orchestration ?? {}),
+      selectedAgentIds: Array.isArray(orchestration?.selectedAgentIds)
+        ? orchestration.selectedAgentIds.filter((item): item is string => typeof item === 'string')
+        : fallback.orchestration.selectedAgentIds,
+      sessionStartedAt:
+        typeof orchestration?.sessionStartedAt === 'string'
+          ? orchestration.sessionStartedAt
+          : fallback.orchestration.sessionStartedAt,
+      sessionAgentIds: Array.isArray(orchestration?.sessionAgentIds)
+        ? orchestration.sessionAgentIds.filter((item): item is string => typeof item === 'string')
+        : fallback.orchestration.sessionAgentIds,
+      sessionTask:
+        typeof orchestration?.sessionTask === 'string'
+          ? orchestration.sessionTask
+          : fallback.orchestration.sessionTask,
+    },
   }
 
   if (!next.chats.threads.some((thread) => thread.id === next.chats.activeThreadId)) {
