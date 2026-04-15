@@ -42,3 +42,4 @@
   - `공식 무료`
   - `gemma4 E4B`
 - The latest public orchestration screenshot shows the parallel worker state instead of the old all-nodes-everywhere layout.
+- Public settings screenshots now use a dedicated doc-screenshot mode that strips saved provider state before capture.

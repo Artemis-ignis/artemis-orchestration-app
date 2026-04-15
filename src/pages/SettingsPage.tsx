@@ -32,6 +32,15 @@ type ProviderDraft = {
   candidateModelsText: string
 }
 
+function isDocScreenshotMode() {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem('artemis-doc-screenshot-mode') === '1'
+  } catch {
+    return false
+  }
+}
+
 function capabilityLabel(capability: AgentCapability) {
   switch (capability) {
     case 'chat':
@@ -274,6 +283,7 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
   const [providerDrafts, setProviderDrafts] = useState<Record<string, ProviderDraft>>({})
   const [aiError, setAiError] = useState<string | null>(null)
   const [busyKey, setBusyKey] = useState<string | null>(null)
+  const docScreenshotMode = useMemo(() => isDocScreenshotMode(), [])
 
   const managedAgents = useMemo(
     () => state.agents.items.filter((agent) => MANAGED_AGENT_PRESETS.includes(agent.preset)),
@@ -283,9 +293,6 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
     (activeAgent && MANAGED_AGENT_PRESETS.includes(activeAgent.preset) ? activeAgent : null) ?? managedAgents[0] ?? null
   const topCandidate = aiPreview?.candidates[0] ?? null
   const readyLocalProviders = bridgeHealth?.providers.filter((item) => item.ready).length ?? 0
-  const readyOfficialProviders = aiProviders.filter(
-    (item) => item.enabled && item.configured && (item.status === 'ready' || item.available_count > 0),
-  ).length
   const localProviders = useMemo(
     () =>
       ((bridgeHealth?.providers ?? []).filter(
@@ -305,6 +312,31 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
         .filter((item) => item.free_candidate && item.verified_available && !item.excluded)
         .sort((left, right) => (right.score ?? right.quality_score) - (left.score ?? left.quality_score)),
     [aiModels],
+  )
+  const visibleAiProviders = useMemo(
+    () =>
+      docScreenshotMode
+        ? aiProviders.map((provider) => ({
+            ...provider,
+            enabled: false,
+            masked_key: '',
+            configured: false,
+            status: 'idle',
+            detail: '',
+            available_count: 0,
+            last_test_at: null,
+            last_test_status: null,
+            last_test_message: '',
+          }))
+        : aiProviders,
+    [aiProviders, docScreenshotMode],
+  )
+  const readyOfficialProviders = useMemo(
+    () =>
+      visibleAiProviders.filter(
+        (item) => item.enabled && item.configured && (item.status === 'ready' || item.available_count > 0),
+      ).length,
+    [visibleAiProviders],
   )
 
   const loadAiState = useCallback(async () => {
@@ -537,7 +569,7 @@ function SettingsModelsPane({ onNavigate }: { onNavigate: (page: PageId) => void
           </div>
           <div className="provider-grid provider-grid--official">
           {OFFICIAL_PROVIDER_ORDER.map((providerId) => {
-            const provider = aiProviders.find((item) => item.provider === providerId)
+            const provider = visibleAiProviders.find((item) => item.provider === providerId)
             const draft = providerDrafts[providerId] ?? { enabled: false, apiKey: '', candidateModelsText: '' }
             if (!provider) return null
 

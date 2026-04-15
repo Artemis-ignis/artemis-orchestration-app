@@ -36,3 +36,4 @@
 - Regenerated `docs/screenshots/*.png` from the demo workspace.
 - Resynced `public/marketing/workspace-chat.png`, `workspace-files.png`, and `workspace-orchestration.png` from the latest safe screenshots.
 - Re-scanned tracked text files for the literal local workspace path and found no remaining plain-text leaks.
+- Added a dedicated doc-screenshot mode for settings so saved provider keys and personal connection state are not rendered into public screenshots.

@@ -75,6 +75,7 @@ await context.addInitScript((workspaceRoot) => {
       currentPath: '',
     }),
   )
+  window.localStorage.setItem('artemis-doc-screenshot-mode', '1')
 }, demoWorkspaceRoot)
 
 const page = await context.newPage()
