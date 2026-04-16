@@ -84,6 +84,10 @@
   - published history
   - approve/reject/publish-now actions
   - recent logs
+- Signals internal publishing detail is no longer a raw `<pre>` dump:
+  - draft previews now render as an article-style reader,
+  - published history entries now open into the same article-style reader,
+  - the reader separates headings, paragraphs, bullets, metadata chips, and source footer.
 - Activity now shows internal publishing health, provider counts, and recent publish failures without assuming X is the primary target.
 - Manual API verification confirmed:
   - `ingest -> draft -> approve -> scheduled -> published` works for internal publishing,
@@ -179,6 +183,7 @@
 ## Next Checks
 
 - Decide whether the internal published feed should later get its own dedicated page or remain embedded inside Signals and Activity.
+- Decide whether the article-style reader should later support richer source cards, thumbnail media, or HTML export for internal posts.
 - Add a retention or archive policy for old skipped and failed drafts if the queue grows too large over time.
 - Decide later whether provider-specific ranking weights should become editable in the UI instead of env/settings only.
 - Re-run the X autopost flow once real X user-context tokens are available so the branch can confirm a real `POST /2/tweets` success instead of dry-run fallback.

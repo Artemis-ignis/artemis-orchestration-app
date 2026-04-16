@@ -11,6 +11,7 @@ import {
   formatRelative,
   signalSourceLabel,
 } from '../crewPageHelpers'
+import { PublisherArticle } from '../features/publisher/PublisherArticle'
 import { Icon } from '../icons'
 import {
   approvePublisherDraft,
@@ -1397,7 +1398,18 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                     <h2>게시 초안</h2>
                     <span className="chip chip--soft">{selectedDraft.generationModel}</span>
                   </div>
-                  <pre className="x-autopost-preview">{selectedDraft.generatedText}</pre>
+                  <PublisherArticle
+                    authors={selectedDraft.authors}
+                    body={selectedDraft.generatedText}
+                    category={selectedDraft.category}
+                    excerpt={compactText(selectedDraft.sourceSummary, 180)}
+                    publishedAt={selectedDraft.scheduledAt || selectedDraft.sourcePublishedAt}
+                    sourceLabel={selectedDraft.sourceLabel}
+                    sourceUrl={selectedDraft.sourceUrl}
+                    summaryType={selectedDraft.summaryType}
+                    tags={selectedDraft.tags}
+                    title={selectedDraft.sourceTitle}
+                  />
                 </section>
 
                 <section className="panel-card">
@@ -1452,7 +1464,18 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                     <h2>내부 게시 본문</h2>
                     <span className="chip chip--soft">{selectedPublished.provider}</span>
                   </div>
-                  <pre className="x-autopost-preview">{selectedPublished.body}</pre>
+                  <PublisherArticle
+                    authors={selectedPublished.authors}
+                    body={selectedPublished.body}
+                    category={selectedPublished.category || '내부 게시'}
+                    excerpt={selectedPublished.excerpt}
+                    publishedAt={selectedPublished.publishedAt}
+                    sourceLabel={selectedPublished.sourceLabel || selectedPublished.provider}
+                    sourceUrl={selectedPublished.sourceUrl}
+                    summaryType={selectedPublished.summaryType}
+                    tags={selectedPublished.tags}
+                    title={selectedPublished.title}
+                  />
                 </section>
               </>
             ) : (

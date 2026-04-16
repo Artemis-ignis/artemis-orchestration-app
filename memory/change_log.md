@@ -67,6 +67,21 @@
   - restart recovery
 - Added `/publisher/` to `.gitignore` so runtime queue and published feed files do not pollute commits.
 
+### Source-agnostic publisher reader polish
+
+- Added `src/features/publisher/PublisherArticle.tsx` to render draft and published internal posts as readable article-style content instead of raw preformatted text.
+- The new article renderer now:
+  - extracts heading-like lines into sections,
+  - keeps bullet lists readable,
+  - shows article metadata in a calmer reader header,
+  - moves source links into a dedicated footer block.
+- Updated `SignalsPage.tsx` so both:
+  - `게시 초안`
+  - `내부 게시 본문`
+  use the article-style renderer instead of a plain text dump.
+- Added article reader styling to `src/styles/pages/support.css`.
+- Re-verified in a live browser session that the Signals publisher panel now renders the internal post as a multi-section article view rather than a small raw text box.
+
 ### X autopost pipeline
 
 - Added a dedicated X autopost pipeline under `local-bridge/x-autopost/` instead of overloading the article auto-post flow.
