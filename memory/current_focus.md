@@ -18,6 +18,37 @@
 
 ## Latest Confirmed State
 
+- `feat/x-autopost-pipeline` worktree now has a dedicated X autopost pipeline that is separate from the premium UI shell branch and does not mix in the older dirty bridge changes.
+- The bridge exposes `/api/x-autopost/state`, `/queue`, `/run`, `/settings`, `/:id/approve`, `/:id/reject`, and `/:id/publish`.
+- X autopost queue items now persist under `x-autopost/` with statuses:
+  - `draft`
+  - `approved`
+  - `scheduled`
+  - `posted`
+  - `failed`
+  - `skipped`
+- Queue records now store source url/title, topic hash, novelty score, generated text, scheduled/post timestamps, X post id, and structured error/skip reasons.
+- Guardrails now block:
+  - duplicate source urls
+  - recently repeated topic hashes
+  - near-duplicate post text
+  - low-novelty candidates
+  - too-short or too-generic copy
+  - banned certainty/clickbait phrases
+- Manual API verification on the branch-local bridge confirmed:
+  - one X-style source item can create a draft,
+  - the same source url is skipped on the next run,
+  - `draft -> approved -> scheduled -> posted` transitions work,
+  - missing X auth stays visible as `publisher disabled` while `publish now` falls back to dry-run and still records a simulated post id.
+- Signals now has a dedicated `X 자동 게시` operator tab that shows:
+  - mode
+  - hourly and daily caps
+  - queue items
+  - approve/reject/publish-now actions
+  - recent logs
+- Activity now shows a small X autopost summary block with recent publish counts and the latest queue/publish logs.
+- Root runtime output for X autopost is now ignored via `/x-autopost/`, while `local-bridge/x-autopost/` remains tracked code.
+
 - `4173` preview responds normally.
 - `4174` bridge responds normally.
 - Ollama exposes only `gemma4-E4B-uncensored-q4fast:latest`.
@@ -68,6 +99,10 @@
 
 ## Next Checks
 
+- Re-run the X autopost flow once real X user-context tokens are available so the branch can confirm a real `POST /2/tweets` success instead of dry-run fallback.
+- Decide whether approval mode should expose a manual `schedule now` operator action instead of waiting for the scheduler poll window.
+- Watch the text-generation path for repeated sentence openings once more real queue volume accumulates.
+- Decide whether skipped items should stay in the visible queue forever or be trimmed into a separate audit log after a retention window.
 - Keep orchestration labels readable without truncation.
 - Keep official direct-model labels short enough to scan at a glance.
 - Re-check screenshots whenever orchestration labels or workspace labels change.

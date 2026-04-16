@@ -21,6 +21,7 @@ import {
 } from './workspace.mjs'
 import { createAiRouter } from './ai/router.mjs'
 import { createAutoPostsScheduler } from './auto-posts/scheduler.mjs'
+import { createXAutopostScheduler } from './x-autopost/scheduler.mjs'
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -549,6 +550,12 @@ const autoPostsScheduler = createAutoPostsScheduler({
   collectSignalItems,
   fetchWithTimeout,
   revealWorkspacePath,
+  runCodex,
+})
+const xAutopostScheduler = createXAutopostScheduler({
+  resolveWorkspaceRoot: getDefaultWorkspace,
+  collectSignalItems,
+  fetchWithTimeout,
   runCodex,
 })
 
@@ -2865,6 +2872,78 @@ const server = http.createServer(async (request, response) => {
       return
     }
 
+    if (request.method === 'GET' && request.url === '/api/x-autopost/state') {
+      const payload = await xAutopostScheduler.getStatus()
+      sendJson(request, response, 200, { ok: true, ...payload })
+      return
+    }
+
+    if (request.method === 'GET' && request.url === '/api/x-autopost/queue') {
+      const payload = await xAutopostScheduler.listQueue()
+      sendJson(request, response, 200, { ok: true, ...payload })
+      return
+    }
+
+    if (request.method === 'POST' && request.url === '/api/x-autopost/run') {
+      const body = await readBody(request)
+      const result = await xAutopostScheduler.runNow({
+        category: body.category || '전체',
+        limit: Number(body.limit || 1),
+        force: Boolean(body.force),
+        seedItems: Array.isArray(body.seedItems) ? body.seedItems : [],
+        reason: body.reason || 'manual',
+      })
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    if (request.method === 'PATCH' && request.url === '/api/x-autopost/settings') {
+      const body = await readBody(request)
+      const payload = await xAutopostScheduler.updateSettings(body)
+      sendJson(request, response, 200, { ok: true, ...payload })
+      return
+    }
+
+    const xAutopostApproveMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/x-autopost\/([^/]+)\/approve$/)
+        : null
+    if (xAutopostApproveMatch) {
+      const result = await xAutopostScheduler.approveDraft(decodeURIComponent(xAutopostApproveMatch[1]))
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    const xAutopostRejectMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/x-autopost\/([^/]+)\/reject$/)
+        : null
+    if (xAutopostRejectMatch) {
+      const body = await readBody(request)
+      const result = await xAutopostScheduler.rejectDraft(
+        decodeURIComponent(xAutopostRejectMatch[1]),
+        typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim() : 'operator_rejected',
+      )
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    const xAutopostPublishMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/x-autopost\/([^/]+)\/publish$/)
+        : null
+    if (xAutopostPublishMatch) {
+      const body = await readBody(request)
+      const result = await xAutopostScheduler.publishDraftNow(
+        decodeURIComponent(xAutopostPublishMatch[1]),
+        {
+          dryRun: Boolean(body.dryRun),
+        },
+      )
+      sendJson(request, response, 200, result)
+      return
+    }
+
     if (request.method === 'GET' && request.url === '/api/skills') {
       const catalog = await listSkills()
       sendJson(request, response, 200, {
@@ -3026,6 +3105,13 @@ const server = http.createServer(async (request, response) => {
 autoPostsScheduler.init().catch((error) => {
   console.error(
     '[auto-posts] scheduler init failed',
+    error instanceof Error ? error.message : error,
+  )
+})
+
+xAutopostScheduler.start().catch((error) => {
+  console.error(
+    '[x-autopost] scheduler init failed',
     error instanceof Error ? error.message : error,
   )
 })

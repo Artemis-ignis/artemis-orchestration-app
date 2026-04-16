@@ -8,6 +8,9 @@
 
 ## Still Unresolved
 
+- Confirm one real X user-context publish on this branch once live credentials are available.
+- Decide whether approval mode should keep scheduler-only slot assignment or expose a manual `schedule now` operator action too.
+- Decide whether skipped queue items should remain in the main queue list or move into a separate audit history after a retention period.
 - Verify the remaining official-provider paths end to end, especially Google, OpenRouter, and Gemini flows.
 - Decide whether the secondary navigation groups should collapse by default to reduce first-screen density further.
 - Re-check public screenshots whenever workspace labels, runtime cards, or orchestration labels change again.

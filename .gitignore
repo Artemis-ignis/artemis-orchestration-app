@@ -25,6 +25,7 @@ artemis-workspace-test/
 .codex-tmp-verify.js
 generated-posts/
 media-cache/
+/x-autopost/
 
 # Editor directories and files
 .vscode/*

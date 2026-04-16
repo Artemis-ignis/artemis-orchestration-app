@@ -13,15 +13,21 @@ import {
 } from '../crewPageHelpers'
 import { Icon } from '../icons'
 import {
+  approveXAutopostDraft,
   exportAutoPost,
   fetchAutoPostDetail,
   fetchAutoPostState,
   fetchAutoPosts,
   fetchSignalsFeed,
+  fetchXAutopostState,
+  publishXAutopostDraftNow,
+  rejectXAutopostDraft,
   regenerateAutoPost,
   revealAutoPostFolder,
   runAutoPosts,
+  runXAutopost,
   type SignalFeedItem,
+  updateXAutopostSettings,
   updateAutoPostSettings,
 } from '../lib/modelClient'
 import { useArtemisApp } from '../state/context'
@@ -31,8 +37,16 @@ import type {
   GeneratedPostSummary,
   SchedulerState,
 } from '../types/autoPosts'
+import type {
+  XAutopostDraft,
+  XAutopostSettings,
+  XAutopostState,
+  XAutopostLog,
+  XAutopostPublisherStatus,
+  XAutopostMetrics,
+} from '../types/xAutopost'
 
-type SignalsTab = 'feed' | 'posts'
+type SignalsTab = 'feed' | 'posts' | 'publisher'
 
 function buildSignalChatPrompt(item: SignalFeedItem) {
   const lines = [
@@ -93,6 +107,65 @@ function defaultSchedulerState(): SchedulerState {
   }
 }
 
+function defaultXAutopostSettings(): XAutopostSettings {
+  return {
+    mode: 'approval',
+    maxPerHour: 10,
+    minIntervalMinutes: 6,
+    maxPerDay: 120,
+    requireSourceUrl: true,
+    requireUniqueTopic: true,
+    minNoveltyScore: 0.72,
+    blockNearDuplicates: true,
+    outputDir: 'x-autopost',
+    generationModel: 'gpt-5.4-mini',
+    startupDelayMs: 15_000,
+    schedulerPollMs: 60_000,
+    topicCooldownHours: 48,
+    retryLimit: 3,
+    retryBackoffMinutes: 12,
+    maxQueueItems: 400,
+  }
+}
+
+function defaultXAutopostState(): XAutopostState {
+  return {
+    lastDraftRunAt: null,
+    lastPublishAttemptAt: null,
+    lastPostedAt: null,
+    nextGenerationAt: null,
+    nextPublishAt: null,
+    inProgress: false,
+    lastError: '',
+    lastDraftId: null,
+    postedDraftIds: [],
+    skippedDraftIds: [],
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+function defaultXAutopostPublisher(): XAutopostPublisherStatus {
+  return {
+    enabled: false,
+    configured: false,
+    ready: false,
+    detail: 'X publisher 상태를 확인하지 못했습니다.',
+  }
+}
+
+function defaultXAutopostMetrics(): XAutopostMetrics {
+  return {
+    draftCount: 0,
+    approvedCount: 0,
+    scheduledCount: 0,
+    postedCount24h: 0,
+    postedCount1h: 0,
+    failedCount: 0,
+    publisher: defaultXAutopostPublisher(),
+    recentFailures: [],
+  }
+}
+
 function postStatusLabel(status: GeneratedPost['status']) {
   switch (status) {
     case 'failed':
@@ -101,6 +174,23 @@ function postStatusLabel(status: GeneratedPost['status']) {
       return '초안'
     default:
       return '준비됨'
+  }
+}
+
+function draftStatusLabel(status: XAutopostDraft['status']) {
+  switch (status) {
+    case 'approved':
+      return '승인됨'
+    case 'scheduled':
+      return '예약됨'
+    case 'posted':
+      return '게시됨'
+    case 'failed':
+      return '실패'
+    case 'skipped':
+      return '건너뜀'
+    default:
+      return '초안'
   }
 }
 
@@ -128,6 +218,14 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
   const [schedulerState, setSchedulerState] = useState<SchedulerState>(defaultSchedulerState)
   const [autoPostSettings, setAutoPostSettings] = useState<AutoPostSettings>(defaultAutoPostSettings)
   const [settingsDraft, setSettingsDraft] = useState<AutoPostSettings>(defaultAutoPostSettings)
+  const [xQueue, setXQueue] = useState<XAutopostDraft[]>([])
+  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
+  const [xAutopostSettings, setXAutopostSettings] = useState<XAutopostSettings>(defaultXAutopostSettings)
+  const [xSettingsDraft, setXSettingsDraft] = useState<XAutopostSettings>(defaultXAutopostSettings)
+  const [xAutopostState, setXAutopostState] = useState<XAutopostState>(defaultXAutopostState)
+  const [xAutopostLogs, setXAutopostLogs] = useState<XAutopostLog[]>([])
+  const [xAutopostMetrics, setXAutopostMetrics] = useState<XAutopostMetrics>(defaultXAutopostMetrics)
+  const [xPublisherStatus, setXPublisherStatus] = useState<XAutopostPublisherStatus>(defaultXAutopostPublisher)
 
   const loadFeed = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -209,6 +307,38 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     [bridgeUrl, selectedPostId],
   )
 
+  const loadXAutopost = useCallback(
+    async ({ silent = false, focusDraftId }: { silent?: boolean; focusDraftId?: string | null } = {}) => {
+      if (!silent) {
+        setPostActionLoading(true)
+        setActionMessage(null)
+      }
+
+      try {
+        const response = await fetchXAutopostState(bridgeUrl)
+        setXQueue(response.queue)
+        setXAutopostSettings(response.settings)
+        setXSettingsDraft(response.settings)
+        setXAutopostState(response.state)
+        setXAutopostLogs(response.logs)
+        setXAutopostMetrics(response.metrics)
+        setXPublisherStatus(response.publisher)
+
+        const nextSelectedId = focusDraftId ?? selectedDraftId ?? response.queue[0]?.id ?? null
+        setSelectedDraftId(nextSelectedId)
+      } catch (nextError) {
+        if (!silent) {
+          setActionMessage(nextError instanceof Error ? nextError.message : 'X 자동 게시 상태를 불러오지 못했습니다.')
+        }
+      } finally {
+        if (!silent) {
+          setPostActionLoading(false)
+        }
+      }
+    },
+    [bridgeUrl, selectedDraftId],
+  )
+
   const loadPostDetail = useCallback(
     async (postId: string) => {
       setSelectedPostId(postId)
@@ -236,18 +366,23 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     if (activeTab === 'posts') {
       void loadPosts()
     }
-  }, [activeTab, loadPosts])
+    if (activeTab === 'publisher') {
+      void loadXAutopost()
+    }
+  }, [activeTab, loadPosts, loadXAutopost])
 
   useEffect(() => {
     const timer = window.setInterval(() => {
       void loadFeed({ silent: true })
       if (activeTab === 'posts') {
         void loadPosts({ silent: true, focusPostId: selectedPostId })
+      } else if (activeTab === 'publisher') {
+        void loadXAutopost({ silent: true, focusDraftId: selectedDraftId })
       }
     }, 90_000)
 
     return () => window.clearInterval(timer)
-  }, [activeTab, loadFeed, loadPosts, selectedPostId])
+  }, [activeTab, loadFeed, loadPosts, loadXAutopost, selectedDraftId, selectedPostId])
 
   const filteredFeed = useMemo(() => {
     const keyword = deferredQuery.trim().toLowerCase()
@@ -290,6 +425,34 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     filteredPosts.find((item) => item.id === selectedPostId) ??
     postItems.find((item) => item.id === selectedPostId) ??
     null
+  const filteredDrafts = useMemo(() => {
+    const keyword = deferredQuery.trim().toLowerCase()
+    if (!keyword) {
+      return xQueue
+    }
+
+    return xQueue.filter((item) =>
+      `${item.sourceTitle} ${item.generatedText} ${item.sourceLabel} ${item.category}`
+        .toLowerCase()
+        .includes(keyword),
+    )
+  }, [deferredQuery, xQueue])
+
+  const selectedDraft =
+    filteredDrafts.find((item) => item.id === selectedDraftId) ??
+    xQueue.find((item) => item.id === selectedDraftId) ??
+    null
+
+  useEffect(() => {
+    if (!selectedDraftId && filteredDrafts[0]) {
+      setSelectedDraftId(filteredDrafts[0].id)
+      return
+    }
+
+    if (selectedDraftId && !xQueue.some((item) => item.id === selectedDraftId)) {
+      setSelectedDraftId(filteredDrafts[0]?.id ?? null)
+    }
+  }, [filteredDrafts, selectedDraftId, xQueue])
 
   const executeRunNow = async () => {
     setPostActionLoading(true)
@@ -413,10 +576,114 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     }
   }
 
+  const executeCreateDraftFromSignal = async (item?: SignalFeedItem | null) => {
+    const seedItem = item ?? null
+    setPostActionLoading(true)
+    setActionMessage(null)
+
+    try {
+      const response = await runXAutopost({
+        bridgeUrl,
+        category,
+        limit: seedItem ? 1 : 2,
+        force: false,
+        seedItems: seedItem ? [seedItem] : [],
+        reason: seedItem ? 'signal-seed' : 'manual',
+      })
+      setActionMessage(
+        response.createdCount > 0
+          ? `${response.createdCount}개의 X 게시 초안을 큐에 추가했습니다.`
+          : response.skippedCount > 0
+            ? `${response.skippedCount}개의 후보가 guardrail에 걸려 건너뛰었습니다.`
+            : '새로 큐에 넣을 초안이 없었습니다.',
+      )
+      await loadXAutopost({ focusDraftId: response.items[0]?.id ?? selectedDraftId ?? null })
+      setActiveTab('publisher')
+    } catch (nextError) {
+      setActionMessage(nextError instanceof Error ? nextError.message : 'X 게시 초안 생성에 실패했습니다.')
+    } finally {
+      setPostActionLoading(false)
+    }
+  }
+
+  const executeSaveXSettings = async () => {
+    setPostActionLoading(true)
+    setActionMessage(null)
+
+    try {
+      const response = await updateXAutopostSettings({
+        bridgeUrl,
+        patch: xSettingsDraft,
+      })
+      setXAutopostSettings(response.settings)
+      setXSettingsDraft(response.settings)
+      setXAutopostState(response.state)
+      setXQueue(response.queue)
+      setXAutopostLogs(response.logs)
+      setXAutopostMetrics(response.metrics)
+      setXPublisherStatus(response.publisher)
+      setActionMessage('X 자동 게시 설정을 저장했습니다.')
+    } catch (nextError) {
+      setActionMessage(nextError instanceof Error ? nextError.message : 'X 자동 게시 설정 저장에 실패했습니다.')
+    } finally {
+      setPostActionLoading(false)
+    }
+  }
+
+  const executeApproveDraft = async (draftId: string) => {
+    setPostActionLoading(true)
+    setActionMessage(null)
+    try {
+      const response = await approveXAutopostDraft(bridgeUrl, draftId)
+      setActionMessage('초안을 승인했습니다. 스케줄러가 다음 슬롯을 배정합니다.')
+      await loadXAutopost({ focusDraftId: response.item.id })
+    } catch (nextError) {
+      setActionMessage(nextError instanceof Error ? nextError.message : '초안 승인에 실패했습니다.')
+    } finally {
+      setPostActionLoading(false)
+    }
+  }
+
+  const executeRejectDraft = async (draftId: string) => {
+    setPostActionLoading(true)
+    setActionMessage(null)
+    try {
+      const response = await rejectXAutopostDraft(bridgeUrl, draftId)
+      setActionMessage(`초안을 큐에서 제외했습니다: ${response.item.sourceTitle}`)
+      await loadXAutopost({ focusDraftId: response.item.id })
+    } catch (nextError) {
+      setActionMessage(nextError instanceof Error ? nextError.message : '초안 거절에 실패했습니다.')
+    } finally {
+      setPostActionLoading(false)
+    }
+  }
+
+  const executePublishDraft = async (draftId: string) => {
+    setPostActionLoading(true)
+    setActionMessage(null)
+    try {
+      const response = await publishXAutopostDraftNow(
+        bridgeUrl,
+        draftId,
+        !xPublisherStatus.ready || xAutopostSettings.mode === 'dry-run',
+      )
+      setActionMessage(
+        response.simulated
+          ? '실제 인증이 없어 dry-run으로 게시 시뮬레이션을 완료했습니다.'
+          : '공식 X API로 게시를 완료했습니다.',
+      )
+      await loadXAutopost({ focusDraftId: response.item.id })
+    } catch (nextError) {
+      setActionMessage(nextError instanceof Error ? nextError.message : '즉시 게시에 실패했습니다.')
+    } finally {
+      setPostActionLoading(false)
+    }
+  }
+
   return (
     <section className="page">
       <PageIntro
-        description="실시간 공개 피드와 자동 생성된 장문 HTML 게시글을 한 화면에서 관리합니다. 자동 게시글은 로컬 브리지가 1시간 주기로 수집·점수화·생성해 워크스페이스에 저장합니다."
+        description="실시간 시그널, 장문 분석글 저장, 그리고 실제 X 자동 게시 큐를 한 화면에서 운영합니다. X 자동 게시 탭에서는 초안 생성, 승인, 예약, 즉시 발행, 최근 로그를 직접 관리할 수 있습니다."
         icon="signals"
         title="시그널"
         trailing={
@@ -426,6 +693,12 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                 ? generatedAt
                   ? `실시간 피드 갱신 ${formatDate(generatedAt)}`
                   : '실시간 피드를 준비하고 있습니다.'
+                : activeTab === 'publisher'
+                  ? xAutopostState.inProgress
+                    ? 'X 자동 게시 스케줄러가 실행 중입니다.'
+                    : xAutopostState.lastPostedAt
+                      ? `최근 게시 ${formatDate(xAutopostState.lastPostedAt)}`
+                      : xPublisherStatus.detail
                 : schedulerState.inProgress
                   ? '자동 게시글 생성이 실행 중입니다.'
                   : schedulerState.lastSuccessAt
@@ -437,6 +710,8 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
               onClick={() => {
                 if (activeTab === 'feed') {
                   void loadFeed()
+                } else if (activeTab === 'publisher') {
+                  void loadXAutopost()
                 } else {
                   void loadPosts()
                 }
@@ -459,6 +734,13 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
             실시간 시그널
           </button>
           <button
+            className={`chip ${activeTab === 'publisher' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('publisher')}
+            type="button"
+          >
+            X 자동 게시
+          </button>
+          <button
             className={`chip ${activeTab === 'posts' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('posts')}
             type="button"
@@ -469,7 +751,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
         <div className="signals-toolbar__actions">
           <SearchField
             onChange={setQuery}
-            placeholder={activeTab === 'feed' ? '시그널 검색...' : '게시글 검색...'}
+            placeholder={activeTab === 'feed' ? '시그널 검색...' : activeTab === 'publisher' ? '큐 검색...' : '게시글 검색...'}
             value={query}
           />
         </div>
@@ -574,6 +856,14 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                         게시글 탭 보기
                       </button>
                       <button
+                        className="ghost-button"
+                        disabled={postActionLoading}
+                        onClick={() => void executeCreateDraftFromSignal(item)}
+                        type="button"
+                      >
+                        X 초안 생성
+                      </button>
+                      <button
                         className="primary-button"
                         onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
                         type="button"
@@ -592,6 +882,213 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
             />
           )}
         </>
+      ) : activeTab === 'publisher' ? (
+        <div className="x-autopost-shell">
+          <div className="x-autopost-side">
+            <section className="panel-card">
+              <div className="panel-card__header">
+                <h2>X 자동 게시 운영</h2>
+                <span className={`chip ${xAutopostState.inProgress ? 'is-active' : 'chip--soft'}`}>
+                  {xAutopostSettings.mode}
+                </span>
+              </div>
+              <div className="stack-grid stack-grid--compact">
+                <div className="summary-row">
+                  <span>publisher</span>
+                  <strong>{xPublisherStatus.ready ? '연결됨' : xPublisherStatus.enabled ? 'fallback' : '비활성'}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>최근 게시</span>
+                  <strong>{xAutopostState.lastPostedAt ? formatDate(xAutopostState.lastPostedAt) : '없음'}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>다음 생성</span>
+                  <strong>{xAutopostState.nextGenerationAt ? formatDate(xAutopostState.nextGenerationAt) : '중지됨'}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>다음 발행</span>
+                  <strong>{xAutopostState.nextPublishAt ? formatDate(xAutopostState.nextPublishAt) : '없음'}</strong>
+                </div>
+              </div>
+              <p className="settings-card__lead">{xPublisherStatus.detail}</p>
+              <div className="badge-row">
+                <span className="chip chip--soft">1시간 {xAutopostMetrics.postedCount1h}/{xAutopostSettings.maxPerHour}</span>
+                <span className="chip chip--soft">24시간 {xAutopostMetrics.postedCount24h}/{xAutopostSettings.maxPerDay}</span>
+                <span className="chip chip--soft">실패 {xAutopostMetrics.failedCount}</span>
+              </div>
+              <div className="badge-row">
+                <button className="primary-button" disabled={postActionLoading} onClick={() => void executeCreateDraftFromSignal()} type="button">
+                  현재 카테고리로 초안 채우기
+                </button>
+                <button className="ghost-button" disabled={postActionLoading} onClick={() => void loadXAutopost()} type="button">
+                  큐 새로고침
+                </button>
+              </div>
+            </section>
+
+            <section className="panel-card">
+              <div className="panel-card__header">
+                <h2>자동 게시 설정</h2>
+                <span className="chip chip--soft">{xSettingsDraft.generationModel}</span>
+              </div>
+              <div className="auto-post-settings-grid">
+                <label className="field">
+                  <span>모드</span>
+                  <select value={xSettingsDraft.mode} onChange={(event) => setXSettingsDraft((current) => ({ ...current, mode: event.target.value as XAutopostSettings['mode'] }))}>
+                    <option value="dry-run">dry-run</option>
+                    <option value="approval">approval</option>
+                    <option value="auto">auto</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>시간당 최대</span>
+                  <input type="number" min={1} max={24} value={xSettingsDraft.maxPerHour} onChange={(event) => setXSettingsDraft((current) => ({ ...current, maxPerHour: Number(event.target.value || current.maxPerHour) }))} />
+                </label>
+                <label className="field">
+                  <span>최소 간격(분)</span>
+                  <input type="number" min={1} value={xSettingsDraft.minIntervalMinutes} onChange={(event) => setXSettingsDraft((current) => ({ ...current, minIntervalMinutes: Number(event.target.value || current.minIntervalMinutes) }))} />
+                </label>
+                <label className="field">
+                  <span>일일 최대</span>
+                  <input type="number" min={1} value={xSettingsDraft.maxPerDay} onChange={(event) => setXSettingsDraft((current) => ({ ...current, maxPerDay: Number(event.target.value || current.maxPerDay) }))} />
+                </label>
+                <label className="field">
+                  <span>최소 novelty</span>
+                  <input type="number" step="0.01" min={0} max={1} value={xSettingsDraft.minNoveltyScore} onChange={(event) => setXSettingsDraft((current) => ({ ...current, minNoveltyScore: Number(event.target.value || current.minNoveltyScore) }))} />
+                </label>
+                <label className="field">
+                  <span>생성 모델</span>
+                  <input value={xSettingsDraft.generationModel} onChange={(event) => setXSettingsDraft((current) => ({ ...current, generationModel: event.target.value }))} />
+                </label>
+              </div>
+              <div className="badge-row">
+                <button className="primary-button" disabled={postActionLoading} onClick={() => void executeSaveXSettings()} type="button">
+                  설정 저장
+                </button>
+              </div>
+            </section>
+
+            <section className="panel-card">
+              <div className="panel-card__header">
+                <h2>큐 목록</h2>
+                <span className="chip chip--soft">{filteredDrafts.length}개</span>
+              </div>
+              {filteredDrafts.length > 0 ? (
+                <div className="x-autopost-queue">
+                  {filteredDrafts.map((item) => (
+                    <button key={item.id} className={`auto-post-card ${selectedDraftId === item.id ? 'is-active' : ''}`} onClick={() => setSelectedDraftId(item.id)} type="button">
+                      <div className="auto-post-card__body">
+                        <div className="card-topline">
+                          <span className="chip chip--soft">{item.sourceLabel || item.sourceType}</span>
+                          <small>{formatDate(item.updatedAt)}</small>
+                        </div>
+                        <strong>{item.sourceTitle}</strong>
+                        <p>{compactText(item.generatedText || item.sourceSummary, 140)}</p>
+                        <div className="badge-row">
+                          <span className="chip chip--soft">{draftStatusLabel(item.status)}</span>
+                          <span className="chip chip--soft">novelty {item.noveltyScore.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  description="실시간 시그널에서 초안을 만들거나 현재 카테고리로 큐를 채우면 여기에 쌓입니다."
+                  action="지금 초안 만들기"
+                  onAction={() => void executeCreateDraftFromSignal()}
+                  title="X 게시 큐가 비어 있습니다"
+                />
+              )}
+            </section>
+          </div>
+
+          <div className="x-autopost-detail">
+            {actionMessage ? (
+              <div className="status-banner status-banner--info">
+                <Icon name="spark" size={16} />
+                <span>{actionMessage}</span>
+              </div>
+            ) : null}
+            {selectedDraft ? (
+              <>
+                <section className="panel-card">
+                  <div className="panel-card__header">
+                    <div>
+                      <h2>{selectedDraft.sourceTitle}</h2>
+                      <p className="settings-card__lead">{selectedDraft.sourceLabel} / {selectedDraft.category} / novelty {selectedDraft.noveltyScore.toFixed(2)}</p>
+                    </div>
+                    <div className="badge-row">
+                      <span className="chip chip--soft">{draftStatusLabel(selectedDraft.status)}</span>
+                      {selectedDraft.scheduledAt ? <span className="chip chip--soft">예약 {formatDate(selectedDraft.scheduledAt)}</span> : null}
+                      {selectedDraft.postedAt ? <span className="chip chip--soft">게시 {formatDate(selectedDraft.postedAt)}</span> : null}
+                    </div>
+                  </div>
+                  <div className="badge-row">
+                    {selectedDraft.status === 'draft' ? (
+                      <button className="primary-button" disabled={postActionLoading} onClick={() => void executeApproveDraft(selectedDraft.id)} type="button">
+                        승인
+                      </button>
+                    ) : null}
+                    {selectedDraft.status !== 'posted' && selectedDraft.status !== 'skipped' ? (
+                      <button className="ghost-button" disabled={postActionLoading} onClick={() => void executePublishDraft(selectedDraft.id)} type="button">
+                        지금 게시
+                      </button>
+                    ) : null}
+                    {selectedDraft.status !== 'posted' ? (
+                      <button className="ghost-button" disabled={postActionLoading} onClick={() => void executeRejectDraft(selectedDraft.id)} type="button">
+                        제외
+                      </button>
+                    ) : null}
+                    {selectedDraft.sourceUrl ? (
+                      <button className="ghost-button" onClick={() => window.open(selectedDraft.sourceUrl, '_blank', 'noopener,noreferrer')} type="button">
+                        원문 열기
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="summary-row summary-row--soft">
+                    <span>topic hash</span>
+                    <strong>{selectedDraft.topicHash.slice(0, 16)}…</strong>
+                  </div>
+                  {selectedDraft.errorReason ? (
+                    <div className="status-banner status-banner--warning">
+                      <Icon name="warning" size={16} />
+                      <span>{selectedDraft.errorReason}</span>
+                    </div>
+                  ) : null}
+                </section>
+
+                <section className="panel-card">
+                  <div className="panel-card__header">
+                    <h2>게시 초안</h2>
+                    <span className="chip chip--soft">{selectedDraft.generationModel}</span>
+                  </div>
+                  <pre className="x-autopost-preview">{selectedDraft.generatedText}</pre>
+                </section>
+
+                <section className="panel-card">
+                  <div className="panel-card__header">
+                    <h2>최근 로그</h2>
+                    <span className="chip chip--soft">{xAutopostLogs.length}개</span>
+                  </div>
+                  <div className="run-card__logs">
+                    {xAutopostLogs.slice(0, 16).map((log) => (
+                      <div key={log.id} className={`run-log run-log--${log.level === 'warning' ? 'error' : log.level}`}>
+                        <span>{formatDate(log.createdAt)}</span>
+                        <p>{log.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </>
+            ) : (
+              <EmptyState
+                description="왼쪽 큐에서 초안을 선택하면 생성문, 예약 상태, 게시 결과, 로그를 볼 수 있습니다."
+                title="초안을 선택해 주세요"
+              />
+            )}
+          </div>
+        </div>
       ) : (
         <div className="auto-posts-shell">
           <div className="auto-posts-side">

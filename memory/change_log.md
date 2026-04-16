@@ -1,5 +1,71 @@
 # Change Log
 
+## 2026-04-16
+
+### X autopost pipeline
+
+- Added a dedicated X autopost pipeline under `local-bridge/x-autopost/` instead of overloading the article auto-post flow.
+- Added persistent queue, state, settings, and log storage for X publishing workflows under the runtime `x-autopost/` workspace directory.
+- Added X autopost statuses:
+  - `draft`
+  - `approved`
+  - `scheduled`
+  - `posted`
+  - `failed`
+  - `skipped`
+- Added draft generation that reuses signal-like source items, prefers Codex-generated Korean copy, and falls back to a rules-based X post builder when needed.
+- Added draft metadata fields for:
+  - source url/title/summary
+  - topic hash
+  - novelty score
+  - generated text
+  - scheduled/post timestamps
+  - X post id
+  - retry info
+  - error and skip reasons
+- Added guardrails for:
+  - duplicate source urls
+  - duplicate topic hashes inside a cooldown window
+  - near-duplicate generated copy
+  - low novelty
+  - missing source urls when required
+  - too-short or too-generic posts
+  - banned certainty/clickbait phrases
+- Added an official X publisher adapter that targets `POST /2/tweets` and uses environment-variable credentials only.
+- Added publisher auth handling for:
+  - direct user access token
+  - refresh-token-based token renewal with client id and optional client secret
+  - disabled or missing-auth dry-run fallback
+- Added scheduler logic for:
+  - hourly and daily publish caps
+  - minimum interval spacing
+  - retry backoff
+  - persistent queue recovery after process restart
+- Wired the bridge with new APIs:
+  - `GET /api/x-autopost/state`
+  - `GET /api/x-autopost/queue`
+  - `POST /api/x-autopost/run`
+  - `PATCH /api/x-autopost/settings`
+  - `POST /api/x-autopost/:id/approve`
+  - `POST /api/x-autopost/:id/reject`
+  - `POST /api/x-autopost/:id/publish`
+- Added frontend bridge client helpers and shared types for the X autopost API surface.
+- Expanded `SignalsPage.tsx` with a new `X 자동 게시` operations tab that supports:
+  - queue refresh
+  - queue seeding from the current category
+  - mode/cap/model settings
+  - per-draft approve/reject/publish actions
+  - recent operator and publish logs
+- Added an Activity-page summary panel for recent X autopost counts and logs.
+- Added branch-local tests in `local-bridge/x-autopost/pipeline.test.mjs` for queue generation, dedupe, scheduler interval, dry-run fallback, and publish state transitions.
+- Added `/x-autopost/` to `.gitignore` so runtime queue output does not pollute commits, while keeping `local-bridge/x-autopost/` tracked.
+- Verified end to end on the branch-local bridge and preview servers that:
+  - a draft can be created,
+  - duplicate source urls are skipped,
+  - approval moves to scheduled on the next scheduler tick,
+  - publish-now records a dry-run post when X auth is not configured,
+  - Signals and Activity both show the new operating data in the UI.
+
 ## 2026-04-15
 
 ### Settings pane refactor and screenshot refresh
