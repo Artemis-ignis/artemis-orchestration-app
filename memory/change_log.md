@@ -66,6 +66,26 @@
   - publish-now records a dry-run post when X auth is not configured,
   - Signals and Activity both show the new operating data in the UI.
 
+### X autopost follow-up hardening
+
+- Changed approval handling so a newly approved draft is scheduled immediately instead of waiting for the next scheduler poll loop just to get a slot.
+- Updated queue-state bookkeeping so `nextPublishAt` is recalculated from the actual scheduled queue whenever:
+  - a draft is approved,
+  - scheduling runs,
+  - a publish succeeds,
+  - a publish is delayed or retried.
+- Added a publish-window guard to `publishDraftNow()` so operator-triggered `publish now` also respects:
+  - hourly cap
+  - daily cap
+  - minimum spacing interval
+- When the current publish window is full, `publish now` now:
+  - keeps the draft in the queue,
+  - moves it to `scheduled`,
+  - stores a human-readable reason with the next eligible slot instead of forcing an over-cap publish.
+- Added tests for:
+  - next-eligible publish-time calculation under the hourly cap
+  - manual publish being deferred into `scheduled` instead of publishing immediately when the cap is full.
+
 ## 2026-04-15
 
 ### Settings pane refactor and screenshot refresh

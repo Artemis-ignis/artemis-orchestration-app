@@ -41,6 +41,14 @@ function reserveFutureSlots(queue) {
     .sort((left, right) => left - right)
 }
 
+function collectScheduledTimes(queue) {
+  return queue
+    .filter((item) => item.status === 'scheduled')
+    .map((item) => Date.parse(item.scheduledAt || item.nextRetryAt || 0))
+    .filter(Number.isFinite)
+    .sort((left, right) => left - right)
+}
+
 export function computeScheduleForApprovedDrafts(queue, settings, now = Date.now()) {
   const minIntervalMs = settings.minIntervalMinutes * 60_000
   const reservedTimes = [
@@ -95,6 +103,26 @@ export function computeScheduleForApprovedDrafts(queue, settings, now = Date.now
   }
 
   return nextQueue
+}
+
+export function getNextEligiblePublishTime(queue, settings, targetDraftId, now = Date.now()) {
+  const probeId = '__x-autopost-probe__'
+  const baseQueue = queue
+    .filter((item) => item.id !== targetDraftId)
+    .map((item) => ({ ...item }))
+
+  baseQueue.push({
+    id: probeId,
+    status: 'approved',
+    approvedAt: new Date(now).toISOString(),
+    createdAt: new Date(now).toISOString(),
+    updatedAt: new Date(now).toISOString(),
+  })
+
+  const scheduledQueue = computeScheduleForApprovedDrafts(baseQueue, settings, now)
+  const probe = scheduledQueue.find((item) => item.id === probeId)
+  const slotTime = Date.parse(probe?.scheduledAt || 0)
+  return Number.isFinite(slotTime) ? slotTime : now
 }
 
 function computeMetrics(queue, publisherStatus) {
@@ -193,6 +221,14 @@ export function createXAutopostScheduler({ resolveWorkspaceRoot, collectSignalIt
       store.saveState(workspaceRoot, state, settings),
     ])
     return { queue: savedQueue, state: savedState }
+  }
+
+  function buildNextPublishState(queue, state) {
+    const scheduledTimes = collectScheduledTimes(queue)
+    return {
+      ...state,
+      nextPublishAt: scheduledTimes.length > 0 ? new Date(scheduledTimes[0]).toISOString() : null,
+    }
   }
 
   async function queueDrafts({ category = '전체', limit = 1, force = false, seedItems = [], reason = 'manual' } = {}) {
@@ -367,7 +403,29 @@ export function createXAutopostScheduler({ resolveWorkspaceRoot, collectSignalIt
     draft.errorReason = null
     await appendLog(workspaceRoot, createQueueLog('success', 'draft-approved', `${draft.sourceTitle} 초안을 승인했습니다.`, id), settings)
 
-    const saved = await saveQueueAndState(workspaceRoot, queue, state, settings)
+    const nextQueue = computeScheduleForApprovedDrafts(queue, settings)
+    const scheduledDraft = nextQueue.find((item) => item.id === id)
+
+    if (scheduledDraft?.status === 'scheduled' && scheduledDraft.scheduledAt) {
+      await appendLog(
+        workspaceRoot,
+        createQueueLog(
+          'info',
+          'draft-scheduled',
+          `${draft.sourceTitle} 초안의 다음 발행 슬롯을 배정했습니다.`,
+          id,
+          { scheduledAt: scheduledDraft.scheduledAt },
+        ),
+        settings,
+      )
+    }
+
+    const saved = await saveQueueAndState(
+      workspaceRoot,
+      nextQueue,
+      buildNextPublishState(nextQueue, state),
+      settings,
+    )
     return { ok: true, item: saved.queue.find((item) => item.id === id) ?? draft, state: saved.state }
   }
 
@@ -398,11 +456,11 @@ export function createXAutopostScheduler({ resolveWorkspaceRoot, collectSignalIt
     return { ok: true, item: saved.queue.find((item) => item.id === id) ?? draft, state: saved.state }
   }
 
-  async function publishDraftNow(id, { dryRun = false } = {}) {
+  async function publishDraftNow(id, { dryRun = false, now = Date.now(), queueOverride = null } = {}) {
     const workspaceRoot = await getWorkspaceRoot()
     const settings = await store.getSettings(workspaceRoot)
     const state = await store.getState(workspaceRoot, settings)
-    const queue = await store.getQueue(workspaceRoot, settings)
+    const queue = queueOverride ?? (await store.getQueue(workspaceRoot, settings))
     const draft = queue.find((item) => item.id === id)
 
     if (!draft) {
@@ -410,6 +468,40 @@ export function createXAutopostScheduler({ resolveWorkspaceRoot, collectSignalIt
     }
     if (draft.status === 'posted') {
       return { ok: true, item: draft, state }
+    }
+
+    const nextEligibleTime = getNextEligiblePublishTime(queue, settings, id, now)
+    if (!dryRun && settings.mode !== 'dry-run' && nextEligibleTime > now) {
+      draft.status = 'scheduled'
+      draft.scheduledAt = new Date(nextEligibleTime).toISOString()
+      draft.nextRetryAt = null
+      draft.updatedAt = new Date(now).toISOString()
+      draft.errorReason = `현재 발행 한도를 넘겨 즉시 게시하지 않았습니다. 다음 슬롯은 ${draft.scheduledAt} 입니다.`
+
+      await appendLog(
+        workspaceRoot,
+        createQueueLog(
+          'warning',
+          'publish-delayed',
+          `${draft.sourceTitle} 게시를 한도 때문에 예약으로 돌렸습니다.`,
+          id,
+          { scheduledAt: draft.scheduledAt },
+        ),
+        settings,
+      )
+
+      const nextState = buildNextPublishState(queue, {
+        ...state,
+        lastPublishAttemptAt: new Date(now).toISOString(),
+        lastError: draft.errorReason,
+      })
+      const saved = await saveQueueAndState(workspaceRoot, queue, nextState, settings)
+      return {
+        ok: true,
+        item: saved.queue.find((item) => item.id === id) ?? draft,
+        state: saved.state,
+        detail: draft.errorReason,
+      }
     }
 
     draft.attempts = Number(draft.attempts ?? 0) + 1
@@ -441,18 +533,23 @@ export function createXAutopostScheduler({ resolveWorkspaceRoot, collectSignalIt
       const saved = await saveQueueAndState(
         workspaceRoot,
         queue,
-        {
+        buildNextPublishState(queue, {
           ...state,
           lastPublishAttemptAt: draft.lastAttemptAt,
           lastPostedAt: draft.postedAt,
-          nextPublishAt: null,
           lastError: '',
           postedDraftIds: [...(state.postedDraftIds ?? []), id].slice(-300),
-        },
+        }),
         settings,
       )
 
-      return { ok: true, item: saved.queue.find((item) => item.id === id) ?? draft, state: saved.state, simulated: result.simulated }
+      return {
+        ok: true,
+        item: saved.queue.find((item) => item.id === id) ?? draft,
+        state: saved.state,
+        simulated: result.simulated,
+        detail: result.detail ?? null,
+      }
     }
 
     const retryCount = Number(draft.retryCount ?? 0) + 1
@@ -479,7 +576,11 @@ export function createXAutopostScheduler({ resolveWorkspaceRoot, collectSignalIt
     const saved = await saveQueueAndState(
       workspaceRoot,
       queue,
-      { ...state, lastPublishAttemptAt: draft.lastAttemptAt, nextPublishAt: retryAt, lastError: draft.errorReason },
+      buildNextPublishState(queue, {
+        ...state,
+        lastPublishAttemptAt: draft.lastAttemptAt,
+        lastError: draft.errorReason,
+      }),
       settings,
     )
 
@@ -519,16 +620,10 @@ export function createXAutopostScheduler({ resolveWorkspaceRoot, collectSignalIt
           const queueWithScheduled = computeScheduleForApprovedDrafts(queue, settings)
           const changed = queueWithScheduled.some((item, index) => item !== queue[index])
           if (changed) {
-            const scheduledTimes = queueWithScheduled
-              .filter((item) => item.status === 'scheduled')
-              .map((item) => Date.parse(item.scheduledAt || 0))
-              .filter(Number.isFinite)
-              .sort((left, right) => left - right)
-
             await saveQueueAndState(
               workspaceRoot,
               queueWithScheduled,
-              { ...(await store.getState(workspaceRoot, settings)), nextPublishAt: scheduledTimes.length > 0 ? new Date(scheduledTimes[0]).toISOString() : null },
+              buildNextPublishState(queueWithScheduled, await store.getState(workspaceRoot, settings)),
               settings,
             )
           }

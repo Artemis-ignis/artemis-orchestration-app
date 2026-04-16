@@ -131,6 +131,7 @@ export type XAutopostDraftActionResponse = {
   item: XAutopostDraft
   state: XAutopostState
   simulated?: boolean
+  detail?: string | null
   error?: {
     status?: number
     message?: string

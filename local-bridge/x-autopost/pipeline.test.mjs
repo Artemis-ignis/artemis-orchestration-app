@@ -4,7 +4,11 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { buildTopicHash, calculateNoveltyScore, jaccardSimilarity, validateDraftCandidate } from './guardrails.mjs'
-import { computeScheduleForApprovedDrafts, createXAutopostScheduler } from './scheduler.mjs'
+import {
+  computeScheduleForApprovedDrafts,
+  createXAutopostScheduler,
+  getNextEligiblePublishTime,
+} from './scheduler.mjs'
 
 function makeSignal(overrides = {}) {
   return {
@@ -144,6 +148,28 @@ test('스케줄 계산은 최소 간격을 반영한다', () => {
   assert.equal(scheduled?.scheduledAt, '2026-04-16T00:04:00.000Z')
 })
 
+test('다음 발행 가능 시각 계산은 시간당 cap을 넘기면 다음 시간대로 민다', () => {
+  const now = Date.parse('2026-04-16T00:30:00.000Z')
+  const queue = Array.from({ length: 10 }, (_, index) => ({
+    id: `posted-${index}`,
+    status: 'posted',
+    postedAt: new Date(Date.parse('2026-04-16T00:00:00.000Z') + index * 60_000).toISOString(),
+  }))
+
+  const nextEligible = getNextEligiblePublishTime(
+    queue,
+    {
+      minIntervalMinutes: 6,
+      maxPerHour: 10,
+      maxPerDay: 120,
+    },
+    'draft-a',
+    now,
+  )
+
+  assert.equal(new Date(nextEligible).toISOString(), '2026-04-16T01:00:00.000Z')
+})
+
 test('dry-run에서 draft가 생성되고 approval에서 approve -> scheduled -> posted로 이어진다', async (t) => {
   process.env.AUTOPOST_MODE = 'approval'
   process.env.X_API_ENABLED = 'false'
@@ -154,16 +180,48 @@ test('dry-run에서 draft가 생성되고 approval에서 approve -> scheduled ->
   assert.equal(queued.items[0].status, 'draft')
 
   const approved = await scheduler.approveDraft(queued.items[0].id)
-  assert.equal(approved.item.status, 'approved')
-
-  const afterSchedule = await scheduler.tick('test-schedule')
-  const scheduled = afterSchedule.queue.find((item) => item.id === queued.items[0].id)
-  assert.equal(scheduled?.status, 'scheduled')
+  assert.equal(approved.item.status, 'scheduled')
+  assert.ok(approved.item.scheduledAt)
 
   const publishResult = await scheduler.publishDraftNow(queued.items[0].id)
   assert.equal(publishResult.ok, true)
   assert.equal(publishResult.item.status, 'posted')
   assert.match(String(publishResult.item.xPostId), /^dryrun-/)
+})
+
+test('지금 게시는 cap을 넘기면 즉시 게시하지 않고 예약으로 돌린다', async (t) => {
+  process.env.AUTOPOST_MODE = 'approval'
+  process.env.X_API_ENABLED = 'true'
+  process.env.X_ACCESS_TOKEN = 'token-present'
+
+  const now = Date.parse('2026-04-16T00:30:00.000Z')
+  const { scheduler } = await createScheduler(t, {
+    fetchWithTimeout: async () => {
+      throw new Error('publish should not run while capped')
+    },
+  })
+
+  const queued = await scheduler.runNow({ limit: 1, reason: 'manual-cap-test' })
+  const status = await scheduler.getStatus()
+  const queueWithCap = [
+    ...Array.from({ length: 10 }, (_, index) => ({
+      id: `posted-${index}`,
+      status: 'posted',
+      postedAt: new Date(Date.parse('2026-04-16T00:00:00.000Z') + index * 60_000).toISOString(),
+    })),
+    ...status.queue,
+  ]
+
+  const publishResult = await scheduler.publishDraftNow(queued.items[0].id, {
+    dryRun: false,
+    now,
+    queueOverride: queueWithCap,
+  })
+
+  assert.equal(publishResult.ok, true)
+  assert.equal(publishResult.item.status, 'scheduled')
+  assert.equal(publishResult.item.scheduledAt, '2026-04-16T01:00:00.000Z')
+  assert.match(String(publishResult.detail), /다음 슬롯/)
 })
 
 test('인증이 없으면 publisher 상태는 disabled/미준비로 내려간다', async (t) => {

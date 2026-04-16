@@ -40,6 +40,14 @@
   - the same source url is skipped on the next run,
   - `draft -> approved -> scheduled -> posted` transitions work,
   - missing X auth stays visible as `publisher disabled` while `publish now` falls back to dry-run and still records a simulated post id.
+- Approval no longer waits for the next scheduler poll just to get a publish slot:
+  - approving a draft now assigns the next valid slot immediately,
+  - the queue state updates to `scheduled` right away,
+  - `nextPublishAt` is refreshed without waiting for the next background tick.
+- Manual `publish now` now also respects the hourly and daily caps when not in dry-run:
+  - if the current window is full, the draft is not pushed immediately,
+  - it is moved back to `scheduled`,
+  - the operator gets the next allowed slot instead of silently exceeding the cap.
 - Signals now has a dedicated `X 자동 게시` operator tab that shows:
   - mode
   - hourly and daily caps
@@ -100,7 +108,6 @@
 ## Next Checks
 
 - Re-run the X autopost flow once real X user-context tokens are available so the branch can confirm a real `POST /2/tweets` success instead of dry-run fallback.
-- Decide whether approval mode should expose a manual `schedule now` operator action instead of waiting for the scheduler poll window.
 - Watch the text-generation path for repeated sentence openings once more real queue volume accumulates.
 - Decide whether skipped items should stay in the visible queue forever or be trimmed into a separate audit log after a retention window.
 - Keep orchestration labels readable without truncation.

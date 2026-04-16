@@ -635,7 +635,11 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     setActionMessage(null)
     try {
       const response = await approveXAutopostDraft(bridgeUrl, draftId)
-      setActionMessage('초안을 승인했습니다. 스케줄러가 다음 슬롯을 배정합니다.')
+      setActionMessage(
+        response.item.scheduledAt
+          ? `초안을 승인했고 다음 발행 슬롯을 배정했습니다: ${formatDate(response.item.scheduledAt)}`
+          : '초안을 승인했습니다.',
+      )
       await loadXAutopost({ focusDraftId: response.item.id })
     } catch (nextError) {
       setActionMessage(nextError instanceof Error ? nextError.message : '초안 승인에 실패했습니다.')
@@ -668,7 +672,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
         !xPublisherStatus.ready || xAutopostSettings.mode === 'dry-run',
       )
       setActionMessage(
-        response.simulated
+        response.item.status === 'scheduled' && response.detail
+          ? response.detail
+          : response.simulated
           ? '실제 인증이 없어 dry-run으로 게시 시뮬레이션을 완료했습니다.'
           : '공식 X API로 게시를 완료했습니다.',
       )
