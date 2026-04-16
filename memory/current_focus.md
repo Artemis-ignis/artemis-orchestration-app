@@ -9,6 +9,9 @@
 
 ## Current Goals
 
+- Turn the publishing stack into a source-agnostic publisher where internal publishing is the default output and X is only an optional cross-post target.
+- Keep source ingestion based on official APIs, RSS, Atom, and configured feeds instead of arbitrary HTML scraping.
+- Keep the queue, scheduling, and approval flow stable even when X credentials are missing.
 - Keep the official API flow simple: connect provider, save one model, run it directly.
 - Keep settings understandable: local runtimes first, official providers second.
 - Keep the settings models/runtime pane split into maintainable sections instead of one giant file.
@@ -18,6 +21,74 @@
 
 ## Latest Confirmed State
 
+- `feat/source-agnostic-publisher` now generalizes the older X autopost branch into a content-ingest and internal-publishing pipeline instead of an X-first pipeline.
+- The bridge now exposes source-agnostic publisher APIs:
+  - `GET /api/publisher/state`
+  - `GET /api/publisher/queue`
+  - `POST /api/publisher/run`
+  - `PATCH /api/publisher/settings`
+  - `POST /api/publisher/:id/approve`
+  - `POST /api/publisher/:id/reject`
+  - `POST /api/publisher/:id/publish`
+- New provider modules under `local-bridge/publisher/` now fetch and normalize items from:
+  - arXiv
+  - Crossref
+  - Semantic Scholar
+  - News API
+  - configured RSS/Atom feeds
+  - the legacy signal collector as a compatibility source
+- Normalized content items now keep:
+  - `sourceType`
+  - `provider`
+  - canonical/source URLs
+  - title/subtitle
+  - authors
+  - publish time
+  - abstract/snippet
+  - language
+  - DOI/arXiv id
+  - tags
+  - score/topic hash
+  - raw metadata
+- The publisher queue now uses statuses:
+  - `draft`
+  - `approved`
+  - `scheduled`
+  - `published`
+  - `failed`
+  - `skipped`
+  - `disabled`
+- Queue items now store:
+  - source metadata
+  - generated Korean post text
+  - summary type
+  - novelty score
+  - scheduled/published timestamps
+  - publish target/result
+  - skip reason
+  - error reason
+- Dedupe and quality gates now block:
+  - duplicate canonical URLs
+  - duplicate DOI values
+  - duplicate arXiv ids
+  - near-duplicate titles
+  - repeated recent topic hashes
+  - low-novelty topics
+  - too-short or too-generic generated drafts
+- Internal publishing is now the default path and writes published entries into the local runtime feed state.
+- Optional X cross-posting remains available through the publisher abstraction, but it stays disabled by default and does not break the queue when credentials are absent.
+- Signals now includes a source-agnostic publishing operations panel that shows:
+  - active sources
+  - provider fetch counts
+  - queue filters
+  - published history
+  - approve/reject/publish-now actions
+  - recent logs
+- Activity now shows internal publishing health, provider counts, and recent publish failures without assuming X is the primary target.
+- Manual API verification confirmed:
+  - `ingest -> draft -> approve -> scheduled -> published` works for internal publishing,
+  - X-disabled mode still keeps the queue running,
+  - provider stats and published history update in `GET /api/publisher/state`.
 - `feat/x-autopost-pipeline` worktree now has a dedicated X autopost pipeline that is separate from the premium UI shell branch and does not mix in the older dirty bridge changes.
 - The bridge exposes `/api/x-autopost/state`, `/queue`, `/run`, `/settings`, `/:id/approve`, `/:id/reject`, and `/:id/publish`.
 - X autopost queue items now persist under `x-autopost/` with statuses:
@@ -107,6 +178,9 @@
 
 ## Next Checks
 
+- Decide whether the internal published feed should later get its own dedicated page or remain embedded inside Signals and Activity.
+- Add a retention or archive policy for old skipped and failed drafts if the queue grows too large over time.
+- Decide later whether provider-specific ranking weights should become editable in the UI instead of env/settings only.
 - Re-run the X autopost flow once real X user-context tokens are available so the branch can confirm a real `POST /2/tweets` success instead of dry-run fallback.
 - Watch the text-generation path for repeated sentence openings once more real queue volume accumulates.
 - Decide whether skipped items should stay in the visible queue forever or be trimmed into a separate audit log after a retention window.

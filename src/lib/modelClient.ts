@@ -17,6 +17,11 @@ import type {
   XAutopostRunResponse,
   XAutopostStateResponse,
 } from '../types/xAutopost'
+import type {
+  PublisherDraftActionResponse,
+  PublisherRunResponse,
+  PublisherStateResponse,
+} from '../types/publisher'
 
 export type ProviderStatus = {
   provider: 'ollama' | 'codex'
@@ -308,6 +313,109 @@ export async function revealAutoPostFolder({
 export async function fetchXAutopostState(bridgeUrl: string) {
   const response = await fetchWithTimeout(`${bridgeUrl}/api/x-autopost/state`, undefined, 20_000)
   return readJson<XAutopostStateResponse>(response)
+}
+
+export async function fetchPublisherState(bridgeUrl: string) {
+  const response = await fetchWithTimeout(`${bridgeUrl}/api/publisher/state`, undefined, 20_000)
+  return readJson<PublisherStateResponse>(response)
+}
+
+export async function fetchPublisherQueue(bridgeUrl: string) {
+  const response = await fetchWithTimeout(`${bridgeUrl}/api/publisher/queue`, undefined, 30_000)
+  return readJson<PublisherStateResponse>(response)
+}
+
+export async function runPublisher({
+  bridgeUrl,
+  limit,
+  force = false,
+  reason,
+  seedItems = [],
+}: {
+  bridgeUrl: string
+  limit?: number
+  force?: boolean
+  reason?: string
+  seedItems?: unknown[]
+}) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/publisher/run`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ limit, force, reason, seedItems }),
+    },
+    120_000,
+  )
+  return readJson<PublisherRunResponse>(response)
+}
+
+export async function updatePublisherSettings({
+  bridgeUrl,
+  patch,
+}: {
+  bridgeUrl: string
+  patch: Record<string, unknown>
+}) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/publisher/settings`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify(patch),
+    },
+    30_000,
+  )
+  return readJson<PublisherStateResponse>(response)
+}
+
+export async function approvePublisherDraft(bridgeUrl: string, draftId: string) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/publisher/${encodeURIComponent(draftId)}/approve`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({}),
+    },
+    20_000,
+  )
+  return readJson<PublisherDraftActionResponse>(response)
+}
+
+export async function rejectPublisherDraft(bridgeUrl: string, draftId: string, reason = 'operator_rejected') {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/publisher/${encodeURIComponent(draftId)}/reject`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ reason }),
+    },
+    20_000,
+  )
+  return readJson<PublisherDraftActionResponse>(response)
+}
+
+export async function publishPublisherDraftNow(bridgeUrl: string, draftId: string, dryRun = false) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/publisher/${encodeURIComponent(draftId)}/publish`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ dryRun }),
+    },
+    30_000,
+  )
+  return readJson<PublisherDraftActionResponse>(response)
 }
 
 export async function fetchXAutopostQueue(bridgeUrl: string) {

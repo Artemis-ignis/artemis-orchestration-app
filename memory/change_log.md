@@ -2,6 +2,71 @@
 
 ## 2026-04-16
 
+### Source-agnostic publisher
+
+- Generalized the older X-centric autopost workflow into a source-agnostic publishing pipeline under `local-bridge/publisher/`.
+- Added provider-based ingestion modules for:
+  - arXiv
+  - Crossref
+  - Semantic Scholar
+  - News API
+  - configured RSS/Atom feeds
+  - legacy signal collection as a compatibility input
+- Added a normalized content schema that keeps:
+  - source type/provider
+  - canonical/source URLs
+  - title/subtitle
+  - authors
+  - publish timestamps
+  - abstract/snippet
+  - DOI/arXiv ids
+  - tags
+  - raw metadata
+- Added source-agnostic draft generation for internal website publishing with Korean summary types:
+  - `breaking`
+  - `brief-points`
+  - `paper-intro`
+- Added generic dedupe and quality gates for:
+  - canonical URL duplicates
+  - DOI duplicates
+  - arXiv duplicates
+  - near-title duplicates
+  - recent topic-hash reuse
+  - low novelty
+  - too-short or too-generic generated drafts
+- Added a publisher abstraction with:
+  - `internalPublisher`
+  - optional `xPublisher`
+- Kept internal publishing enabled by default and X publishing disabled by default unless credentials are configured.
+- Added persistent runtime storage for the generic publisher:
+  - queue
+  - state
+  - settings
+  - logs
+  - published history
+- Added bridge APIs for source-agnostic publishing:
+  - `GET /api/publisher/state`
+  - `GET /api/publisher/queue`
+  - `POST /api/publisher/run`
+  - `PATCH /api/publisher/settings`
+  - `POST /api/publisher/:id/approve`
+  - `POST /api/publisher/:id/reject`
+  - `POST /api/publisher/:id/publish`
+- Expanded `SignalsPage.tsx` so the operations panel now manages source-agnostic publishing instead of assuming X is the only target.
+- Expanded `ActivityPage.tsx` so the recent publish summary reflects internal publishing metrics and optional publisher status.
+- Added `src/types/publisher.ts` plus new bridge client helpers in `src/lib/modelClient.ts`.
+- Added `local-bridge/publisher/pipeline.test.mjs` to cover:
+  - provider normalization
+  - DOI/arXiv/url dedupe
+  - title similarity dedupe
+  - novelty gating
+  - approval to scheduled transitions
+  - cap overflow redirecting `publish now` back to `scheduled`
+  - internal publish success
+  - X-disabled fallback
+  - restart recovery
+- Added `/publisher/` to `.gitignore` so runtime queue and published feed files do not pollute commits.
+
 ### X autopost pipeline
 
 - Added a dedicated X autopost pipeline under `local-bridge/x-autopost/` instead of overloading the article auto-post flow.

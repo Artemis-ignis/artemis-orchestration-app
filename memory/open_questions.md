@@ -8,6 +8,9 @@
 
 ## Still Unresolved
 
+- Decide whether the internal published feed should eventually move into its own dedicated route or stay embedded in Signals and Activity.
+- Decide whether provider-level ranking weights and source caps should remain env/settings driven or become operator-editable in the UI.
+- Decide whether old published entries should later be exported to static article pages or remain feed records only.
 - Confirm one real X user-context publish on this branch once live credentials are available.
 - Decide whether approval mode should keep scheduler-only slot assignment or expose a manual `schedule now` operator action too.
 - Decide whether skipped queue items should remain in the main queue list or move into a separate audit history after a retention period.

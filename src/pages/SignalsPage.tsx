@@ -13,22 +13,22 @@ import {
 } from '../crewPageHelpers'
 import { Icon } from '../icons'
 import {
-  approveXAutopostDraft,
+  approvePublisherDraft,
   exportAutoPost,
   fetchAutoPostDetail,
   fetchAutoPostState,
   fetchAutoPosts,
+  fetchPublisherState,
   fetchSignalsFeed,
-  fetchXAutopostState,
-  publishXAutopostDraftNow,
-  rejectXAutopostDraft,
+  publishPublisherDraftNow,
+  rejectPublisherDraft,
   regenerateAutoPost,
   revealAutoPostFolder,
+  runPublisher,
   runAutoPosts,
-  runXAutopost,
   type SignalFeedItem,
-  updateXAutopostSettings,
   updateAutoPostSettings,
+  updatePublisherSettings,
 } from '../lib/modelClient'
 import { useArtemisApp } from '../state/context'
 import type {
@@ -38,13 +38,14 @@ import type {
   SchedulerState,
 } from '../types/autoPosts'
 import type {
-  XAutopostDraft,
-  XAutopostSettings,
-  XAutopostState,
-  XAutopostLog,
-  XAutopostPublisherStatus,
-  XAutopostMetrics,
-} from '../types/xAutopost'
+  PublisherDraft,
+  PublisherSettings,
+  PublisherState,
+  PublisherLog,
+  PublisherRuntimeStatus,
+  PublisherMetrics,
+  PublishedPost,
+} from '../types/publisher'
 
 type SignalsTab = 'feed' | 'posts' | 'publisher'
 
@@ -107,9 +108,11 @@ function defaultSchedulerState(): SchedulerState {
   }
 }
 
-function defaultXAutopostSettings(): XAutopostSettings {
+function defaultXAutopostSettings(): PublisherSettings {
   return {
     mode: 'approval',
+    publishInternalEnabled: true,
+    publishXEnabled: false,
     maxPerHour: 10,
     minIntervalMinutes: 6,
     maxPerDay: 120,
@@ -117,7 +120,7 @@ function defaultXAutopostSettings(): XAutopostSettings {
     requireUniqueTopic: true,
     minNoveltyScore: 0.72,
     blockNearDuplicates: true,
-    outputDir: 'x-autopost',
+    outputDir: 'publisher',
     generationModel: 'gpt-5.4-mini',
     startupDelayMs: 15_000,
     schedulerPollMs: 60_000,
@@ -125,44 +128,57 @@ function defaultXAutopostSettings(): XAutopostSettings {
     retryLimit: 3,
     retryBackoffMinutes: 12,
     maxQueueItems: 400,
+    ingestArxivEnabled: true,
+    ingestCrossrefEnabled: true,
+    ingestSemanticScholarEnabled: true,
+    ingestNewsApiEnabled: false,
+    newsApiKey: '',
+    ingestRssEnabled: false,
+    rssFeeds: [],
+    ingestLegacySignalsEnabled: true,
+    ingestQuery: 'artificial intelligence large language model agent multimodal open source research',
+    defaultQueueLimit: 3,
   }
 }
 
-function defaultXAutopostState(): XAutopostState {
+function defaultXAutopostState(): PublisherState {
   return {
-    lastDraftRunAt: null,
+    lastIngestRunAt: null,
     lastPublishAttemptAt: null,
-    lastPostedAt: null,
-    nextGenerationAt: null,
+    lastPublishedAt: null,
+    nextIngestAt: null,
     nextPublishAt: null,
     inProgress: false,
     lastError: '',
     lastDraftId: null,
-    postedDraftIds: [],
+    publishedDraftIds: [],
     skippedDraftIds: [],
+    providerStats: [],
     updatedAt: new Date().toISOString(),
   }
 }
 
-function defaultXAutopostPublisher(): XAutopostPublisherStatus {
+function defaultXAutopostPublisher(): PublisherRuntimeStatus {
   return {
+    target: 'internal',
     enabled: false,
     configured: false,
     ready: false,
-    detail: 'X publisher 상태를 확인하지 못했습니다.',
+    detail: '내부 게시기 상태를 확인하지 못했습니다.',
   }
 }
 
-function defaultXAutopostMetrics(): XAutopostMetrics {
+function defaultXAutopostMetrics(): PublisherMetrics {
   return {
     draftCount: 0,
     approvedCount: 0,
     scheduledCount: 0,
-    postedCount24h: 0,
-    postedCount1h: 0,
+    publishedCount24h: 0,
+    publishedCount1h: 0,
     failedCount: 0,
-    publisher: defaultXAutopostPublisher(),
+    providerCounts24h: [],
     recentFailures: [],
+    publishers: [],
   }
 }
 
@@ -177,14 +193,16 @@ function postStatusLabel(status: GeneratedPost['status']) {
   }
 }
 
-function draftStatusLabel(status: XAutopostDraft['status']) {
+function draftStatusLabel(status: PublisherDraft['status']) {
   switch (status) {
     case 'approved':
       return '승인됨'
     case 'scheduled':
       return '예약됨'
-    case 'posted':
+    case 'published':
       return '게시됨'
+    case 'disabled':
+      return '비활성'
     case 'failed':
       return '실패'
     case 'skipped':
@@ -218,14 +236,18 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
   const [schedulerState, setSchedulerState] = useState<SchedulerState>(defaultSchedulerState)
   const [autoPostSettings, setAutoPostSettings] = useState<AutoPostSettings>(defaultAutoPostSettings)
   const [settingsDraft, setSettingsDraft] = useState<AutoPostSettings>(defaultAutoPostSettings)
-  const [xQueue, setXQueue] = useState<XAutopostDraft[]>([])
+  const [xQueue, setXQueue] = useState<PublisherDraft[]>([])
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
-  const [xAutopostSettings, setXAutopostSettings] = useState<XAutopostSettings>(defaultXAutopostSettings)
-  const [xSettingsDraft, setXSettingsDraft] = useState<XAutopostSettings>(defaultXAutopostSettings)
-  const [xAutopostState, setXAutopostState] = useState<XAutopostState>(defaultXAutopostState)
-  const [xAutopostLogs, setXAutopostLogs] = useState<XAutopostLog[]>([])
-  const [xAutopostMetrics, setXAutopostMetrics] = useState<XAutopostMetrics>(defaultXAutopostMetrics)
-  const [xPublisherStatus, setXPublisherStatus] = useState<XAutopostPublisherStatus>(defaultXAutopostPublisher)
+  const [xAutopostSettings, setXAutopostSettings] = useState<PublisherSettings>(defaultXAutopostSettings)
+  const [xSettingsDraft, setXSettingsDraft] = useState<PublisherSettings>(defaultXAutopostSettings)
+  const [xAutopostState, setXAutopostState] = useState<PublisherState>(defaultXAutopostState)
+  const [xAutopostLogs, setXAutopostLogs] = useState<PublisherLog[]>([])
+  const [xAutopostMetrics, setXAutopostMetrics] = useState<PublisherMetrics>(defaultXAutopostMetrics)
+  const [xPublisherStatus, setXPublisherStatus] = useState<PublisherRuntimeStatus>(defaultXAutopostPublisher)
+  const [publishedItems, setPublishedItems] = useState<PublishedPost[]>([])
+  const [selectedPublishedId, setSelectedPublishedId] = useState<string | null>(null)
+  const [publisherProviderFilter, setPublisherProviderFilter] = useState('all')
+  const [publisherStatusFilter, setPublisherStatusFilter] = useState('all')
 
   const loadFeed = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -315,20 +337,25 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       }
 
       try {
-        const response = await fetchXAutopostState(bridgeUrl)
+        const response = await fetchPublisherState(bridgeUrl)
         setXQueue(response.queue)
         setXAutopostSettings(response.settings)
         setXSettingsDraft(response.settings)
         setXAutopostState(response.state)
         setXAutopostLogs(response.logs)
         setXAutopostMetrics(response.metrics)
-        setXPublisherStatus(response.publisher)
+        setPublishedItems(response.published)
+        setXPublisherStatus(
+          response.publishers.find((item) => item.target === 'internal') ??
+            response.publishers[0] ??
+            defaultXAutopostPublisher(),
+        )
 
         const nextSelectedId = focusDraftId ?? selectedDraftId ?? response.queue[0]?.id ?? null
         setSelectedDraftId(nextSelectedId)
       } catch (nextError) {
         if (!silent) {
-          setActionMessage(nextError instanceof Error ? nextError.message : 'X 자동 게시 상태를 불러오지 못했습니다.')
+          setActionMessage(nextError instanceof Error ? nextError.message : '게시 엔진 상태를 불러오지 못했습니다.')
         }
       } finally {
         if (!silent) {
@@ -427,21 +454,94 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     null
   const filteredDrafts = useMemo(() => {
     const keyword = deferredQuery.trim().toLowerCase()
-    if (!keyword) {
-      return xQueue
+    return xQueue.filter((item) => {
+      if (publisherProviderFilter !== 'all' && item.provider !== publisherProviderFilter) {
+        return false
+      }
+      if (publisherStatusFilter !== 'all' && item.status !== publisherStatusFilter) {
+        return false
+      }
+      if (!keyword) {
+        return true
+      }
+
+      return `${item.sourceTitle} ${item.generatedText} ${item.sourceLabel} ${item.category}`
+        .toLowerCase()
+        .includes(keyword)
+    })
+  }, [deferredQuery, publisherProviderFilter, publisherStatusFilter, xQueue])
+
+  const filteredPublishedItems = useMemo(() => {
+    const keyword = deferredQuery.trim().toLowerCase()
+    return publishedItems.filter((item) => {
+      if (publisherProviderFilter !== 'all' && item.provider !== publisherProviderFilter) {
+        return false
+      }
+      if (!keyword) {
+        return true
+      }
+      return `${item.title} ${item.excerpt} ${item.provider} ${item.category ?? ''}`.toLowerCase().includes(keyword)
+    })
+  }, [deferredQuery, publishedItems, publisherProviderFilter])
+
+  const publisherStatuses = useMemo(() => {
+    if (xAutopostMetrics.publishers.length > 0) {
+      return xAutopostMetrics.publishers
     }
 
-    return xQueue.filter((item) =>
-      `${item.sourceTitle} ${item.generatedText} ${item.sourceLabel} ${item.category}`
-        .toLowerCase()
-        .includes(keyword),
-    )
-  }, [deferredQuery, xQueue])
+    return [xPublisherStatus]
+  }, [xAutopostMetrics.publishers, xPublisherStatus])
+
+  const internalPublisherStatus =
+    publisherStatuses.find((item) => item.target === 'internal') ??
+    xPublisherStatus
+
+  const xCrossPostStatus =
+    publisherStatuses.find((item) => item.target === 'x') ??
+    null
+
+  const providerOptions = useMemo(() => {
+    const next = new Map<string, string>()
+
+    for (const stat of xAutopostState.providerStats) {
+      next.set(stat.provider, stat.label || stat.provider)
+    }
+
+    for (const item of xQueue) {
+      if (!next.has(item.provider)) {
+        next.set(item.provider, item.sourceLabel || item.provider)
+      }
+    }
+
+    for (const item of publishedItems) {
+      if (!next.has(item.provider)) {
+        next.set(item.provider, item.sourceLabel || item.provider)
+      }
+    }
+
+    return Array.from(next.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((left, right) => left.label.localeCompare(right.label, 'ko'))
+  }, [publishedItems, xAutopostState.providerStats, xQueue])
 
   const selectedDraft =
     filteredDrafts.find((item) => item.id === selectedDraftId) ??
     xQueue.find((item) => item.id === selectedDraftId) ??
     null
+
+  const selectedPublished =
+    filteredPublishedItems.find((item) => item.id === selectedPublishedId) ??
+    publishedItems.find((item) => item.id === selectedPublishedId) ??
+    null
+
+  const selectedDraftLogs = useMemo(() => {
+    if (!selectedDraft) {
+      return xAutopostLogs.slice(0, 16)
+    }
+
+    const scoped = xAutopostLogs.filter((item) => item.draftId === selectedDraft.id)
+    return (scoped.length > 0 ? scoped : xAutopostLogs).slice(0, 16)
+  }, [selectedDraft, xAutopostLogs])
 
   useEffect(() => {
     if (!selectedDraftId && filteredDrafts[0]) {
@@ -453,6 +553,21 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       setSelectedDraftId(filteredDrafts[0]?.id ?? null)
     }
   }, [filteredDrafts, selectedDraftId, xQueue])
+
+  useEffect(() => {
+    if (selectedDraftId) {
+      return
+    }
+
+    if (!selectedPublishedId && filteredPublishedItems[0]) {
+      setSelectedPublishedId(filteredPublishedItems[0].id)
+      return
+    }
+
+    if (selectedPublishedId && !publishedItems.some((item) => item.id === selectedPublishedId)) {
+      setSelectedPublishedId(filteredPublishedItems[0]?.id ?? null)
+    }
+  }, [filteredPublishedItems, publishedItems, selectedDraftId, selectedPublishedId])
 
   const executeRunNow = async () => {
     setPostActionLoading(true)
@@ -582,9 +697,8 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     setActionMessage(null)
 
     try {
-      const response = await runXAutopost({
+      const response = await runPublisher({
         bridgeUrl,
-        category,
         limit: seedItem ? 1 : 2,
         force: false,
         seedItems: seedItem ? [seedItem] : [],
@@ -592,7 +706,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       })
       setActionMessage(
         response.createdCount > 0
-          ? `${response.createdCount}개의 X 게시 초안을 큐에 추가했습니다.`
+          ? `${response.createdCount}개의 내부 게시 초안을 큐에 추가했습니다.`
           : response.skippedCount > 0
             ? `${response.skippedCount}개의 후보가 guardrail에 걸려 건너뛰었습니다.`
             : '새로 큐에 넣을 초안이 없었습니다.',
@@ -600,7 +714,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       await loadXAutopost({ focusDraftId: response.items[0]?.id ?? selectedDraftId ?? null })
       setActiveTab('publisher')
     } catch (nextError) {
-      setActionMessage(nextError instanceof Error ? nextError.message : 'X 게시 초안 생성에 실패했습니다.')
+      setActionMessage(nextError instanceof Error ? nextError.message : '게시 초안 생성에 실패했습니다.')
     } finally {
       setPostActionLoading(false)
     }
@@ -611,7 +725,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     setActionMessage(null)
 
     try {
-      const response = await updateXAutopostSettings({
+      const response = await updatePublisherSettings({
         bridgeUrl,
         patch: xSettingsDraft,
       })
@@ -621,10 +735,15 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       setXQueue(response.queue)
       setXAutopostLogs(response.logs)
       setXAutopostMetrics(response.metrics)
-      setXPublisherStatus(response.publisher)
-      setActionMessage('X 자동 게시 설정을 저장했습니다.')
+      setPublishedItems(response.published)
+      setXPublisherStatus(
+        response.publishers.find((item) => item.target === 'internal') ??
+          response.publishers[0] ??
+          defaultXAutopostPublisher(),
+      )
+      setActionMessage('게시 엔진 설정을 저장했습니다.')
     } catch (nextError) {
-      setActionMessage(nextError instanceof Error ? nextError.message : 'X 자동 게시 설정 저장에 실패했습니다.')
+      setActionMessage(nextError instanceof Error ? nextError.message : '게시 엔진 설정 저장에 실패했습니다.')
     } finally {
       setPostActionLoading(false)
     }
@@ -634,7 +753,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     setPostActionLoading(true)
     setActionMessage(null)
     try {
-      const response = await approveXAutopostDraft(bridgeUrl, draftId)
+      const response = await approvePublisherDraft(bridgeUrl, draftId)
       setActionMessage(
         response.item.scheduledAt
           ? `초안을 승인했고 다음 발행 슬롯을 배정했습니다: ${formatDate(response.item.scheduledAt)}`
@@ -652,7 +771,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     setPostActionLoading(true)
     setActionMessage(null)
     try {
-      const response = await rejectXAutopostDraft(bridgeUrl, draftId)
+      const response = await rejectPublisherDraft(bridgeUrl, draftId)
       setActionMessage(`초안을 큐에서 제외했습니다: ${response.item.sourceTitle}`)
       await loadXAutopost({ focusDraftId: response.item.id })
     } catch (nextError) {
@@ -666,17 +785,17 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     setPostActionLoading(true)
     setActionMessage(null)
     try {
-      const response = await publishXAutopostDraftNow(
+      const response = await publishPublisherDraftNow(
         bridgeUrl,
         draftId,
-        !xPublisherStatus.ready || xAutopostSettings.mode === 'dry-run',
+        xAutopostSettings.mode === 'dry-run',
       )
       setActionMessage(
         response.item.status === 'scheduled' && response.detail
           ? response.detail
           : response.simulated
           ? '실제 인증이 없어 dry-run으로 게시 시뮬레이션을 완료했습니다.'
-          : '공식 X API로 게시를 완료했습니다.',
+          : '내부 게시를 완료했습니다.',
       )
       await loadXAutopost({ focusDraftId: response.item.id })
     } catch (nextError) {
@@ -689,7 +808,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
   return (
     <section className="page">
       <PageIntro
-        description="실시간 시그널, 장문 분석글 저장, 그리고 실제 X 자동 게시 큐를 한 화면에서 운영합니다. X 자동 게시 탭에서는 초안 생성, 승인, 예약, 즉시 발행, 최근 로그를 직접 관리할 수 있습니다."
+        description="실시간 시그널, 장문 분석글 저장, 그리고 내부 게시 큐를 한 화면에서 운영합니다. 게시 엔진 탭에서는 초안 생성, 승인, 예약, 즉시 발행, 최근 로그를 직접 관리할 수 있습니다."
         icon="signals"
         title="시그널"
         trailing={
@@ -701,10 +820,10 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                   : '실시간 피드를 준비하고 있습니다.'
                 : activeTab === 'publisher'
                   ? xAutopostState.inProgress
-                    ? 'X 자동 게시 스케줄러가 실행 중입니다.'
-                    : xAutopostState.lastPostedAt
-                      ? `최근 게시 ${formatDate(xAutopostState.lastPostedAt)}`
-                      : xPublisherStatus.detail
+                    ? '게시 엔진 스케줄러가 실행 중입니다.'
+                    : xAutopostState.lastPublishedAt
+                      ? `최근 게시 ${formatDate(xAutopostState.lastPublishedAt)}`
+                      : internalPublisherStatus.detail
                 : schedulerState.inProgress
                   ? '자동 게시글 생성이 실행 중입니다.'
                   : schedulerState.lastSuccessAt
@@ -744,7 +863,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
             onClick={() => setActiveTab('publisher')}
             type="button"
           >
-            X 자동 게시
+            게시 엔진
           </button>
           <button
             className={`chip ${activeTab === 'posts' ? 'is-active' : ''}`}
@@ -867,7 +986,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                         onClick={() => void executeCreateDraftFromSignal(item)}
                         type="button"
                       >
-                        X 초안 생성
+                        게시 초안 생성
                       </button>
                       <button
                         className="primary-button"
@@ -893,33 +1012,48 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
           <div className="x-autopost-side">
             <section className="panel-card">
               <div className="panel-card__header">
-                <h2>X 자동 게시 운영</h2>
+                <h2>게시 엔진 운영</h2>
                 <span className={`chip ${xAutopostState.inProgress ? 'is-active' : 'chip--soft'}`}>
                   {xAutopostSettings.mode}
                 </span>
               </div>
               <div className="stack-grid stack-grid--compact">
                 <div className="summary-row">
-                  <span>publisher</span>
-                  <strong>{xPublisherStatus.ready ? '연결됨' : xPublisherStatus.enabled ? 'fallback' : '비활성'}</strong>
+                  <span>내부 게시기</span>
+                  <strong>{internalPublisherStatus.ready ? '준비됨' : internalPublisherStatus.enabled ? '제한됨' : '비활성'}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>X cross-post</span>
+                  <strong>{xCrossPostStatus ? (xCrossPostStatus.ready ? '준비됨' : xCrossPostStatus.enabled ? '비활성 대기' : '사용 안 함') : '사용 안 함'}</strong>
                 </div>
                 <div className="summary-row">
                   <span>최근 게시</span>
-                  <strong>{xAutopostState.lastPostedAt ? formatDate(xAutopostState.lastPostedAt) : '없음'}</strong>
+                  <strong>{xAutopostState.lastPublishedAt ? formatDate(xAutopostState.lastPublishedAt) : '없음'}</strong>
                 </div>
                 <div className="summary-row">
-                  <span>다음 생성</span>
-                  <strong>{xAutopostState.nextGenerationAt ? formatDate(xAutopostState.nextGenerationAt) : '중지됨'}</strong>
+                  <span>다음 수집</span>
+                  <strong>{xAutopostState.nextIngestAt ? formatDate(xAutopostState.nextIngestAt) : '중지됨'}</strong>
                 </div>
                 <div className="summary-row">
                   <span>다음 발행</span>
                   <strong>{xAutopostState.nextPublishAt ? formatDate(xAutopostState.nextPublishAt) : '없음'}</strong>
                 </div>
               </div>
-              <p className="settings-card__lead">{xPublisherStatus.detail}</p>
+              {xAutopostState.lastError ? (
+                <div className="status-banner status-banner--warning">
+                  <Icon name="warning" size={16} />
+                  <span>{xAutopostState.lastError}</span>
+                </div>
+              ) : null}
+              <p className="settings-card__lead">{internalPublisherStatus.detail}</p>
+              {xCrossPostStatus ? (
+                <p className="settings-card__lead">X: {xCrossPostStatus.detail}</p>
+              ) : null}
               <div className="badge-row">
-                <span className="chip chip--soft">1시간 {xAutopostMetrics.postedCount1h}/{xAutopostSettings.maxPerHour}</span>
-                <span className="chip chip--soft">24시간 {xAutopostMetrics.postedCount24h}/{xAutopostSettings.maxPerDay}</span>
+                <span className="chip chip--soft">1시간 {xAutopostMetrics.publishedCount1h}/{xAutopostSettings.maxPerHour}</span>
+                <span className="chip chip--soft">24시간 {xAutopostMetrics.publishedCount24h}/{xAutopostSettings.maxPerDay}</span>
+                <span className="chip chip--soft">승인 대기 {xAutopostMetrics.draftCount}</span>
+                <span className="chip chip--soft">예약 {xAutopostMetrics.scheduledCount}</span>
                 <span className="chip chip--soft">실패 {xAutopostMetrics.failedCount}</span>
               </div>
               <div className="badge-row">
@@ -927,24 +1061,32 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                   현재 카테고리로 초안 채우기
                 </button>
                 <button className="ghost-button" disabled={postActionLoading} onClick={() => void loadXAutopost()} type="button">
-                  큐 새로고침
+                  상태 새로고침
                 </button>
               </div>
             </section>
 
             <section className="panel-card">
               <div className="panel-card__header">
-                <h2>자동 게시 설정</h2>
+                <h2>소스와 발행 정책</h2>
                 <span className="chip chip--soft">{xSettingsDraft.generationModel}</span>
               </div>
               <div className="auto-post-settings-grid">
                 <label className="field">
                   <span>모드</span>
-                  <select value={xSettingsDraft.mode} onChange={(event) => setXSettingsDraft((current) => ({ ...current, mode: event.target.value as XAutopostSettings['mode'] }))}>
+                  <select value={xSettingsDraft.mode} onChange={(event) => setXSettingsDraft((current) => ({ ...current, mode: event.target.value as PublisherSettings['mode'] }))}>
                     <option value="dry-run">dry-run</option>
                     <option value="approval">approval</option>
                     <option value="auto">auto</option>
                   </select>
+                </label>
+                <label className="field">
+                  <span>생성 모델</span>
+                  <input value={xSettingsDraft.generationModel} onChange={(event) => setXSettingsDraft((current) => ({ ...current, generationModel: event.target.value }))} />
+                </label>
+                <label className="field">
+                  <span>기본 큐 생성 수</span>
+                  <input type="number" min={1} max={20} value={xSettingsDraft.defaultQueueLimit} onChange={(event) => setXSettingsDraft((current) => ({ ...current, defaultQueueLimit: Number(event.target.value || current.defaultQueueLimit) }))} />
                 </label>
                 <label className="field">
                   <span>시간당 최대</span>
@@ -963,8 +1105,68 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                   <input type="number" step="0.01" min={0} max={1} value={xSettingsDraft.minNoveltyScore} onChange={(event) => setXSettingsDraft((current) => ({ ...current, minNoveltyScore: Number(event.target.value || current.minNoveltyScore) }))} />
                 </label>
                 <label className="field">
-                  <span>생성 모델</span>
-                  <input value={xSettingsDraft.generationModel} onChange={(event) => setXSettingsDraft((current) => ({ ...current, generationModel: event.target.value }))} />
+                  <span>내부 게시</span>
+                  <select value={xSettingsDraft.publishInternalEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, publishInternalEnabled: event.target.value === 'enabled' }))}>
+                    <option value="enabled">활성</option>
+                    <option value="disabled">비활성</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>X cross-post</span>
+                  <select value={xSettingsDraft.publishXEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, publishXEnabled: event.target.value === 'enabled' }))}>
+                    <option value="disabled">비활성</option>
+                    <option value="enabled">활성</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>arXiv</span>
+                  <select value={xSettingsDraft.ingestArxivEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, ingestArxivEnabled: event.target.value === 'enabled' }))}>
+                    <option value="enabled">활성</option>
+                    <option value="disabled">비활성</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Crossref</span>
+                  <select value={xSettingsDraft.ingestCrossrefEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, ingestCrossrefEnabled: event.target.value === 'enabled' }))}>
+                    <option value="enabled">활성</option>
+                    <option value="disabled">비활성</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Semantic Scholar</span>
+                  <select value={xSettingsDraft.ingestSemanticScholarEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, ingestSemanticScholarEnabled: event.target.value === 'enabled' }))}>
+                    <option value="enabled">활성</option>
+                    <option value="disabled">비활성</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>News API</span>
+                  <select value={xSettingsDraft.ingestNewsApiEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, ingestNewsApiEnabled: event.target.value === 'enabled' }))}>
+                    <option value="disabled">비활성</option>
+                    <option value="enabled">활성</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>RSS / Atom</span>
+                  <select value={xSettingsDraft.ingestRssEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, ingestRssEnabled: event.target.value === 'enabled' }))}>
+                    <option value="disabled">비활성</option>
+                    <option value="enabled">활성</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Legacy signals</span>
+                  <select value={xSettingsDraft.ingestLegacySignalsEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, ingestLegacySignalsEnabled: event.target.value === 'enabled' }))}>
+                    <option value="enabled">활성</option>
+                    <option value="disabled">비활성</option>
+                  </select>
+                </label>
+                <label className="field field--full">
+                  <span>수집 질의</span>
+                  <input value={xSettingsDraft.ingestQuery} onChange={(event) => setXSettingsDraft((current) => ({ ...current, ingestQuery: event.target.value }))} />
+                </label>
+                <label className="field field--full">
+                  <span>RSS / Atom 피드</span>
+                  <textarea rows={3} value={xSettingsDraft.rssFeeds.join('\n')} onChange={(event) => setXSettingsDraft((current) => ({ ...current, rssFeeds: event.target.value.split(/\r?\n/).map((entry) => entry.trim()).filter(Boolean) }))} />
                 </label>
               </div>
               <div className="badge-row">
@@ -976,22 +1178,83 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
 
             <section className="panel-card">
               <div className="panel-card__header">
-                <h2>큐 목록</h2>
+                <h2>활성 소스 현황</h2>
+                <span className="chip chip--soft">{xAutopostState.providerStats.length}개</span>
+              </div>
+              {xAutopostState.providerStats.length > 0 ? (
+                <div className="run-card__logs">
+                  {xAutopostState.providerStats.map((stat) => (
+                    <div key={stat.provider} className={`run-log run-log--${stat.lastError ? 'error' : stat.enabled ? 'success' : 'info'}`}>
+                      <span>{stat.label}</span>
+                      <p>
+                        수집 {stat.lastFetchedCount} / draft {stat.lastDraftCount} / skip {stat.lastSkippedCount}
+                        {stat.lastFetchedAt ? ` · 최근 ${formatRelative(stat.lastFetchedAt)}` : ''}
+                        {stat.lastError ? ` · 오류: ${stat.lastError}` : ''}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  description="한 번 이상 수집이 실행되면 소스별 수집 수와 오류 상태가 여기에 기록됩니다."
+                  title="소스 기록이 없습니다"
+                />
+              )}
+            </section>
+
+            <section className="panel-card">
+              <div className="panel-card__header">
+                <h2>승인 큐</h2>
                 <span className="chip chip--soft">{filteredDrafts.length}개</span>
+              </div>
+              <div className="auto-post-settings-grid">
+                <label className="field">
+                  <span>소스 필터</span>
+                  <select value={publisherProviderFilter} onChange={(event) => setPublisherProviderFilter(event.target.value)}>
+                    <option value="all">전체</option>
+                    {providerOptions.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>상태 필터</span>
+                  <select value={publisherStatusFilter} onChange={(event) => setPublisherStatusFilter(event.target.value)}>
+                    <option value="all">전체</option>
+                    <option value="draft">초안</option>
+                    <option value="approved">승인됨</option>
+                    <option value="scheduled">예약됨</option>
+                    <option value="published">게시됨</option>
+                    <option value="failed">실패</option>
+                    <option value="skipped">건너뜀</option>
+                    <option value="disabled">비활성</option>
+                  </select>
+                </label>
               </div>
               {filteredDrafts.length > 0 ? (
                 <div className="x-autopost-queue">
                   {filteredDrafts.map((item) => (
-                    <button key={item.id} className={`auto-post-card ${selectedDraftId === item.id ? 'is-active' : ''}`} onClick={() => setSelectedDraftId(item.id)} type="button">
+                    <button
+                      key={item.id}
+                      className={`auto-post-card ${selectedDraftId === item.id ? 'is-active' : ''}`}
+                      onClick={() => {
+                        setSelectedDraftId(item.id)
+                        setSelectedPublishedId(null)
+                      }}
+                      type="button"
+                    >
                       <div className="auto-post-card__body">
                         <div className="card-topline">
-                          <span className="chip chip--soft">{item.sourceLabel || item.sourceType}</span>
+                          <span className="chip chip--soft">{item.sourceLabel || item.provider}</span>
                           <small>{formatDate(item.updatedAt)}</small>
                         </div>
                         <strong>{item.sourceTitle}</strong>
                         <p>{compactText(item.generatedText || item.sourceSummary, 140)}</p>
                         <div className="badge-row">
                           <span className="chip chip--soft">{draftStatusLabel(item.status)}</span>
+                          <span className="chip chip--soft">{item.category}</span>
                           <span className="chip chip--soft">novelty {item.noveltyScore.toFixed(2)}</span>
                         </div>
                       </div>
@@ -1003,7 +1266,47 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                   description="실시간 시그널에서 초안을 만들거나 현재 카테고리로 큐를 채우면 여기에 쌓입니다."
                   action="지금 초안 만들기"
                   onAction={() => void executeCreateDraftFromSignal()}
-                  title="X 게시 큐가 비어 있습니다"
+                  title="게시 큐가 비어 있습니다"
+                />
+              )}
+            </section>
+
+            <section className="panel-card">
+              <div className="panel-card__header">
+                <h2>내부 게시 이력</h2>
+                <span className="chip chip--soft">{filteredPublishedItems.length}개</span>
+              </div>
+              {filteredPublishedItems.length > 0 ? (
+                <div className="x-autopost-queue">
+                  {filteredPublishedItems.slice(0, 24).map((item) => (
+                    <button
+                      key={item.id}
+                      className={`auto-post-card ${selectedPublishedId === item.id ? 'is-active' : ''}`}
+                      onClick={() => {
+                        setSelectedPublishedId(item.id)
+                        setSelectedDraftId(null)
+                      }}
+                      type="button"
+                    >
+                      <div className="auto-post-card__body">
+                        <div className="card-topline">
+                          <span className="chip chip--soft">{item.sourceLabel || item.provider}</span>
+                          <small>{formatDate(item.publishedAt)}</small>
+                        </div>
+                        <strong>{item.title}</strong>
+                        <p>{compactText(item.excerpt, 140)}</p>
+                        <div className="badge-row">
+                          <span className="chip chip--soft">{item.category || '내부 게시'}</span>
+                          <span className="chip chip--soft">{item.summaryType}</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  description="승인된 초안을 발행하면 내부 웹사이트용 게시 이력이 여기에 남습니다."
+                  title="내부 게시 이력이 없습니다"
                 />
               )}
             </section>
@@ -1026,8 +1329,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                     </div>
                     <div className="badge-row">
                       <span className="chip chip--soft">{draftStatusLabel(selectedDraft.status)}</span>
+                      <span className="chip chip--soft">{selectedDraft.summaryType}</span>
                       {selectedDraft.scheduledAt ? <span className="chip chip--soft">예약 {formatDate(selectedDraft.scheduledAt)}</span> : null}
-                      {selectedDraft.postedAt ? <span className="chip chip--soft">게시 {formatDate(selectedDraft.postedAt)}</span> : null}
+                      {selectedDraft.publishedAt ? <span className="chip chip--soft">게시 {formatDate(selectedDraft.publishedAt)}</span> : null}
                     </div>
                   </div>
                   <div className="badge-row">
@@ -1036,12 +1340,12 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                         승인
                       </button>
                     ) : null}
-                    {selectedDraft.status !== 'posted' && selectedDraft.status !== 'skipped' ? (
+                    {selectedDraft.status !== 'published' && selectedDraft.status !== 'skipped' && selectedDraft.status !== 'disabled' ? (
                       <button className="ghost-button" disabled={postActionLoading} onClick={() => void executePublishDraft(selectedDraft.id)} type="button">
                         지금 게시
                       </button>
                     ) : null}
-                    {selectedDraft.status !== 'posted' ? (
+                    {selectedDraft.status !== 'published' ? (
                       <button className="ghost-button" disabled={postActionLoading} onClick={() => void executeRejectDraft(selectedDraft.id)} type="button">
                         제외
                       </button>
@@ -1052,9 +1356,33 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                       </button>
                     ) : null}
                   </div>
-                  <div className="summary-row summary-row--soft">
-                    <span>topic hash</span>
-                    <strong>{selectedDraft.topicHash.slice(0, 16)}…</strong>
+                  <div className="stack-grid stack-grid--compact">
+                    <div className="summary-row summary-row--soft">
+                      <span>topic hash</span>
+                      <strong>{selectedDraft.topicHash.slice(0, 16)}…</strong>
+                    </div>
+                    <div className="summary-row summary-row--soft">
+                      <span>원문 시각</span>
+                      <strong>{selectedDraft.sourcePublishedAt ? formatDate(selectedDraft.sourcePublishedAt) : '없음'}</strong>
+                    </div>
+                    {selectedDraft.authors.length > 0 ? (
+                      <div className="summary-row summary-row--soft">
+                        <span>저자</span>
+                        <strong>{selectedDraft.authors.slice(0, 4).join(', ')}</strong>
+                      </div>
+                    ) : null}
+                    {selectedDraft.doi ? (
+                      <div className="summary-row summary-row--soft">
+                        <span>DOI</span>
+                        <strong>{selectedDraft.doi}</strong>
+                      </div>
+                    ) : null}
+                    {selectedDraft.arxivId ? (
+                      <div className="summary-row summary-row--soft">
+                        <span>arXiv</span>
+                        <strong>{selectedDraft.arxivId}</strong>
+                      </div>
+                    ) : null}
                   </div>
                   {selectedDraft.errorReason ? (
                     <div className="status-banner status-banner--warning">
@@ -1075,10 +1403,10 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                 <section className="panel-card">
                   <div className="panel-card__header">
                     <h2>최근 로그</h2>
-                    <span className="chip chip--soft">{xAutopostLogs.length}개</span>
+                    <span className="chip chip--soft">{selectedDraftLogs.length}개</span>
                   </div>
                   <div className="run-card__logs">
-                    {xAutopostLogs.slice(0, 16).map((log) => (
+                    {selectedDraftLogs.map((log) => (
                       <div key={log.id} className={`run-log run-log--${log.level === 'warning' ? 'error' : log.level}`}>
                         <span>{formatDate(log.createdAt)}</span>
                         <p>{log.message}</p>
@@ -1087,10 +1415,50 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                   </div>
                 </section>
               </>
+            ) : selectedPublished ? (
+              <>
+                <section className="panel-card">
+                  <div className="panel-card__header">
+                    <div>
+                      <h2>{selectedPublished.title}</h2>
+                      <p className="settings-card__lead">
+                        {selectedPublished.sourceLabel || selectedPublished.provider} / {selectedPublished.category || '내부 게시'}
+                      </p>
+                    </div>
+                    <div className="badge-row">
+                      <span className="chip chip--soft">게시 완료</span>
+                      <span className="chip chip--soft">{selectedPublished.summaryType}</span>
+                      <span className="chip chip--soft">{formatDate(selectedPublished.publishedAt)}</span>
+                    </div>
+                  </div>
+                  <p className="settings-card__lead">{selectedPublished.excerpt}</p>
+                  <div className="badge-row">
+                    {selectedPublished.sourceUrl ? (
+                      <button className="ghost-button" onClick={() => window.open(selectedPublished.sourceUrl, '_blank', 'noopener,noreferrer')} type="button">
+                        원문 열기
+                      </button>
+                    ) : null}
+                  </div>
+                  {selectedPublished.authors.length > 0 ? (
+                    <div className="summary-row summary-row--soft">
+                      <span>저자</span>
+                      <strong>{selectedPublished.authors.slice(0, 5).join(', ')}</strong>
+                    </div>
+                  ) : null}
+                </section>
+
+                <section className="panel-card">
+                  <div className="panel-card__header">
+                    <h2>내부 게시 본문</h2>
+                    <span className="chip chip--soft">{selectedPublished.provider}</span>
+                  </div>
+                  <pre className="x-autopost-preview">{selectedPublished.body}</pre>
+                </section>
+              </>
             ) : (
               <EmptyState
-                description="왼쪽 큐에서 초안을 선택하면 생성문, 예약 상태, 게시 결과, 로그를 볼 수 있습니다."
-                title="초안을 선택해 주세요"
+                description="왼쪽에서 초안이나 게시 이력을 선택하면 생성문, 게시 결과, 실패 이유, 최근 로그를 볼 수 있습니다."
+                title="초안 또는 게시물을 선택해 주세요"
               />
             )}
           </div>

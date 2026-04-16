@@ -26,6 +26,7 @@ artemis-workspace-test/
 generated-posts/
 media-cache/
 /x-autopost/
+/publisher/
 
 # Editor directories and files
 .vscode/*

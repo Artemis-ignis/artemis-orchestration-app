@@ -21,6 +21,7 @@ import {
 } from './workspace.mjs'
 import { createAiRouter } from './ai/router.mjs'
 import { createAutoPostsScheduler } from './auto-posts/scheduler.mjs'
+import { createPublisherScheduler } from './publisher/scheduler.mjs'
 import { createXAutopostScheduler } from './x-autopost/scheduler.mjs'
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -553,6 +554,12 @@ const autoPostsScheduler = createAutoPostsScheduler({
   runCodex,
 })
 const xAutopostScheduler = createXAutopostScheduler({
+  resolveWorkspaceRoot: getDefaultWorkspace,
+  collectSignalItems,
+  fetchWithTimeout,
+  runCodex,
+})
+const publisherScheduler = createPublisherScheduler({
   resolveWorkspaceRoot: getDefaultWorkspace,
   collectSignalItems,
   fetchWithTimeout,
@@ -2872,6 +2879,77 @@ const server = http.createServer(async (request, response) => {
       return
     }
 
+    if (request.method === 'GET' && request.url === '/api/publisher/state') {
+      const payload = await publisherScheduler.getStatus()
+      sendJson(request, response, 200, { ok: true, ...payload })
+      return
+    }
+
+    if (request.method === 'GET' && request.url === '/api/publisher/queue') {
+      const payload = await publisherScheduler.listQueue()
+      sendJson(request, response, 200, { ok: true, ...payload })
+      return
+    }
+
+    if (request.method === 'POST' && request.url === '/api/publisher/run') {
+      const body = await readBody(request)
+      const result = await publisherScheduler.runNow({
+        reason: body.reason || 'manual',
+        limit: body.limit,
+        force: Boolean(body.force),
+        seedItems: Array.isArray(body.seedItems) ? body.seedItems : [],
+      })
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    if (request.method === 'PATCH' && request.url === '/api/publisher/settings') {
+      const body = await readBody(request)
+      const payload = await publisherScheduler.updateSettings(body)
+      sendJson(request, response, 200, { ok: true, ...payload })
+      return
+    }
+
+    const publisherApproveMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/publisher\/([^/]+)\/approve$/)
+        : null
+    if (publisherApproveMatch) {
+      const result = await publisherScheduler.approveDraft(decodeURIComponent(publisherApproveMatch[1]))
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    const publisherRejectMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/publisher\/([^/]+)\/reject$/)
+        : null
+    if (publisherRejectMatch) {
+      const body = await readBody(request)
+      const result = await publisherScheduler.rejectDraft(
+        decodeURIComponent(publisherRejectMatch[1]),
+        typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim() : 'operator_rejected',
+      )
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    const publisherPublishMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/publisher\/([^/]+)\/publish$/)
+        : null
+    if (publisherPublishMatch) {
+      const body = await readBody(request)
+      const result = await publisherScheduler.publishDraftNow(
+        decodeURIComponent(publisherPublishMatch[1]),
+        {
+          dryRun: Boolean(body.dryRun),
+        },
+      )
+      sendJson(request, response, 200, result)
+      return
+    }
+
     if (request.method === 'GET' && request.url === '/api/x-autopost/state') {
       const payload = await xAutopostScheduler.getStatus()
       sendJson(request, response, 200, { ok: true, ...payload })
@@ -3112,6 +3190,13 @@ autoPostsScheduler.init().catch((error) => {
 xAutopostScheduler.start().catch((error) => {
   console.error(
     '[x-autopost] scheduler init failed',
+    error instanceof Error ? error.message : error,
+  )
+})
+
+publisherScheduler.start().catch((error) => {
+  console.error(
+    '[publisher] scheduler init failed',
     error instanceof Error ? error.message : error,
   )
 })
