@@ -1,17 +1,14 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import type { PageId } from '../crewData'
-import {
-  EmptyState,
-  PageIntro,
-  SearchField,
-} from '../crewPageShared'
-import {
-  formatDate,
-  pageLabel,
-} from '../crewPageHelpers'
+import { EmptyState, PageIntro, SearchField } from '../crewPageShared'
+import { formatDate, pageLabel } from '../crewPageHelpers'
 import { fetchPublisherState } from '../lib/modelClient'
 import { useArtemisApp } from '../state/context'
-import type { PublisherLog, PublisherMetrics } from '../types/publisher'
+import type { PublisherLog, PublisherMetrics, PublishedPost } from '../types/publisher'
+
+function publisherTargetLabel(target: 'internal' | 'x') {
+  return target === 'internal' ? 'Artemis Wire' : 'X'
+}
 
 export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   const { state } = useArtemisApp()
@@ -19,6 +16,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
   const deferredQuery = useDeferredValue(query)
   const [publisherMetrics, setPublisherMetrics] = useState<PublisherMetrics | null>(null)
   const [publisherLogs, setPublisherLogs] = useState<PublisherLog[]>([])
+  const [publishedPosts, setPublishedPosts] = useState<PublishedPost[]>([])
   const [publisherError, setPublisherError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -32,12 +30,13 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
         }
         setPublisherMetrics(response.metrics)
         setPublisherLogs(response.logs.slice(0, 8))
+        setPublishedPosts(response.published.slice(0, 4))
         setPublisherError(null)
       } catch (error) {
         if (ignore) {
           return
         }
-        setPublisherError(error instanceof Error ? error.message : '게시 엔진 상태를 불러오지 못했습니다.')
+        setPublisherError(error instanceof Error ? error.message : 'Artemis Wire 상태를 불러오지 못했습니다.')
       }
     }
 
@@ -60,9 +59,9 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
   }, [deferredQuery, state.activity.items])
 
   return (
-    <section className="page">
+    <section className="page activity-page">
       <PageIntro
-        description="실제로 실행된 채팅, 스킬, 오케스트레이션, 저장 작업 기록만 보여줍니다."
+        description="채팅, 파일, 오케스트레이션, 그리고 Artemis Wire 운영에서 실제로 일어난 실행 기록만 모아 봅니다."
         icon="insights"
         title="활동"
       />
@@ -74,7 +73,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
       {publisherMetrics ? (
         <section className="panel-card panel-card--muted">
           <div className="panel-card__header">
-            <h2>내부 게시 현황</h2>
+            <h2>Artemis Wire 운영 현황</h2>
             <span className="chip chip--soft">최근 24시간 {publisherMetrics.publishedCount24h}건</span>
           </div>
           <div className="badge-row">
@@ -86,7 +85,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
           <div className="badge-row">
             {publisherMetrics.publishers.map((item) => (
               <span key={item.target} className="chip chip--soft">
-                {item.target === 'internal' ? '내부' : 'X'} · {item.ready ? '준비됨' : item.enabled ? '대기' : '비활성'}
+                {publisherTargetLabel(item.target)} · {item.ready ? '준비됨' : item.enabled ? '대기' : '비활성'}
               </span>
             ))}
           </div>
@@ -106,13 +105,43 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
                 </div>
               ))
             ) : (
-              <p className="subtle-label">아직 기록된 게시 엔진 로그가 없습니다.</p>
+              <p className="subtle-label">아직 쌓인 Artemis Wire 운영 로그가 없습니다.</p>
             )}
           </div>
         </section>
       ) : publisherError ? (
         <section className="panel-card panel-card--muted">
           <p>{publisherError}</p>
+        </section>
+      ) : null}
+
+      {publishedPosts.length > 0 ? (
+        <section className="panel-card panel-card--muted">
+          <div className="panel-card__header">
+            <div>
+              <h2>최근 Wire 게시물</h2>
+              <p className="settings-card__lead">최근 내부 게시 이력을 빠르게 확인하고, 시그널 화면에서 이어서 검토할 수 있습니다.</p>
+            </div>
+            <button className="ghost-button" onClick={() => onNavigate('signals')} type="button">
+              시그널에서 자세히 보기
+            </button>
+          </div>
+          <div className="stack-grid">
+            {publishedPosts.map((post) => (
+              <article key={post.id} className="panel-card">
+                <div className="card-topline">
+                  <span className="chip chip--soft">{post.sourceLabel || post.provider}</span>
+                  <small>{formatDate(post.publishedAt)}</small>
+                </div>
+                <strong>{post.title}</strong>
+                <p>{post.excerpt}</p>
+                <div className="badge-row">
+                  <span className="chip chip--soft">{post.category || 'Artemis Wire'}</span>
+                  <span className="chip chip--soft">{post.summaryType}</span>
+                </div>
+              </article>
+            ))}
+          </div>
         </section>
       ) : null}
 
@@ -131,7 +160,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
         </div>
       ) : (
         <EmptyState
-          description="채팅이나 오케스트레이션을 실행하면 실제 기록이 여기에 쌓입니다."
+          description="채팅, 오케스트레이션, Wire 운영을 실행하면 실제 기록이 여기에 쌓입니다."
           action="오케스트레이션 열기"
           onAction={() => onNavigate('agents')}
           secondaryAction="가이드 열기"

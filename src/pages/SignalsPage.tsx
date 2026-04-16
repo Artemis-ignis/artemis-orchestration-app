@@ -165,7 +165,7 @@ function defaultXAutopostPublisher(): PublisherRuntimeStatus {
     enabled: false,
     configured: false,
     ready: false,
-    detail: '내부 게시기 상태를 확인하지 못했습니다.',
+    detail: 'Artemis Wire 게시기 상태를 확인하지 못했습니다.',
   }
 }
 
@@ -210,6 +210,39 @@ function draftStatusLabel(status: PublisherDraft['status']) {
       return '건너뜀'
     default:
       return '초안'
+  }
+}
+
+function publisherModeLabel(mode: PublisherSettings['mode']) {
+  switch (mode) {
+    case 'auto':
+      return '자동 게시'
+    case 'dry-run':
+      return '드라이 런'
+    default:
+      return '승인 대기'
+  }
+}
+
+function summaryTypeLabel(summaryType: PublisherDraft['summaryType'] | PublishedPost['summaryType']) {
+  switch (summaryType) {
+    case 'paper-intro':
+      return '논문 소개형'
+    case 'brief-points':
+      return '핵심 포인트형'
+    default:
+      return '속보형'
+  }
+}
+
+function sourceTypeLabel(sourceType: PublisherDraft['sourceType'] | PublishedPost['sourceType']) {
+  switch (sourceType) {
+    case 'paper':
+      return '논문'
+    case 'news':
+      return '뉴스'
+    default:
+      return '피드'
   }
 }
 
@@ -331,7 +364,15 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
   )
 
   const loadXAutopost = useCallback(
-    async ({ silent = false, focusDraftId }: { silent?: boolean; focusDraftId?: string | null } = {}) => {
+    async ({
+      silent = false,
+      focusDraftId,
+      focusPublishedId,
+    }: {
+      silent?: boolean
+      focusDraftId?: string | null
+      focusPublishedId?: string | null
+    } = {}) => {
       if (!silent) {
         setPostActionLoading(true)
         setActionMessage(null)
@@ -352,11 +393,16 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
             defaultXAutopostPublisher(),
         )
 
-        const nextSelectedId = focusDraftId ?? selectedDraftId ?? response.queue[0]?.id ?? null
-        setSelectedDraftId(nextSelectedId)
+        const nextSelectedDraftId = focusDraftId ?? selectedDraftId ?? response.queue[0]?.id ?? null
+        const nextSelectedPublishedId =
+          focusPublishedId ??
+          (nextSelectedDraftId ? null : selectedPublishedId ?? response.published[0]?.id ?? null)
+
+        setSelectedDraftId(nextSelectedDraftId)
+        setSelectedPublishedId(nextSelectedPublishedId)
       } catch (nextError) {
         if (!silent) {
-          setActionMessage(nextError instanceof Error ? nextError.message : '게시 엔진 상태를 불러오지 못했습니다.')
+          setActionMessage(nextError instanceof Error ? nextError.message : 'Artemis Wire 상태를 불러오지 못했습니다.')
         }
       } finally {
         if (!silent) {
@@ -364,7 +410,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
         }
       }
     },
-    [bridgeUrl, selectedDraftId],
+    [bridgeUrl, selectedDraftId, selectedPublishedId],
   )
 
   const loadPostDetail = useCallback(
@@ -707,7 +753,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       })
       setActionMessage(
         response.createdCount > 0
-          ? `${response.createdCount}개의 내부 게시 초안을 큐에 추가했습니다.`
+          ? `${response.createdCount}개의 Artemis Wire 초안을 큐에 추가했습니다.`
           : response.skippedCount > 0
             ? `${response.skippedCount}개의 후보가 guardrail에 걸려 건너뛰었습니다.`
             : '새로 큐에 넣을 초안이 없었습니다.',
@@ -742,9 +788,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
           response.publishers[0] ??
           defaultXAutopostPublisher(),
       )
-      setActionMessage('게시 엔진 설정을 저장했습니다.')
+      setActionMessage('Artemis Wire 설정을 저장했습니다.')
     } catch (nextError) {
-      setActionMessage(nextError instanceof Error ? nextError.message : '게시 엔진 설정 저장에 실패했습니다.')
+      setActionMessage(nextError instanceof Error ? nextError.message : 'Artemis Wire 설정 저장에 실패했습니다.')
     } finally {
       setPostActionLoading(false)
     }
@@ -796,9 +842,13 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
           ? response.detail
           : response.simulated
           ? '실제 인증이 없어 dry-run으로 게시 시뮬레이션을 완료했습니다.'
-          : '내부 게시를 완료했습니다.',
+          : 'Artemis Wire 게시를 완료했습니다.',
       )
-      await loadXAutopost({ focusDraftId: response.item.id })
+      await loadXAutopost({
+        focusDraftId: response.item.status === 'published' ? null : response.item.id,
+        focusPublishedId:
+          response.item.status === 'published' ? response.item.internalPostId ?? null : null,
+      })
     } catch (nextError) {
       setActionMessage(nextError instanceof Error ? nextError.message : '즉시 게시에 실패했습니다.')
     } finally {
@@ -809,7 +859,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
   return (
     <section className="page">
       <PageIntro
-        description="실시간 시그널, 장문 분석글 저장, 그리고 내부 게시 큐를 한 화면에서 운영합니다. 게시 엔진 탭에서는 초안 생성, 승인, 예약, 즉시 발행, 최근 로그를 직접 관리할 수 있습니다."
+        description="실시간 소스, 심층 리포트, 그리고 Artemis Wire 내부 게시 큐를 한 화면에서 운영합니다. Wire 탭에서는 초안 생성, 승인, 예약, 즉시 게시, 최근 로그를 직접 관리할 수 있습니다."
         icon="signals"
         title="시그널"
         trailing={
@@ -821,9 +871,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                   : '실시간 피드를 준비하고 있습니다.'
                 : activeTab === 'publisher'
                   ? xAutopostState.inProgress
-                    ? '게시 엔진 스케줄러가 실행 중입니다.'
+                    ? 'Artemis Wire 수집기와 스케줄러가 실행 중입니다.'
                     : xAutopostState.lastPublishedAt
-                      ? `최근 게시 ${formatDate(xAutopostState.lastPublishedAt)}`
+                      ? `최근 Wire 게시 ${formatDate(xAutopostState.lastPublishedAt)}`
                       : internalPublisherStatus.detail
                 : schedulerState.inProgress
                   ? '자동 게시글 생성이 실행 중입니다.'
@@ -864,20 +914,20 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
             onClick={() => setActiveTab('publisher')}
             type="button"
           >
-            게시 엔진
+            Artemis Wire
           </button>
           <button
             className={`chip ${activeTab === 'posts' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('posts')}
             type="button"
           >
-            자동 생성 게시글
+            심층 리포트
           </button>
         </div>
         <div className="signals-toolbar__actions">
           <SearchField
             onChange={setQuery}
-            placeholder={activeTab === 'feed' ? '시그널 검색...' : activeTab === 'publisher' ? '큐 검색...' : '게시글 검색...'}
+            placeholder={activeTab === 'feed' ? '시그널 검색...' : activeTab === 'publisher' ? 'Wire 검색...' : '리포트 검색...'}
             value={query}
           />
         </div>
@@ -914,7 +964,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
               ))}
             </div>
             <p>
-              실시간 탭은 원문 피드 목록입니다. 장문 결과물은 자동 생성 게시글 탭과 좌측 결과 메뉴에 별도로 저장됩니다.
+              실시간 탭은 원문 소스 목록입니다. 심층 리포트와 Artemis Wire 게시 흐름은 각각 별도 탭에서 이어서 관리합니다.
             </p>
           </section>
 
@@ -987,7 +1037,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                         onClick={() => void executeCreateDraftFromSignal(item)}
                         type="button"
                       >
-                        게시 초안 생성
+                        Wire 초안 생성
                       </button>
                       <button
                         className="primary-button"
@@ -1009,18 +1059,21 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
           )}
         </>
       ) : activeTab === 'publisher' ? (
-        <div className="x-autopost-shell">
-          <div className="x-autopost-side">
+        <div className="publisher-shell">
+          <div className="publisher-side">
             <section className="panel-card">
               <div className="panel-card__header">
-                <h2>게시 엔진 운영</h2>
+                <div>
+                  <h2>Artemis Wire 운영</h2>
+                  <p className="settings-card__lead">Artemis Wire 내부 게시를 기본 출력으로 사용하고, X는 선택적 크로스포스트로만 동작합니다.</p>
+                </div>
                 <span className={`chip ${xAutopostState.inProgress ? 'is-active' : 'chip--soft'}`}>
-                  {xAutopostSettings.mode}
+                  {publisherModeLabel(xAutopostSettings.mode)}
                 </span>
               </div>
               <div className="stack-grid stack-grid--compact">
                 <div className="summary-row">
-                  <span>내부 게시기</span>
+                  <span>Artemis Wire 게시기</span>
                   <strong>{internalPublisherStatus.ready ? '준비됨' : internalPublisherStatus.enabled ? '제한됨' : '비활성'}</strong>
                 </div>
                 <div className="summary-row">
@@ -1059,7 +1112,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
               </div>
               <div className="badge-row">
                 <button className="primary-button" disabled={postActionLoading} onClick={() => void executeCreateDraftFromSignal()} type="button">
-                  현재 카테고리로 초안 채우기
+                  현재 카테고리로 Wire 초안 채우기
                 </button>
                 <button className="ghost-button" disabled={postActionLoading} onClick={() => void loadXAutopost()} type="button">
                   상태 새로고침
@@ -1069,7 +1122,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
 
             <section className="panel-card">
               <div className="panel-card__header">
-                <h2>소스와 발행 정책</h2>
+                <h2>와이어 수집 및 발행 정책</h2>
                 <span className="chip chip--soft">{xSettingsDraft.generationModel}</span>
               </div>
               <div className="auto-post-settings-grid">
@@ -1106,7 +1159,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                   <input type="number" step="0.01" min={0} max={1} value={xSettingsDraft.minNoveltyScore} onChange={(event) => setXSettingsDraft((current) => ({ ...current, minNoveltyScore: Number(event.target.value || current.minNoveltyScore) }))} />
                 </label>
                 <label className="field">
-                  <span>내부 게시</span>
+                  <span>Artemis Wire 게시</span>
                   <select value={xSettingsDraft.publishInternalEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, publishInternalEnabled: event.target.value === 'enabled' }))}>
                     <option value="enabled">활성</option>
                     <option value="disabled">비활성</option>
@@ -1205,7 +1258,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
 
             <section className="panel-card">
               <div className="panel-card__header">
-                <h2>승인 큐</h2>
+                <h2>와이어 승인 큐</h2>
                 <span className="chip chip--soft">{filteredDrafts.length}개</span>
               </div>
               <div className="auto-post-settings-grid">
@@ -1235,7 +1288,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                 </label>
               </div>
               {filteredDrafts.length > 0 ? (
-                <div className="x-autopost-queue">
+                <div className="publisher-queue">
                   {filteredDrafts.map((item) => (
                     <button
                       key={item.id}
@@ -1255,6 +1308,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                         <p>{compactText(item.generatedText || item.sourceSummary, 140)}</p>
                         <div className="badge-row">
                           <span className="chip chip--soft">{draftStatusLabel(item.status)}</span>
+                          <span className="chip chip--soft">{sourceTypeLabel(item.sourceType)}</span>
                           <span className="chip chip--soft">{item.category}</span>
                           <span className="chip chip--soft">novelty {item.noveltyScore.toFixed(2)}</span>
                         </div>
@@ -1265,20 +1319,20 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
               ) : (
                 <EmptyState
                   description="실시간 시그널에서 초안을 만들거나 현재 카테고리로 큐를 채우면 여기에 쌓입니다."
-                  action="지금 초안 만들기"
+                  action="지금 Wire 초안 만들기"
                   onAction={() => void executeCreateDraftFromSignal()}
-                  title="게시 큐가 비어 있습니다"
+                  title="Artemis Wire 큐가 비어 있습니다"
                 />
               )}
             </section>
 
             <section className="panel-card">
               <div className="panel-card__header">
-                <h2>내부 게시 이력</h2>
+                <h2>Artemis Wire 게시 이력</h2>
                 <span className="chip chip--soft">{filteredPublishedItems.length}개</span>
               </div>
               {filteredPublishedItems.length > 0 ? (
-                <div className="x-autopost-queue">
+                <div className="publisher-queue">
                   {filteredPublishedItems.slice(0, 24).map((item) => (
                     <button
                       key={item.id}
@@ -1297,8 +1351,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                         <strong>{item.title}</strong>
                         <p>{compactText(item.excerpt, 140)}</p>
                         <div className="badge-row">
-                          <span className="chip chip--soft">{item.category || '내부 게시'}</span>
-                          <span className="chip chip--soft">{item.summaryType}</span>
+                          <span className="chip chip--soft">{item.category || 'Artemis Wire'}</span>
+                          <span className="chip chip--soft">{summaryTypeLabel(item.summaryType)}</span>
+                          <span className="chip chip--soft">{sourceTypeLabel(item.sourceType)}</span>
                         </div>
                       </div>
                     </button>
@@ -1307,13 +1362,13 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
               ) : (
                 <EmptyState
                   description="승인된 초안을 발행하면 내부 웹사이트용 게시 이력이 여기에 남습니다."
-                  title="내부 게시 이력이 없습니다"
+                  title="Artemis Wire 게시 이력이 없습니다"
                 />
               )}
             </section>
           </div>
 
-          <div className="x-autopost-detail">
+          <div className="publisher-detail">
             {actionMessage ? (
               <div className="status-banner status-banner--info">
                 <Icon name="spark" size={16} />
@@ -1330,7 +1385,8 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                     </div>
                     <div className="badge-row">
                       <span className="chip chip--soft">{draftStatusLabel(selectedDraft.status)}</span>
-                      <span className="chip chip--soft">{selectedDraft.summaryType}</span>
+                      <span className="chip chip--soft">{summaryTypeLabel(selectedDraft.summaryType)}</span>
+                      <span className="chip chip--soft">{sourceTypeLabel(selectedDraft.sourceType)}</span>
                       {selectedDraft.scheduledAt ? <span className="chip chip--soft">예약 {formatDate(selectedDraft.scheduledAt)}</span> : null}
                       {selectedDraft.publishedAt ? <span className="chip chip--soft">게시 {formatDate(selectedDraft.publishedAt)}</span> : null}
                     </div>
@@ -1358,6 +1414,10 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                     ) : null}
                   </div>
                   <div className="stack-grid stack-grid--compact">
+                    <div className="summary-row summary-row--soft">
+                      <span>게시 대상</span>
+                      <strong>{selectedDraft.publishTarget === 'internal' ? 'Artemis Wire' : 'X'}</strong>
+                    </div>
                     <div className="summary-row summary-row--soft">
                       <span>topic hash</span>
                       <strong>{selectedDraft.topicHash.slice(0, 16)}…</strong>
@@ -1395,7 +1455,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
 
                 <section className="panel-card">
                   <div className="panel-card__header">
-                    <h2>게시 초안</h2>
+                    <h2>Artemis Wire 초안</h2>
                     <span className="chip chip--soft">{selectedDraft.generationModel}</span>
                   </div>
                   <PublisherArticle
@@ -1414,7 +1474,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
 
                 <section className="panel-card">
                   <div className="panel-card__header">
-                    <h2>최근 로그</h2>
+                    <h2>Wire 최근 로그</h2>
                     <span className="chip chip--soft">{selectedDraftLogs.length}개</span>
                   </div>
                   <div className="run-card__logs">
@@ -1434,12 +1494,13 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                     <div>
                       <h2>{selectedPublished.title}</h2>
                       <p className="settings-card__lead">
-                        {selectedPublished.sourceLabel || selectedPublished.provider} / {selectedPublished.category || '내부 게시'}
+                        {selectedPublished.sourceLabel || selectedPublished.provider} / {selectedPublished.category || 'Artemis Wire'}
                       </p>
                     </div>
                     <div className="badge-row">
                       <span className="chip chip--soft">게시 완료</span>
-                      <span className="chip chip--soft">{selectedPublished.summaryType}</span>
+                      <span className="chip chip--soft">{summaryTypeLabel(selectedPublished.summaryType)}</span>
+                      <span className="chip chip--soft">{sourceTypeLabel(selectedPublished.sourceType)}</span>
                       <span className="chip chip--soft">{formatDate(selectedPublished.publishedAt)}</span>
                     </div>
                   </div>
@@ -1457,17 +1518,35 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                       <strong>{selectedPublished.authors.slice(0, 5).join(', ')}</strong>
                     </div>
                   ) : null}
+                  <div className="stack-grid stack-grid--compact">
+                    <div className="summary-row summary-row--soft">
+                      <span>게시 대상</span>
+                      <strong>Artemis Wire</strong>
+                    </div>
+                    <div className="summary-row summary-row--soft">
+                      <span>소스 유형</span>
+                      <strong>{sourceTypeLabel(selectedPublished.sourceType)}</strong>
+                    </div>
+                    <div className="summary-row summary-row--soft">
+                      <span>출처 공급자</span>
+                      <strong>{selectedPublished.provider}</strong>
+                    </div>
+                    <div className="summary-row summary-row--soft">
+                      <span>원문 링크</span>
+                      <strong>{selectedPublished.canonicalUrl || selectedPublished.sourceUrl}</strong>
+                    </div>
+                  </div>
                 </section>
 
                 <section className="panel-card">
                   <div className="panel-card__header">
-                    <h2>내부 게시 본문</h2>
+                    <h2>Artemis Wire 게시물</h2>
                     <span className="chip chip--soft">{selectedPublished.provider}</span>
                   </div>
                   <PublisherArticle
                     authors={selectedPublished.authors}
                     body={selectedPublished.body}
-                    category={selectedPublished.category || '내부 게시'}
+                    category={selectedPublished.category || 'Artemis Wire'}
                     excerpt={selectedPublished.excerpt}
                     publishedAt={selectedPublished.publishedAt}
                     sourceLabel={selectedPublished.sourceLabel || selectedPublished.provider}
@@ -1480,8 +1559,8 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
               </>
             ) : (
               <EmptyState
-                description="왼쪽에서 초안이나 게시 이력을 선택하면 생성문, 게시 결과, 실패 이유, 최근 로그를 볼 수 있습니다."
-                title="초안 또는 게시물을 선택해 주세요"
+                description="왼쪽에서 Wire 초안이나 게시 이력을 선택하면 생성문, 게시 결과, 실패 이유, 최근 로그를 볼 수 있습니다."
+                title="Wire 초안 또는 게시물을 선택해 주세요"
               />
             )}
           </div>

@@ -88,6 +88,27 @@
   - draft previews now render as an article-style reader,
   - published history entries now open into the same article-style reader,
   - the reader separates headings, paragraphs, bullets, metadata chips, and source footer.
+- The source-agnostic publisher operator lane is now named `Artemis Wire` in the UI instead of the older generic `게시 엔진` wording.
+- Signals now presents three clearer lanes:
+  - `실시간 시그널`
+  - `Artemis Wire`
+  - `심층 리포트`
+- The Artemis Wire tab now uses publisher-specific layout class names instead of the older `x-autopost-*` CSS naming.
+- The article reader now:
+  - merges broken line-wraps into readable paragraphs,
+  - accepts markdown-style headings,
+  - accepts bullet markers including `•`,
+  - centers article width for better reading density.
+- The Artemis Wire operator detail view now shows:
+  - human-readable mode labels,
+  - summary-type labels,
+  - source-type labels,
+  - explicit publish target and source metadata for drafts and published entries.
+- Activity now includes an Artemis Wire operations block plus a `최근 Wire 게시물` panel so recent internal posts are visible outside the Signals page.
+- Browser verification on localhost confirmed:
+  - the `Artemis Wire` tab heading, copy, and empty states render correctly,
+  - the Activity page shows the new Artemis Wire summary language,
+  - full-page screenshots were captured under `output/playwright/wire-verify/`.
 - Activity now shows internal publishing health, provider counts, and recent publish failures without assuming X is the primary target.
 - Manual API verification confirmed:
   - `ingest -> draft -> approve -> scheduled -> published` works for internal publishing,

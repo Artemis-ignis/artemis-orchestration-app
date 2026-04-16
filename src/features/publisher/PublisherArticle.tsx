@@ -12,28 +12,53 @@ function normalizeLines(value: string) {
 }
 
 function isBulletLine(line: string) {
-  return /^[-*]\s+/.test(line)
+  return /^[-*•]\s+/.test(line)
 }
 
 function toBullet(line: string) {
-  return line.replace(/^[-*]\s+/, '').trim()
+  return line.replace(/^[-*•]\s+/, '').trim()
 }
 
-function sectionTitleFromLine(line: string) {
-  const match = line.match(/^([^:：]{1,24})[:：]\s*(.*)$/)
+function normalizeParagraphText(value: string) {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
+function markdownTitleFromLine(line: string) {
+  const match = line.match(/^#{1,3}\s+(.+)$/)
   if (!match) {
     return null
   }
 
-  const [, rawTitle, rest] = match
-  const title = rawTitle.trim()
+  const title = normalizeParagraphText(match[1])
   if (!title) {
     return null
   }
 
   return {
     title,
-    rest: rest.trim(),
+    rest: '',
+  }
+}
+
+function sectionTitleFromLine(line: string) {
+  if (/^https?:\/\//i.test(line)) {
+    return null
+  }
+
+  const match = line.match(/^([^:：]{1,24})[:：]\s*(.*)$/)
+  if (!match) {
+    return null
+  }
+
+  const [, rawTitle, rest] = match
+  const title = normalizeParagraphText(rawTitle)
+  if (!title) {
+    return null
+  }
+
+  return {
+    title,
+    rest: normalizeParagraphText(rest),
   }
 }
 
@@ -50,8 +75,22 @@ function buildPublisherArticleSections(text: string) {
   const lines = normalizeLines(text)
   const sections: PublisherArticleSection[] = []
   let current = createEmptySection(0)
+  let paragraphBuffer: string[] = []
+
+  const flushParagraph = () => {
+    if (paragraphBuffer.length === 0) {
+      return
+    }
+
+    const paragraph = normalizeParagraphText(paragraphBuffer.join(' '))
+    if (paragraph) {
+      current.paragraphs.push(paragraph)
+    }
+    paragraphBuffer = []
+  }
 
   const flush = () => {
+    flushParagraph()
     if (current.paragraphs.length === 0 && current.bullets.length === 0) {
       return
     }
@@ -66,22 +105,23 @@ function buildPublisherArticleSections(text: string) {
       continue
     }
 
-    const titled = sectionTitleFromLine(line)
+    const titled = markdownTitleFromLine(line) ?? sectionTitleFromLine(line)
     if (titled) {
       flush()
       current = createEmptySection(sections.length, titled.title)
       if (titled.rest) {
-        current.paragraphs.push(titled.rest)
+        paragraphBuffer.push(titled.rest)
       }
       continue
     }
 
     if (isBulletLine(line)) {
+      flushParagraph()
       current.bullets.push(toBullet(line))
       continue
     }
 
-    current.paragraphs.push(line)
+    paragraphBuffer.push(line)
   }
 
   flush()
@@ -91,7 +131,7 @@ function buildPublisherArticleSections(text: string) {
       {
         id: 'section-0',
         title: null,
-        paragraphs: text ? [text] : [],
+        paragraphs: text ? [normalizeParagraphText(text)] : [],
         bullets: [],
       },
     ]

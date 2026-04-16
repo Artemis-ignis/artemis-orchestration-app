@@ -350,6 +350,33 @@
   - the official free router failure is visible inline instead of hiding the rest of the run,
   - leaving `#/agents` for `#/settings` and coming back keeps the latest session visible.
 
+### Artemis Wire publisher polish
+
+- Reframed the generic source-agnostic publisher lane in `SignalsPage.tsx` as `Artemis Wire` so the UI now reads like a product feature instead of an internal engine label.
+- Renamed the source-agnostic publisher layout classes from the old `x-autopost-*` naming to `publisher-*` in `src/styles/pages/support.css`.
+- Upgraded the article reader in `src/features/publisher/PublisherArticle.tsx` so it now:
+  - supports markdown-style section headings,
+  - treats `•` as a bullet marker,
+  - merges wrapped lines into real paragraphs,
+  - uses a narrower centered article measure for easier reading.
+- Improved the Artemis Wire detail panel in `SignalsPage.tsx` with:
+  - readable mode labels,
+  - readable summary/source-type chips,
+  - clearer draft/published headers,
+  - explicit publish-target and source metadata summaries.
+- Improved the Signals copy so the three lanes are now clearer:
+  - `실시간 시그널`
+  - `Artemis Wire`
+  - `심층 리포트`
+- Added a recent Artemis Wire posts summary to `ActivityPage.tsx` so internal publishing output is visible from the activity screen and not only from Signals.
+- Re-ran local verification after the UI pass:
+  - `npm ci`
+  - `npm run lint`
+  - `npm run build`
+  - `node --test local-bridge/ai/router.test.mjs local-bridge/publisher/pipeline.test.mjs`
+  - Playwright browser checks on `#/signals` and `#/activity`
+  - full-page screenshots saved to `output/playwright/wire-verify/signals-wire.png` and `output/playwright/wire-verify/activity-wire.png`
+
 ### Service usability pass
 
 - Added a chat status banner for the currently selected model so the user can see whether Ollama, Codex CLI, or the official free router is actually ready before sending a message.
