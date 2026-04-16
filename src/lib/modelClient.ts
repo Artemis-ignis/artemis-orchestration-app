@@ -5,6 +5,23 @@ import type {
   SettingsState,
   ToolItem,
 } from '../state/types'
+import type {
+  AutoPostDetailResponse,
+  AutoPostExportResponse,
+  AutoPostsListResponse,
+  AutoPostsRunResponse,
+  AutoPostsStateResponse,
+} from '../types/autoPosts'
+import type {
+  XAutopostDraftActionResponse,
+  XAutopostRunResponse,
+  XAutopostStateResponse,
+} from '../types/xAutopost'
+import type {
+  PublisherDraftActionResponse,
+  PublisherRunResponse,
+  PublisherStateResponse,
+} from '../types/publisher'
 
 export type ProviderStatus = {
   provider: 'ollama' | 'codex'
@@ -12,6 +29,11 @@ export type ProviderStatus = {
   ready: boolean
   models: string[]
   detail: string
+  warning?: string | null
+  lastError?: string | null
+  stale?: boolean
+  lastCheckedAt?: string | null
+  lastSuccessAt?: string | null
 }
 
 export type BridgeHealth = {
@@ -56,6 +78,11 @@ export type SignalFeedItem = {
   source: string
   category: string
   publishedAt: string
+  sourceType?: string
+  sourceLabel?: string
+  categoryLabel?: string
+  discoveredAt?: string
+  rawMeta?: Record<string, unknown>
 }
 
 export type SignalFeedResponse = {
@@ -158,6 +185,338 @@ export async function fetchSkillCatalog(bridgeUrl: string) {
 }
 
 export const fetchSkillsCatalog = fetchSkillCatalog
+
+export async function fetchAutoPosts(bridgeUrl: string) {
+  const response = await fetchWithTimeout(`${bridgeUrl}/api/auto-posts`, undefined, 45_000)
+  return readJson<AutoPostsListResponse>(response)
+}
+
+export async function fetchAutoPostDetail(bridgeUrl: string, postId: string) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/auto-posts/${encodeURIComponent(postId)}`,
+    undefined,
+    45_000,
+  )
+  return readJson<AutoPostDetailResponse>(response)
+}
+
+export async function fetchAutoPostState(bridgeUrl: string) {
+  const response = await fetchWithTimeout(`${bridgeUrl}/api/auto-posts/state`, undefined, 20_000)
+  return readJson<AutoPostsStateResponse>(response)
+}
+
+export async function runAutoPosts({
+  bridgeUrl,
+  category,
+  limit,
+  force = false,
+}: {
+  bridgeUrl: string
+  category?: string
+  limit?: number
+  force?: boolean
+}) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/auto-posts/run`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ category, limit, force }),
+    },
+    260_000,
+  )
+  return readJson<AutoPostsRunResponse>(response)
+}
+
+export async function regenerateAutoPost(bridgeUrl: string, postId: string) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/auto-posts/${encodeURIComponent(postId)}/regenerate`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({}),
+    },
+    260_000,
+  )
+  return readJson<AutoPostsRunResponse>(response)
+}
+
+export async function updateAutoPostSettings({
+  bridgeUrl,
+  patch,
+}: {
+  bridgeUrl: string
+  patch: Record<string, unknown>
+}) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/auto-posts/settings`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify(patch),
+    },
+    30_000,
+  )
+  return readJson<AutoPostsStateResponse>(response)
+}
+
+export async function exportAutoPost({
+  bridgeUrl,
+  postId,
+  format = 'html',
+}: {
+  bridgeUrl: string
+  postId: string
+  format?: 'html' | 'markdown'
+}) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/auto-posts/${encodeURIComponent(postId)}/publish-export`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ format }),
+    },
+    30_000,
+  )
+  return readJson<AutoPostExportResponse>(response)
+}
+
+export async function revealAutoPostFolder({
+  bridgeUrl,
+  postId,
+}: {
+  bridgeUrl: string
+  postId: string
+}) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/auto-posts/${encodeURIComponent(postId)}/reveal`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({}),
+    },
+    20_000,
+  )
+  return readJson<{ ok: boolean; absolutePath: string }>(response)
+}
+
+export async function fetchXAutopostState(bridgeUrl: string) {
+  const response = await fetchWithTimeout(`${bridgeUrl}/api/x-autopost/state`, undefined, 20_000)
+  return readJson<XAutopostStateResponse>(response)
+}
+
+export async function fetchPublisherState(bridgeUrl: string) {
+  const response = await fetchWithTimeout(`${bridgeUrl}/api/publisher/state`, undefined, 20_000)
+  return readJson<PublisherStateResponse>(response)
+}
+
+export async function fetchPublisherQueue(bridgeUrl: string) {
+  const response = await fetchWithTimeout(`${bridgeUrl}/api/publisher/queue`, undefined, 30_000)
+  return readJson<PublisherStateResponse>(response)
+}
+
+export async function runPublisher({
+  bridgeUrl,
+  limit,
+  force = false,
+  reason,
+  seedItems = [],
+}: {
+  bridgeUrl: string
+  limit?: number
+  force?: boolean
+  reason?: string
+  seedItems?: unknown[]
+}) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/publisher/run`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ limit, force, reason, seedItems }),
+    },
+    120_000,
+  )
+  return readJson<PublisherRunResponse>(response)
+}
+
+export async function updatePublisherSettings({
+  bridgeUrl,
+  patch,
+}: {
+  bridgeUrl: string
+  patch: Record<string, unknown>
+}) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/publisher/settings`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify(patch),
+    },
+    30_000,
+  )
+  return readJson<PublisherStateResponse>(response)
+}
+
+export async function approvePublisherDraft(bridgeUrl: string, draftId: string) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/publisher/${encodeURIComponent(draftId)}/approve`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({}),
+    },
+    20_000,
+  )
+  return readJson<PublisherDraftActionResponse>(response)
+}
+
+export async function rejectPublisherDraft(bridgeUrl: string, draftId: string, reason = 'operator_rejected') {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/publisher/${encodeURIComponent(draftId)}/reject`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ reason }),
+    },
+    20_000,
+  )
+  return readJson<PublisherDraftActionResponse>(response)
+}
+
+export async function publishPublisherDraftNow(bridgeUrl: string, draftId: string, dryRun = false) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/publisher/${encodeURIComponent(draftId)}/publish`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ dryRun }),
+    },
+    30_000,
+  )
+  return readJson<PublisherDraftActionResponse>(response)
+}
+
+export async function fetchXAutopostQueue(bridgeUrl: string) {
+  const response = await fetchWithTimeout(`${bridgeUrl}/api/x-autopost/queue`, undefined, 30_000)
+  return readJson<XAutopostStateResponse>(response)
+}
+
+export async function runXAutopost({
+  bridgeUrl,
+  category,
+  limit,
+  force = false,
+  seedItems = [],
+  reason,
+}: {
+  bridgeUrl: string
+  category?: string
+  limit?: number
+  force?: boolean
+  seedItems?: unknown[]
+  reason?: string
+}) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/x-autopost/run`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ category, limit, force, seedItems, reason }),
+    },
+    120_000,
+  )
+  return readJson<XAutopostRunResponse>(response)
+}
+
+export async function updateXAutopostSettings({
+  bridgeUrl,
+  patch,
+}: {
+  bridgeUrl: string
+  patch: Record<string, unknown>
+}) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/x-autopost/settings`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify(patch),
+    },
+    30_000,
+  )
+  return readJson<XAutopostStateResponse>(response)
+}
+
+export async function approveXAutopostDraft(bridgeUrl: string, draftId: string) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/x-autopost/${encodeURIComponent(draftId)}/approve`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({}),
+    },
+    20_000,
+  )
+  return readJson<XAutopostDraftActionResponse>(response)
+}
+
+export async function rejectXAutopostDraft(bridgeUrl: string, draftId: string, reason = 'operator_rejected') {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/x-autopost/${encodeURIComponent(draftId)}/reject`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ reason }),
+    },
+    20_000,
+  )
+  return readJson<XAutopostDraftActionResponse>(response)
+}
+
+export async function publishXAutopostDraftNow(bridgeUrl: string, draftId: string, dryRun = false) {
+  const response = await fetchWithTimeout(
+    `${bridgeUrl}/api/x-autopost/${encodeURIComponent(draftId)}/publish`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ dryRun }),
+    },
+    30_000,
+  )
+  return readJson<XAutopostDraftActionResponse>(response)
+}
 
 export async function executeModelPrompt({
   bridgeUrl,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState, type PropsWithChildren } from 'react'
+import { useEffect, useMemo, useReducer, useRef, useState, type PropsWithChildren } from 'react'
 import {
   executeModelPrompt,
   fetchBridgeHealth,
@@ -9,6 +9,7 @@ import {
   type BridgeHealth,
 } from '../lib/modelClient'
 import {
+  fetchAiSettings,
   streamAiChat,
   type AiStreamAttemptEvent,
   type AiRoutingMessageMeta,
@@ -82,8 +83,8 @@ function buildPromptHistory(
   messages: Array<{ role: string; text: string }>,
   limit: number,
 ): Array<{ role: 'master'; text: string }> {
-  // 이전 assistant 답변 문체가 다음 모델 호출에 전염되지 않도록
-  // 사용자의 최근 요청만 컨텍스트로 전달한다.
+  // 이전 assistant 응답은 다음 모델 호출에 섞이지 않도록 하고,
+  // 사용자의 최근 요청만 컨텍스트로 전달합니다.
   return messages
     .filter((message) => message.role === 'master')
     .slice(-limit)
@@ -96,13 +97,13 @@ function buildPromptHistory(
 const RUN_PROGRESS_LOG_STEPS = [
   { delayMs: 2_000, message: '실행기가 요청을 확인하는 중입니다.' },
   { delayMs: 6_000, message: '응답 초안을 준비하는 중입니다.' },
-  { delayMs: 14_000, message: '최종 답변을 모으는 중입니다. 조금만 더 기다려 주세요.' },
-  { delayMs: 30_000, message: '지연이 길어지고 있습니다. 완료 전까지 계속 상태를 갱신합니다.' },
+  { delayMs: 14_000, message: '최종 응답을 모으는 중입니다. 조금만 기다려 주세요.' },
+  { delayMs: 30_000, message: '지연이 길어지고 있습니다. 완료될 때까지 계속 상태를 갱신합니다.' },
   { delayMs: 60_000, message: '응답이 늦어지고 있습니다. 타임아웃 전까지 대기합니다.' },
 ]
 
 function shouldAttachSignalsContext(task: string) {
-  return /(소식|뉴스|동향|브리핑|트렌드|업데이트|신호)/.test(task)
+  return /(\\uC18C\\uC2DD|\\uB274\\uC2A4|\\uB3D9\\uD5A5|\\uBE0C\\uB9AC\\uD551|\\uD2B8\\uB80C\\uB4DC|\\uC5C5\\uB370\\uC774\\uD2B8|\\uC2E0\\uD638)/.test(task)
 }
 
 function buildSignalsContext(
@@ -124,21 +125,30 @@ function buildOfficialRouterSystemPrompt({
   workspacePath: string
 }) {
   return [
-    `너의 이름은 ${agentName || '아르테미스'}다. 사용자를 항상 마스터라고 부른다.`,
-    '항상 한국어로 답하고, 요청이 분명하면 바로 짧고 정확하게 답한다.',
-    '짧은 인사나 잡담에는 자연스럽고 부담 없이 답한다.',
-    '불필요한 "결론:", "다음 조치:" 같은 템플릿 문구는 쓰지 않는다.',
-    '요청이 애매할 때만 한 가지 짧은 질문으로 되묻는다.',
-    '실제로 하지 않은 파일 수정, 실행, 검색을 했다고 말하지 않는다.',
-    '현재 세션은 공식 API 무료 후보를 고르는 채팅 경로이므로, 실제 파일 수정이 필요하면 Codex CLI가 필요하다고 짧게 안내한다.',
-    workspacePath ? `참고 작업 경로: ${workspacePath}` : '',
+    'You are ' + (agentName || 'Artemis') + '. Call the user Master.',
+    'Reply in Korean when possible and keep answers concise.',
+    'Do not claim file edits or commands you did not actually run.',
+    'If real file edits are required, say Codex CLI is needed.',
+    workspacePath ? 'Workspace: ' + workspacePath : '',
   ]
     .filter(Boolean)
     .join('\n')
 }
 
+function resolveOfficialProviderId(baseUrl: string) {
+  const normalized = baseUrl.trim().toLowerCase()
+  if (normalized === 'openrouter' || normalized === 'nvidia-build' || normalized === 'gemini') {
+    return normalized
+  }
+  return 'openrouter'
+}
+
 function describeRoutingMeta(meta: AiStreamMetaEvent) {
-  return `${meta.routing_mode} · 무료 후보 ${meta.candidate_count}개 확인`
+  if (meta.routing_mode === 'manual' && meta.top_candidate) {
+    return '직접 호출 - ' + meta.top_candidate.provider_label + ' - ' + meta.top_candidate.display_name
+  }
+
+  return meta.routing_mode + ' · 후보 ' + meta.candidate_count + '개'
 }
 
 function describeRoutingAttempt(attempt: AiStreamAttemptEvent) {
@@ -193,7 +203,7 @@ function saveWorkspacePrefs(rootPath: string, currentPath: string, showSystemEnt
         }),
     )
   } catch (error) {
-    console.warn('Artemis 작업 폴더 상태 저장에 실패했습니다.', error)
+    console.warn('Artemis ?묒뾽 ?대뜑 ?곹깭 ??μ뿉 ?ㅽ뙣?덉뒿?덈떎.', error)
   }
 }
 
@@ -207,6 +217,7 @@ function clearWorkspacePrefs() {
 
 export function ArtemisProvider({ children }: PropsWithChildren) {
   const [state, dispatch] = useReducer(runtimeReducer, undefined, loadRuntimeState)
+  const agentItemsRef = useRef(state.agents.items)
   const [bridgeHealth, setBridgeHealth] = useState<BridgeHealth | null>(null)
   const [bridgeError, setBridgeError] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -227,6 +238,16 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
   )
   const [workspaceLoading, setWorkspaceLoading] = useState(false)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
+
+  const applyBridgeHealthSuccess = (nextHealth: BridgeHealth) => {
+    setBridgeHealth(nextHealth)
+    setBridgeError(null)
+  }
+
+  const applyBridgeHealthFailure = (error: unknown, fallbackMessage: string) => {
+    setBridgeError(error instanceof Error ? error.message : fallbackMessage)
+  }
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       saveRuntimeState(state)
@@ -234,6 +255,10 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
 
     return () => window.clearTimeout(timer)
   }, [state])
+
+  useEffect(() => {
+    agentItemsRef.current = state.agents.items
+  }, [state.agents.items])
 
   useEffect(() => {
     saveWorkspacePrefs(workspaceRootPath, workspaceCurrentPath, workspaceShowSystemEntries)
@@ -290,7 +315,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       applyWorkspaceListing(listing)
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : '작업 폴더를 불러오지 못했습니다.'
+        error instanceof Error ? error.message : '?묒뾽 ?대뜑瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??'
       setWorkspaceError(message)
     } finally {
       setWorkspaceLoading(false)
@@ -308,7 +333,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       applyWorkspaceListing(listing)
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : '작업 폴더 연결에 실패했습니다.'
+        error instanceof Error ? error.message : '?묒뾽 ?대뜑 ?곌껐???ㅽ뙣?덉뒿?덈떎.'
       setWorkspaceError(message)
       throw error
     } finally {
@@ -334,7 +359,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       setWorkspaceShowSystemEntries(visible)
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : '작업 폴더 표시 옵션을 반영하지 못했습니다.'
+        error instanceof Error ? error.message : '?묒뾽 ?대뜑 ?쒖떆 ?듭뀡??諛섏쁺?섏? 紐삵뻽?듬땲??'
       setWorkspaceError(message)
     } finally {
       setWorkspaceLoading(false)
@@ -409,13 +434,9 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
   const refreshBridgeHealth = async () => {
     try {
       const nextHealth = await fetchBridgeHealth(state.settings.bridgeUrl)
-      setBridgeHealth(nextHealth)
-      setBridgeError(null)
+      applyBridgeHealthSuccess(nextHealth)
     } catch (error) {
-      setBridgeHealth(null)
-      setBridgeError(
-        error instanceof Error ? error.message : '모델 브리지 상태를 확인하지 못했습니다.',
-      )
+      applyBridgeHealthFailure(error, '紐⑤뜽 釉뚮━吏 ?곹깭瑜??뺤씤?섏? 紐삵뻽?듬땲??')
     }
   }
 
@@ -428,7 +449,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       })
       setBridgeError(null)
     } catch (error) {
-      setBridgeError(error instanceof Error ? error.message : '스킬 목록을 불러오지 못했습니다.')
+      setBridgeError(error instanceof Error ? error.message : '?ㅽ궗 紐⑸줉??遺덈윭?ㅼ? 紐삵뻽?듬땲??')
     }
   }
 
@@ -436,10 +457,11 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
     let active = true
 
     const bootstrap = async () => {
-      const [healthResult, skillResult, defaultWorkspaceResult] = await Promise.allSettled([
+      const [healthResult, skillResult, defaultWorkspaceResult, aiSettingsResult] = await Promise.allSettled([
         fetchBridgeHealth(state.settings.bridgeUrl),
         fetchSkillCatalog(state.settings.bridgeUrl),
         fetchDefaultWorkspaceRoot(state.settings.bridgeUrl),
+        fetchAiSettings(state.settings.bridgeUrl),
       ])
 
       if (!active) {
@@ -447,15 +469,9 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       }
 
       if (healthResult.status === 'fulfilled') {
-        setBridgeHealth(healthResult.value)
-        setBridgeError(null)
+        applyBridgeHealthSuccess(healthResult.value)
       } else {
-        setBridgeHealth(null)
-        setBridgeError(
-          healthResult.reason instanceof Error
-            ? healthResult.reason.message
-            : '초기 연결 상태를 준비하지 못했습니다.',
-        )
+        applyBridgeHealthFailure(healthResult.reason, '珥덇린 ?곌껐 ?곹깭瑜?以鍮꾪븯吏 紐삵뻽?듬땲??')
       }
 
       if (skillResult.status === 'fulfilled') {
@@ -464,7 +480,31 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           items: skillResult.value.items.map((item) => ({ ...item, enabled: false })),
         })
       } else {
-        console.warn('Artemis 스킬 목록을 불러오지 못했습니다.', skillResult.reason)
+        console.warn('Artemis ?ㅽ궗 紐⑸줉??遺덈윭?ㅼ? 紐삵뻽?듬땲??', skillResult.reason)
+      }
+
+      if (aiSettingsResult.status === 'fulfilled') {
+        const officialProvider = aiSettingsResult.value.manual_provider
+          ? resolveOfficialProviderId(aiSettingsResult.value.manual_provider)
+          : null
+        const officialModel = aiSettingsResult.value.manual_model?.trim() ?? ''
+
+        if (officialProvider && officialModel) {
+          agentItemsRef.current
+            .filter((item) => item.provider === 'official-router')
+            .forEach((agent) => {
+              if (agent.baseUrl !== officialProvider || agent.model !== officialModel) {
+                dispatch({
+                  type: 'UPDATE_AGENT',
+                  agentId: agent.id,
+                  patch: {
+                    baseUrl: officialProvider,
+                    model: officialModel,
+                  },
+                })
+              }
+            })
+        }
       }
 
       const persistedWorkspace = loadWorkspacePrefs()
@@ -477,7 +517,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       setWorkspaceShowSystemEntries(initialShowSystemEntries)
 
       if (!initialRoot) {
-        setWorkspaceError('작업 폴더를 확인하지 못했습니다.')
+        setWorkspaceError('?묒뾽 ?대뜑瑜??뺤씤?섏? 紐삵뻽?듬땲??')
         return
       }
 
@@ -507,10 +547,10 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
             setWorkspaceError(
               fallbackError instanceof Error
                 ? fallbackError.message
-                : '작업 폴더를 불러오지 못했습니다.',
+                : '?묒뾽 ?대뜑瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??',
             )
           }
-          console.warn('Artemis 작업 폴더 초기화에 실패했습니다.', error)
+          console.warn('Artemis ?묒뾽 ?대뜑 珥덇린?붿뿉 ?ㅽ뙣?덉뒿?덈떎.', error)
         }
       }
     }
@@ -610,6 +650,13 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         const rootPath = await ensureWorkspaceRoot()
 
         if (selectedAgent?.provider === 'official-router') {
+          const officialProvider = resolveOfficialProviderId(selectedAgent.baseUrl)
+          const officialModel = selectedAgent.model.trim()
+
+          if (!officialModel) {
+            throw new Error('Official API model ID is empty. Check provider and model settings.')
+          }
+
           let finalEvent: AiStreamFinalEvent | null = null
           let streamError: string | null = null
           let streamedText = ''
@@ -624,6 +671,9 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
               sessionId: activeThread.id,
               prompt: nextPrompt,
               messages: buildPromptHistory(activeThread.messages, 12),
+              routing_mode: 'manual',
+              manual_provider: officialProvider,
+              manual_model: officialModel,
               systemPrompt: officialRouterSystemPrompt,
             },
             {
@@ -652,7 +702,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           const finalPayload = finalEvent as AiStreamFinalEvent | null
 
           if (!finalPayload) {
-            throw new Error('스트리밍은 연결됐지만 최종 응답을 마무리하지 못했습니다.')
+            throw new Error('?ㅽ듃由щ컢? ?곌껐?먯?留?理쒖쥌 ?묐떟??留덈Т由ы븯吏 紐삵뻽?듬땲??')
           }
 
           const routingMeta: AiRoutingMessageMeta = {
@@ -693,14 +743,14 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           selectedAgent?.provider === 'openai-compatible' &&
           !state.apiKeys.find((item) => item.id === selectedAgent.apiKeyId)
         ) {
-          throw new Error('이 에이전트는 API 키가 필요합니다. 설정에서 먼저 연결해 주세요.')
+          throw new Error('???먯씠?꾪듃??API ?ㅺ? ?꾩슂?⑸땲?? ?ㅼ젙?먯꽌 癒쇱? ?곌껐??二쇱꽭??')
         }
 
         if (
           selectedAgent?.provider === 'anthropic' &&
           !state.apiKeys.find((item) => item.id === selectedAgent.apiKeyId)
         ) {
-          throw new Error('Claude 에이전트는 API 키가 필요합니다. 설정에서 먼저 연결해 주세요.')
+          throw new Error('Claude ?먯씠?꾪듃??API ?ㅺ? ?꾩슂?⑸땲?? ?ㅼ젙?먯꽌 癒쇱? ?곌껐??二쇱꽭??')
         }
 
         const response = await executeModelPrompt({
@@ -734,8 +784,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         await refreshWorkspace(workspaceCurrentPath)
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : '모델 실행 중 오류가 발생했습니다.'
-        setBridgeError(message)
+          error instanceof Error ? error.message : '紐⑤뜽 ?ㅽ뻾 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.'
         dispatch({ type: 'APPEND_CHAT_ERROR', prompt: nextPrompt, error: message })
       } finally {
         setIsGenerating(false)
@@ -759,6 +808,11 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
     updateSettings: (patch) => dispatch({ type: 'UPDATE_SETTINGS', patch }),
     selectChatModel: (provider, model) =>
       dispatch({ type: 'SELECT_CHAT_MODEL', provider, model }),
+    setOrchestrationDraft: (text) => dispatch({ type: 'SET_ORCHESTRATION_DRAFT', text }),
+    setOrchestrationSelection: (agentIds) =>
+      dispatch({ type: 'SET_ORCHESTRATION_SELECTION', agentIds }),
+    startOrchestrationSession: ({ startedAt, task, agentIds }) =>
+      dispatch({ type: 'START_ORCHESTRATION_SESSION', startedAt, task, agentIds }),
     addApiKey: (label, key, presetId) => dispatch({ type: 'ADD_API_KEY', label, key, presetId }),
     removeApiKey: (keyId) => dispatch({ type: 'REMOVE_API_KEY', keyId }),
     setActiveAgent: (agentId) => dispatch({ type: 'SET_ACTIVE_AGENT', agentId }),
@@ -777,7 +831,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         agent.provider === 'openai-compatible' &&
         !state.apiKeys.find((item) => item.id === agent.apiKeyId)
       ) {
-        setBridgeError('이 에이전트는 API 키가 필요합니다. 설정에서 먼저 연결해 주세요.')
+        setBridgeError('???먯씠?꾪듃??API ?ㅺ? ?꾩슂?⑸땲?? ?ㅼ젙?먯꽌 癒쇱? ?곌껐??二쇱꽭??')
         return
       }
 
@@ -785,7 +839,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         agent.provider === 'anthropic' &&
         !state.apiKeys.find((item) => item.id === agent.apiKeyId)
       ) {
-        setBridgeError('Claude 에이전트는 API 키가 필요합니다. 설정에서 먼저 연결해 주세요.')
+        setBridgeError('Claude ?먯씠?꾪듃??API ?ㅺ? ?꾩슂?⑸땲?? ?ㅼ젙?먯꽌 癒쇱? ?곌껐??二쇱꽭??')
         return
       }
 
@@ -850,7 +904,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
                 '[참고 신호]',
                 buildSignalsContext(contextItems),
                 '',
-                '위 신호를 참고해 최신 핵심만 빠르게 정리해 주세요.',
+                '위 신호를 참고해 최신 판단만 짧고 선명하게 정리해 주세요.',
               ].join('\n')
               pushRunLog('info', `최신 신호 ${contextItems.length}건을 참고 문맥으로 연결했습니다.`)
             } else {
@@ -862,6 +916,13 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         }
 
         if (agent.provider === 'official-router') {
+          const officialProvider = resolveOfficialProviderId(agent.baseUrl)
+          const officialModel = agent.model.trim()
+
+          if (!officialModel) {
+            throw new Error('Official API model ID is empty. Check provider and model settings.')
+          }
+
           let finalEvent: AiStreamFinalEvent | null = null
           let streamError: string | null = null
           let streamedText = ''
@@ -872,6 +933,9 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
               sessionId: runId,
               prompt: taskPrompt,
               messages: buildPromptHistory(activeThread.messages, 6),
+              routing_mode: 'manual',
+              manual_provider: officialProvider,
+              manual_model: officialModel,
               systemPrompt: agent.systemPrompt,
             },
             {
@@ -905,7 +969,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           const finalPayload = finalEvent as AiStreamFinalEvent | null
 
           if (!finalPayload) {
-            throw new Error('오케스트레이션 라우터가 최종 응답을 만들지 못했습니다.')
+            throw new Error('?ㅼ??ㅽ듃?덉씠???쇱슦?곌? 理쒖쥌 ?묐떟??留뚮뱾吏 紐삵뻽?듬땲??')
           }
 
           dispatch({
@@ -932,11 +996,11 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           return
         }
 
-        pushRunLog('info', `${agent.name} 실행기에 작업을 전달했습니다.`)
+        pushRunLog('info', `${agent.name} ?ㅽ뻾湲곗뿉 ?묒뾽???꾨떖?덉뒿?덈떎.`)
         if (agent.provider === 'codex' || agent.provider === 'ollama') {
           pushRunLog(
             'info',
-            '이 실행기는 결과를 한 번에 반환합니다. 최종 답변 전까지는 진행 로그가 먼저 갱신됩니다.',
+            '???ㅽ뻾湲곕뒗 寃곌낵瑜???踰덉뿉 諛섑솚?⑸땲?? 理쒖쥌 ?듬? ?꾧퉴吏??吏꾪뻾 濡쒓렇媛 癒쇱? 媛깆떊?⑸땲??',
           )
         }
 
@@ -984,8 +1048,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         await refreshWorkspace(workspaceCurrentPath)
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : '에이전트 실행 중 오류가 발생했습니다.'
-        setBridgeError(message)
+          error instanceof Error ? error.message : '?먯씠?꾪듃 ?ㅽ뻾 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.'
         dispatch({ type: 'FAIL_AGENT_RUN', runId, agentId, error: message })
       }
     },
@@ -1010,3 +1073,4 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
 
   return <ArtemisContext.Provider value={value}>{children}</ArtemisContext.Provider>
 }
+

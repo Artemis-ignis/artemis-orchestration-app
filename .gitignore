@@ -23,6 +23,10 @@ output/
 artemis-live-test/
 artemis-workspace-test/
 .codex-tmp-verify.js
+generated-posts/
+media-cache/
+/x-autopost/
+/publisher/
 
 # Editor directories and files
 .vscode/*

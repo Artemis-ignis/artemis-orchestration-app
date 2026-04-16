@@ -1,6 +1,288 @@
 # Change Log
 
+## 2026-04-17
+
+### Artemis Wire live dossier clustering
+
+- Added `local-bridge/publisher/dossiers.mjs` to cluster related draft and published records into live Artemis Wire dossiers.
+- Dossier clustering now combines items using:
+  - explicit `dossierId` / `dossierKey`
+  - source identity matches
+  - repeated `topicHash`
+  - overlapping title tokens and tags for the same story thread
+- Scheduler draft creation now stamps `dossierKey` and `dossierId` onto new queue entries so later lifecycle steps keep the story linkage.
+- Internal published records now store `dossierId` and `dossierKey`, allowing one live dossier to track both queued and already-published posts.
+- `GET /api/publisher/state` now returns:
+  - `dossiers`
+  - `metrics.dossierCount`
+- Added dossier coverage to `local-bridge/publisher/pipeline.test.mjs` and verified that a draft plus a related published post merge into one live dossier.
+- Rebuilt the Artemis Wire operator panel so it now shows:
+  - dossier overview
+  - live dossier list
+  - draft queue
+  - published history
+  - a detail pane that switches between dossier, draft, and published views
+- `SignalsPage.tsx` now keeps dossier selection state and lets the operator pivot directly from a dossier to drafts or published history without losing the rest of the Artemis Wire context.
+- `ActivityPage.tsx` now shows a `라이브 dossier` summary block so the tracked-story view is visible outside Signals.
+- Re-verified with:
+  - `npm run lint`
+  - `npm run build`
+  - `node --test local-bridge/ai/router.test.mjs local-bridge/publisher/pipeline.test.mjs`
+  - live browser screenshots under `output/playwright/wire-dossier/`
+
+## 2026-04-16
+
+### Source-agnostic publisher
+
+- Generalized the older X-centric autopost workflow into a source-agnostic publishing pipeline under `local-bridge/publisher/`.
+- Added provider-based ingestion modules for:
+  - arXiv
+  - Crossref
+  - Semantic Scholar
+  - News API
+  - configured RSS/Atom feeds
+  - legacy signal collection as a compatibility input
+- Added a normalized content schema that keeps:
+  - source type/provider
+  - canonical/source URLs
+  - title/subtitle
+  - authors
+  - publish timestamps
+  - abstract/snippet
+  - DOI/arXiv ids
+  - tags
+  - raw metadata
+- Added source-agnostic draft generation for internal website publishing with Korean summary types:
+  - `breaking`
+  - `brief-points`
+  - `paper-intro`
+- Added generic dedupe and quality gates for:
+  - canonical URL duplicates
+  - DOI duplicates
+  - arXiv duplicates
+  - near-title duplicates
+  - recent topic-hash reuse
+  - low novelty
+  - too-short or too-generic generated drafts
+- Added a publisher abstraction with:
+  - `internalPublisher`
+  - optional `xPublisher`
+- Kept internal publishing enabled by default and X publishing disabled by default unless credentials are configured.
+- Added persistent runtime storage for the generic publisher:
+  - queue
+  - state
+  - settings
+  - logs
+  - published history
+- Added bridge APIs for source-agnostic publishing:
+  - `GET /api/publisher/state`
+  - `GET /api/publisher/queue`
+  - `POST /api/publisher/run`
+  - `PATCH /api/publisher/settings`
+  - `POST /api/publisher/:id/approve`
+  - `POST /api/publisher/:id/reject`
+  - `POST /api/publisher/:id/publish`
+- Expanded `SignalsPage.tsx` so the operations panel now manages source-agnostic publishing instead of assuming X is the only target.
+- Expanded `ActivityPage.tsx` so the recent publish summary reflects internal publishing metrics and optional publisher status.
+- Added `src/types/publisher.ts` plus new bridge client helpers in `src/lib/modelClient.ts`.
+- Added `local-bridge/publisher/pipeline.test.mjs` to cover:
+  - provider normalization
+  - DOI/arXiv/url dedupe
+  - title similarity dedupe
+  - novelty gating
+  - approval to scheduled transitions
+  - cap overflow redirecting `publish now` back to `scheduled`
+  - internal publish success
+  - X-disabled fallback
+  - restart recovery
+- Added `/publisher/` to `.gitignore` so runtime queue and published feed files do not pollute commits.
+
+### Source-agnostic publisher reader polish
+
+- Added `src/features/publisher/PublisherArticle.tsx` to render draft and published internal posts as readable article-style content instead of raw preformatted text.
+- The new article renderer now:
+  - extracts heading-like lines into sections,
+  - keeps bullet lists readable,
+  - shows article metadata in a calmer reader header,
+  - moves source links into a dedicated footer block.
+- Updated `SignalsPage.tsx` so both:
+  - `게시 초안`
+  - `내부 게시 본문`
+  use the article-style renderer instead of a plain text dump.
+- Added article reader styling to `src/styles/pages/support.css`.
+- Re-verified in a live browser session that the Signals publisher panel now renders the internal post as a multi-section article view rather than a small raw text box.
+
+### X autopost pipeline
+
+- Added a dedicated X autopost pipeline under `local-bridge/x-autopost/` instead of overloading the article auto-post flow.
+- Added persistent queue, state, settings, and log storage for X publishing workflows under the runtime `x-autopost/` workspace directory.
+- Added X autopost statuses:
+  - `draft`
+  - `approved`
+  - `scheduled`
+  - `posted`
+  - `failed`
+  - `skipped`
+- Added draft generation that reuses signal-like source items, prefers Codex-generated Korean copy, and falls back to a rules-based X post builder when needed.
+- Added draft metadata fields for:
+  - source url/title/summary
+  - topic hash
+  - novelty score
+  - generated text
+  - scheduled/post timestamps
+  - X post id
+  - retry info
+  - error and skip reasons
+- Added guardrails for:
+  - duplicate source urls
+  - duplicate topic hashes inside a cooldown window
+  - near-duplicate generated copy
+  - low novelty
+  - missing source urls when required
+  - too-short or too-generic posts
+  - banned certainty/clickbait phrases
+- Added an official X publisher adapter that targets `POST /2/tweets` and uses environment-variable credentials only.
+- Added publisher auth handling for:
+  - direct user access token
+  - refresh-token-based token renewal with client id and optional client secret
+  - disabled or missing-auth dry-run fallback
+- Added scheduler logic for:
+  - hourly and daily publish caps
+  - minimum interval spacing
+  - retry backoff
+  - persistent queue recovery after process restart
+- Wired the bridge with new APIs:
+  - `GET /api/x-autopost/state`
+  - `GET /api/x-autopost/queue`
+  - `POST /api/x-autopost/run`
+  - `PATCH /api/x-autopost/settings`
+  - `POST /api/x-autopost/:id/approve`
+  - `POST /api/x-autopost/:id/reject`
+  - `POST /api/x-autopost/:id/publish`
+- Added frontend bridge client helpers and shared types for the X autopost API surface.
+- Expanded `SignalsPage.tsx` with a new `X 자동 게시` operations tab that supports:
+  - queue refresh
+  - queue seeding from the current category
+  - mode/cap/model settings
+  - per-draft approve/reject/publish actions
+  - recent operator and publish logs
+- Added an Activity-page summary panel for recent X autopost counts and logs.
+- Added branch-local tests in `local-bridge/x-autopost/pipeline.test.mjs` for queue generation, dedupe, scheduler interval, dry-run fallback, and publish state transitions.
+- Added `/x-autopost/` to `.gitignore` so runtime queue output does not pollute commits, while keeping `local-bridge/x-autopost/` tracked.
+- Verified end to end on the branch-local bridge and preview servers that:
+  - a draft can be created,
+  - duplicate source urls are skipped,
+  - approval moves to scheduled on the next scheduler tick,
+  - publish-now records a dry-run post when X auth is not configured,
+  - Signals and Activity both show the new operating data in the UI.
+
+### X autopost follow-up hardening
+
+- Changed approval handling so a newly approved draft is scheduled immediately instead of waiting for the next scheduler poll loop just to get a slot.
+- Updated queue-state bookkeeping so `nextPublishAt` is recalculated from the actual scheduled queue whenever:
+  - a draft is approved,
+  - scheduling runs,
+  - a publish succeeds,
+  - a publish is delayed or retried.
+- Added a publish-window guard to `publishDraftNow()` so operator-triggered `publish now` also respects:
+  - hourly cap
+  - daily cap
+  - minimum spacing interval
+- When the current publish window is full, `publish now` now:
+  - keeps the draft in the queue,
+  - moves it to `scheduled`,
+  - stores a human-readable reason with the next eligible slot instead of forcing an over-cap publish.
+- Added tests for:
+  - next-eligible publish-time calculation under the hourly cap
+  - manual publish being deferred into `scheduled` instead of publishing immediately when the cap is full.
+
 ## 2026-04-15
+
+### Settings pane refactor and screenshot refresh
+
+- Split the settings models/runtime tab into dedicated UI-only sections so the premium shell branch no longer keeps all settings runtime/provider/agent JSX in one 1000-line file.
+- Added focused section files for:
+  - overview summary
+  - local runtime cards
+  - official provider cards
+  - default official target selection
+  - managed chat-agent editing
+- Moved shared provider/runtime labels, status copy, and model parsing helpers into `src/features/settings/settingsModelsShared.ts`.
+- Kept the settings screen behavior intact while making the main `SettingsModelsPane.tsx` a smaller state container.
+- Re-ran lint, build, backend router tests, and fresh Playwright captures after the split to confirm there was no UI regression.
+- Refreshed the public settings/files/chat/orchestration screenshots again from the latest reviewed premium-shell build so docs and marketing assets stay current.
+
+### Premium UI shell follow-up
+
+- Continued the UI-only redesign work on the dedicated `feat/premium-ui-shell` worktree without mixing in the non-UI bridge and signals changes from the other branch.
+- Replaced `src/pages/SettingsPage.tsx` with a small tab-shell page and moved the entire models/runtime/provider section into `src/features/settings/SettingsModelsPane.tsx`.
+- Rewrote `src/features/settings/SettingsProfilePane.tsx` and `src/features/settings/SettingsPreferencesPane.tsx` so the copy and field hierarchy match the premium control-room UI language.
+- Refined the design system with calmer interaction rules:
+  - removed the lift-on-hover motion from shared buttons and chips,
+  - added disabled-state consistency in `base.css`,
+  - flattened settings/runtime/provider panels further.
+- Improved chat idle UX:
+  - shortened visible workspace context to a folder label,
+  - added a proper hero surface for the empty conversation state,
+  - kept the route/model/status summary visible without overwhelming the page.
+- Improved files UX:
+  - widened the browser/inspector split,
+  - added clearer list hover feedback,
+  - made the empty inspector area feel like an intentional product state,
+  - replaced the always-visible absolute root-path input with a collapsed root summary card plus an explicit edit mode.
+- Improved orchestration UX:
+  - increased canvas emphasis,
+  - reduced right-rail visual weight,
+  - made the control rail sticky on desktop so the graph stays the hero surface.
+- Re-ran desktop, tablet, and mobile Playwright screenshots after the second pass and confirmed that:
+  - settings now reads as one system instead of stacked legacy cards,
+  - chat idle state no longer feels like an unfinished blank workspace,
+  - files and orchestration match the same shell, spacing, and panel language.
+- Refreshed `docs/screenshots/chat.png`, `files.png`, `settings.png`, `orchestration.png` and the matching `public/marketing/workspace-*.png` assets from the latest reviewed premium-shell captures.
+- Ran a tracked-text privacy scan for the literal local workspace path, username, and obvious key prefixes before preparing the branch for publish; no tracked text matches were found for the local path or username.
+
+### Orchestration flow and readiness fix
+
+- Replaced the noisy orchestration graph with an execution-first flow that keeps only `input`, `parallel hub`, selected workers, and one `result` node.
+- Removed decorative side nodes such as memory, files, insights, activity, and merge branches from the main parallel canvas so the run path is easier to understand at a glance.
+- Added explicit canvas-side worker readiness input from `OrchestrationPage.tsx` so the graph can distinguish runtime availability from run history.
+- Changed worker badge resolution to separate real runtime readiness from execution history:
+  - connected runtime with no run -> `connected`
+  - connected runtime after a session exists but before that worker starts -> `execution standby`
+  - unavailable runtime -> `not ready`
+  - running, success, or error -> live run state
+- Fixed the Codex CLI worker so it no longer shows a misleading idle badge simply because no recent run object exists while the runtime is actually connected.
+- Verified in browser that the orchestration worker badges now render as `connected` for ready workers before execution, and that the simplified graph no longer looks like a decorative systems map.
+
+### Official API direct-mode cleanup
+
+- Removed the official free-routing UX from settings and kept only provider connection plus a saved default model target.
+- Changed the official managed agent copy, chat selector, orchestration status, and settings summaries from `공식 무료` / free-router wording to `공식 API` direct-call wording.
+- Synced the official managed agent from bridge AI settings during app bootstrap so a fresh browser session keeps the saved provider/model instead of falling back to the seed default.
+- Kept backend execution on `routing_mode: manual` and added a synthetic direct candidate path so typed model IDs can run even when they are not part of the stored candidate list.
+- Changed official execution failures to report `선택한 공식 API 호출이 실패했습니다.` and changed fallback copy from `무료 후보` to neutral `자동 후보` wording.
+- Fixed orchestration canvas labels so direct model ids like `deepseek/deepseek-r1:free` render as readable worker labels such as `DeepSeek R1` instead of collapsing to `free`.
+- Cleaned broken orchestration progress and routing log strings in `AppState.tsx` so live run cards now show readable Korean status text.
+- Fixed the official target quick-pick grid so the current model and saved custom ids are always pinned first; `openrouter/elephant-alpha` now stays visible instead of getting dropped by the old top-8 ranked slice.
+- Verified in fresh Playwright browser sessions that:
+  - settings shows only direct provider/model controls for the official path,
+  - chat restores the saved official target on boot and shows it as `공식 API`,
+  - official chat failures now use the direct-call error copy,
+  - orchestration shows `공식 API · 준비됨 · OpenRouter · deepseek/deepseek-r1:free`,
+  - orchestration live logs now render readable Korean progress text.
+
+### UI/UX simplification pass
+
+- Reduced shell and page chrome by removing heavy card shadows from the main workspace surfaces and tightening the page intro hierarchy.
+- Reworked the settings models tab to start with three compact overview cards and short actions instead of a rule-strip plus multiple equally loud instruction blocks.
+- Renamed the settings disclosures to task-based titles and left `공식 API 키와 연결` collapsed by default so routine model selection is easier to scan.
+- Removed the provider step-flow strip from each official provider card and kept only the fields and status that affect real execution.
+- Reworked chat to show a compact status rail for readiness, warnings, and bridge errors instead of stacking multiple full-width banners ahead of the conversation.
+- Reworked orchestration to show compact per-model readiness tiles, group runner warnings into one status list, and keep a permanent `실행 결과` area visible before the first run.
+- Verified in Playwright that:
+  - settings renders 3 overview cards and keeps 2 disclosure sections collapsed on first open,
+  - orchestration shows compact model status tiles and a dedicated result area even before execution,
+  - chat renders the new status rail while keeping the conversation-first layout.
 
 ### Routing stability audit
 
@@ -37,3 +319,114 @@
 - Resynced `public/marketing/workspace-chat.png`, `workspace-files.png`, and `workspace-orchestration.png` from the latest safe screenshots.
 - Re-scanned tracked text files for the literal local workspace path and found no remaining plain-text leaks.
 - Added a dedicated doc-screenshot mode for settings so saved provider keys and personal connection state are not rendered into public screenshots.
+
+### Local runtime health hardening
+
+- Added an explicit Ollama health timeout in `local-bridge/server.mjs` and applied it to the `/api/tags` response body parse as well.
+- Cached the last successful Ollama runtime snapshot so `/api/health` can return the last confirmed model state with `warning`, `lastError`, `stale`, and timestamp fields instead of collapsing to an empty model list.
+- Changed the frontend bridge-health refresh path to preserve the last confirmed `bridgeHealth` state and update only `bridgeError` on refresh/bootstrap failures.
+- Reworked the local runtime cards in settings so the section never disappears and the Ollama card always shows readiness, model count, current model, latest warning/error, and a working refresh button.
+- Verified in headless Playwright that a forced `/api/health` failure no longer collapses the local runtime card to `0개 모델`.
+- Regenerated `docs/screenshots/settings.png` so the public settings screenshot matches the new stable local-runtime UI.
+- Removed the temporary duplicated commented block left in `src/pages/SettingsPage.tsx` after the hotfix so the file is smaller and easier to maintain.
+
+### Signals auto-post generator
+
+- Added a new auto-post pipeline under `local-bridge/auto-posts/` with separate modules for normalization, scoring, media collection, generation, storage, candidate collection, and scheduling.
+- Reused the existing signal query and source collectors from `local-bridge/server.mjs` by adding a raw `collectSignalItems(category)` path that feeds both the live signal UI and the auto-post scheduler.
+- Added candidate normalization and dedupe handling for canonical URLs, arXiv ids, and YouTube ids so the scheduler can skip repeated topics across runs.
+- Added scoring that blends recency, source quality, AI-topic relevance, community signals, media presence, and category weights before selecting the top candidates.
+- Added source-specific enrichment for Hacker News, GitHub, arXiv, and generic webpages, including OG metadata extraction and related source stats.
+- Added a media pipeline that tries oEmbed first, then OG image/video metadata, then cached remote assets, and finally Playwright screenshots as a fallback.
+- Added a Korean long-form article generator with:
+  - a versioned prompt builder
+  - Codex-backed structured JSON generation
+  - a rules-based HTML fallback when the model call fails
+- Added persistent storage for:
+  - generated HTML articles
+  - JSON metadata
+  - index and scheduler state
+  - scheduler settings
+  - media cache files
+- Added bridge APIs for:
+  - listing auto-posts
+  - fetching details
+  - manual run
+  - regenerate
+  - export
+  - reveal folder
+  - scheduler state
+  - settings patch
+  - media asset serving
+- Reworked `src/pages/SignalsPage.tsx` into two tabs so the UI now supports both the existing real-time signal feed and the new auto-generated article workflow.
+- Added a full article management panel in the signals page with scheduler state, editable settings, recent post cards, HTML preview, media/source sections, regenerate, export, and folder-open actions.
+- Added frontend types and bridge client helpers for the new auto-post API surface.
+- Documented the feature in `README.md`, added a verified screenshot, and added `generated-posts/` plus `media-cache/` to `.gitignore`.
+- Verified end-to-end that:
+  - `POST /api/auto-posts/run` creates a real article,
+  - saved HTML/JSON files exist on disk,
+  - list/detail/state/export APIs respond,
+  - the signals auto-post tab renders the saved article preview in the browser.
+
+### Orchestration state persistence
+
+- Added a dedicated `orchestration` state slice so the current draft, selected model set, and latest orchestration session survive page navigation and reloads.
+- Changed orchestration session filtering to use the persisted session start time and session agent ids instead of component-local state.
+- Kept the orchestration canvas expanded for the latest session and preserved the output/result nodes after execution completes.
+- Stopped blocking a new orchestration run only because an old `bridgeError` banner still exists from the last failed provider.
+- Added inline selected-model status banners plus a recent-session summary so the page shows which model connected, completed, failed, or is still running without opening another menu.
+- Verified in headless Playwright that:
+  - running a 3-model orchestration shows live result cards,
+  - the official free router failure is visible inline instead of hiding the rest of the run,
+  - leaving `#/agents` for `#/settings` and coming back keeps the latest session visible.
+
+### Artemis Wire publisher polish
+
+- Reframed the generic source-agnostic publisher lane in `SignalsPage.tsx` as `Artemis Wire` so the UI now reads like a product feature instead of an internal engine label.
+- Renamed the source-agnostic publisher layout classes from the old `x-autopost-*` naming to `publisher-*` in `src/styles/pages/support.css`.
+- Upgraded the article reader in `src/features/publisher/PublisherArticle.tsx` so it now:
+  - supports markdown-style section headings,
+  - treats `•` as a bullet marker,
+  - merges wrapped lines into real paragraphs,
+  - uses a narrower centered article measure for easier reading.
+- Improved the Artemis Wire detail panel in `SignalsPage.tsx` with:
+  - readable mode labels,
+  - readable summary/source-type chips,
+  - clearer draft/published headers,
+  - explicit publish-target and source metadata summaries.
+- Improved the Signals copy so the three lanes are now clearer:
+  - `실시간 시그널`
+  - `Artemis Wire`
+  - `심층 리포트`
+- Added a recent Artemis Wire posts summary to `ActivityPage.tsx` so internal publishing output is visible from the activity screen and not only from Signals.
+- Re-ran local verification after the UI pass:
+  - `npm ci`
+  - `npm run lint`
+  - `npm run build`
+  - `node --test local-bridge/ai/router.test.mjs local-bridge/publisher/pipeline.test.mjs`
+  - Playwright browser checks on `#/signals` and `#/activity`
+  - full-page screenshots saved to `output/playwright/wire-verify/signals-wire.png` and `output/playwright/wire-verify/activity-wire.png`
+
+### Artemis Wire operator refactor
+
+- Extracted the Artemis Wire operator tab out of `src/pages/SignalsPage.tsx` into `src/features/publisher/PublisherOperationsPanel.tsx`.
+- Moved generic publisher defaults and shared label copy into `src/features/publisher/publisherUi.ts` so the page no longer owns fallback state factories and status-label helpers.
+- Kept the operator behavior unchanged while making the page shell smaller and easier to maintain.
+- Re-verified after extraction with:
+  - `npm run lint`
+  - `npm run build`
+  - `node --test local-bridge/ai/router.test.mjs local-bridge/publisher/pipeline.test.mjs`
+  - a browser smoke check on `#/signals` confirming the Artemis Wire tab still shows overview, policy, provider status, queue, and history sections.
+
+### Service usability pass
+
+- Added a chat status banner for the currently selected model so the user can see whether Ollama, Codex CLI, or the official free router is actually ready before sending a message.
+- Downgraded the non-Codex workspace-write hint in chat from warning tone to info tone and only show it when a workspace is actually connected.
+- Synced the files-page root-path input with the connected workspace root so the current path remains visible and reusable.
+- Added a second in-app delete confirmation step on the files page before the browser confirm dialog, reducing accidental destructive clicks in the list and preview panes.
+- Wrapped each official provider card in settings with a real form so password inputs no longer trigger DOM warnings and Enter can submit the save action.
+- Added a recent-status line plus last-check timestamp to each official provider card so users can tell what was actually tested and when.
+- Verified in headless Playwright that:
+  - chat shows the selected-model readiness banner,
+  - files shows the connected root path in the input and changes delete buttons to `삭제 확인` on first click,
+  - settings no longer emits password-without-form console warnings and shows recent provider status details.

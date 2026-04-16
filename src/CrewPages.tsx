@@ -7,20 +7,18 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { chatPromptCards, type PageId } from './crewData'
+import type { PageId } from './crewData'
 import { getAgentPreset } from './lib/agentCatalog'
 import {
   fetchAiProviders,
-  fetchAiSettings,
-  previewAiRoute,
   type AiProviderState,
-  type AiRoutePreview,
   type AiRoutingAttemptLog,
   type AiRoutingMessageMeta,
   type AiStreamAttemptEvent,
   type AiStreamMetaEvent,
 } from './lib/aiRoutingClient'
 import { formatDate, formatFriendlyModelName, providerLabel } from './crewPageHelpers'
+import { ChatAlertStack, ChatIdlePanel, ChatStatusSummary } from './features/chat/ChatSections'
 import { Icon } from './icons'
 import { useArtemisApp } from './state/context'
 import type { AgentItem } from './state/types'
@@ -236,7 +234,7 @@ function chatAgentRouteLabel(agent: AgentItem) {
     case 'codex-cli':
       return 'Codex CLI'
     case 'official-router':
-      return '공식 무료 라우터'
+      return '공식 API'
     case 'openai-direct':
       return 'OpenAI API'
     case 'gemini-openai':
@@ -250,8 +248,41 @@ function chatAgentRouteLabel(agent: AgentItem) {
   }
 }
 
+function resolveOfficialProviderId(baseUrl: string) {
+  const normalized = baseUrl.trim().toLowerCase()
+  if (normalized === 'openrouter' || normalized === 'nvidia-build' || normalized === 'gemini') {
+    return normalized
+  }
+  return 'openrouter'
+}
+
 function chatAgentChoiceLabel(agent: AgentItem) {
   return formatFriendlyModelName(agent.model)
+}
+
+function getWorkspaceDisplayLabel(currentPath?: string | null, absolutePath?: string | null) {
+  if (currentPath?.trim()) {
+    return currentPath.trim()
+  }
+
+  if (!absolutePath?.trim()) {
+    return '작업 폴더 미연결'
+  }
+
+  const segments = absolutePath.split(/[\\/]+/).filter(Boolean)
+  return segments[segments.length - 1] ?? absolutePath
+}
+
+function getWorkspaceDisplayMeta(currentPath?: string | null, absolutePath?: string | null) {
+  if (currentPath?.trim()) {
+    return '현재 열린 폴더를 기준으로 파일 읽기와 수정 요청이 이어집니다.'
+  }
+
+  if (absolutePath?.trim()) {
+    return '연결된 루트 폴더를 기준으로 파일 작업이 이어집니다.'
+  }
+
+  return '설정 또는 파일 화면에서 작업 폴더를 연결하면 파일 기반 작업을 바로 이어갈 수 있습니다.'
 }
 
 function chatAgentSecondaryLabel(agent: AgentItem) {
@@ -270,14 +301,15 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
     setComposerText,
     state,
     uploadWorkspaceFiles,
+    workspaceAbsolutePath,
+    workspaceCurrentPath,
   } = useArtemisApp()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const threadViewportRef = useRef<HTMLDivElement | null>(null)
   const [openModelMenu, setOpenModelMenu] = useState(false)
   const [aiProviders, setAiProviders] = useState<AiProviderState[]>([])
-  const [aiRoutePreview, setAiRoutePreview] = useState<AiRoutePreview | null>(null)
-  const [aiRouteError, setAiRouteError] = useState<string | null>(null)
+  const [aiProviderError, setAiProviderError] = useState<string | null>(null)
   const [streamMeta, setStreamMeta] = useState<AiStreamMetaEvent | null>(null)
   const [streamAttempts, setStreamAttempts] = useState<LiveAttemptItem[]>([])
   const [streamedText, setStreamedText] = useState('')
@@ -334,40 +366,27 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
 
     if (!hasOfficialRouter) {
       setAiProviders([])
-      setAiRoutePreview(null)
-      setAiRouteError(null)
+      setAiProviderError(null)
       return
     }
 
-    const loadAiRoutingState = async () => {
+    const loadAiProviderState = async () => {
       try {
-        const [providers, settings] = await Promise.all([
-          fetchAiProviders(state.settings.bridgeUrl),
-          fetchAiSettings(state.settings.bridgeUrl),
-        ])
+        const providers = await fetchAiProviders(state.settings.bridgeUrl)
         if (!active) {
           return
         }
         setAiProviders(providers)
-        const preview = await previewAiRoute(state.settings.bridgeUrl, {
-          routing_mode: settings.routing_mode,
-          manual_provider: settings.manual_provider,
-          manual_model: settings.manual_model,
-        })
-        if (!active) {
-          return
-        }
-        setAiRoutePreview(preview)
-        setAiRouteError(null)
+        setAiProviderError(null)
       } catch (error) {
         if (!active) {
           return
         }
-        setAiRouteError(error instanceof Error ? error.message : '무료 후보 정보를 불러오지 못했습니다.')
+        setAiProviderError(error instanceof Error ? error.message : '공식 API 공급자 정보를 불러오지 못했습니다.')
       }
     }
 
-    void loadAiRoutingState()
+    void loadAiProviderState()
     return () => {
       active = false
     }
@@ -395,7 +414,6 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   const selectedModel =
     selectedAgent?.model ??
     (selectedProvider === 'codex' ? state.settings.codexModel : state.settings.ollamaModel)
-  const topPreviewCandidate = streamMeta?.top_candidate ?? aiRoutePreview?.candidates[0] ?? null
   const hasStreamFallback = streamAttempts.some(
     (attempt) =>
       ('success' in attempt && !attempt.success) ||
@@ -404,15 +422,26 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   )
   const currentModelName =
     selectedAgent?.provider === 'official-router'
-      ? topPreviewCandidate?.display_name ?? '자동 무료 최상'
+      ? formatFriendlyModelName(selectedModel || '모델 선택')
       : formatFriendlyModelName(selectedModel || '모델 선택')
   const currentRouteLabel = selectedAgent
     ? chatAgentRouteLabel(selectedAgent)
     : providerLabel(selectedProvider as 'auto' | 'ollama' | 'codex')
   const selectedAgentSupportsWorkspaceWrite = selectedAgent?.provider === 'codex'
-  const readyOfficialProviders = aiProviders.filter(
-    (item) => item.enabled && item.configured && (item.status === 'ready' || item.available_count > 0),
-  )
+  const selectedLocalProviderStatus =
+    selectedAgent?.provider === 'ollama'
+      ? bridgeHealth?.providers.find((item) => item.provider === 'ollama') ?? null
+      : selectedAgent?.provider === 'codex'
+        ? bridgeHealth?.providers.find((item) => item.provider === 'codex') ?? null
+        : null
+  const selectedOfficialProviderId =
+    selectedAgent?.provider === 'official-router'
+      ? resolveOfficialProviderId(selectedAgent.baseUrl)
+      : null
+  const selectedOfficialProviderStatus =
+    selectedOfficialProviderId
+      ? aiProviders.find((item) => item.provider === selectedOfficialProviderId) ?? null
+      : null
   const isEmpty = visibleMessages.length === 0
   const isIdleState = isEmpty && !isGenerating
   const selectedAgentNeedsKey =
@@ -421,7 +450,9 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
     !selectedAgent.apiKeyId
   const selectedAgentUnavailable =
     selectedAgent?.provider === 'official-router'
-      ? readyOfficialProviders.length === 0
+      ? !selectedOfficialProviderStatus?.enabled ||
+        !selectedOfficialProviderStatus?.configured ||
+        !selectedModel?.trim()
       : selectedAgent?.provider === 'ollama'
       ? bridgeHealth?.providers.find((item) => item.provider === 'ollama')?.ready === false
       : selectedAgent?.provider === 'codex'
@@ -435,12 +466,130 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   const composerHint = selectedAgentNeedsKey
     ? '설정에서 API 키를 연결하세요.'
     : selectedAgent?.provider === 'official-router' && selectedAgentUnavailable
-      ? '설정에서 OpenRouter, NVIDIA Build, Gemini 중 하나 이상을 연결하세요.'
+      ? '설정에서 공식 API 공급자와 모델 ID를 확인하세요.'
     : selectedAgentUnavailable
       ? '선택한 실행기가 아직 준비되지 않았습니다.'
       : isGenerating
         ? '응답 생성 중'
         : ''
+  const selectedAgentStatus = useMemo(() => {
+    if (!selectedAgent) {
+      return null
+    }
+
+    if (selectedAgent.provider === 'official-router') {
+      if (!selectedOfficialProviderStatus?.enabled || !selectedOfficialProviderStatus?.configured) {
+        return {
+          tone: 'warning' as const,
+          summary: '공식 API 확인 필요',
+          detail:
+            aiProviderError ??
+            '설정에서 OpenRouter, NVIDIA Build, Gemini 중 사용할 공급자와 키를 먼저 확인해 주세요.',
+        }
+      }
+
+      return {
+        tone: 'info' as const,
+        summary: `${selectedOfficialProviderStatus.label} 연결됨`,
+        detail: selectedModel?.trim()
+          ? `현재 모델 ${selectedModel}`
+          : selectedOfficialProviderStatus.last_test_message || '모델 ID를 입력해 주세요.',
+      }
+    }
+
+    if (selectedLocalProviderStatus) {
+      const detail =
+        selectedLocalProviderStatus.warning ||
+        selectedLocalProviderStatus.lastError ||
+        selectedLocalProviderStatus.detail
+
+      if (selectedLocalProviderStatus.ready && !selectedLocalProviderStatus.stale) {
+        return {
+          tone: 'info' as const,
+          summary: `${chatAgentRouteLabel(selectedAgent)} 연결됨`,
+          detail,
+        }
+      }
+
+      return {
+        tone: 'warning' as const,
+        summary: selectedLocalProviderStatus.stale
+          ? `${chatAgentRouteLabel(selectedAgent)} 최근 정상 상태 유지 중`
+          : `${chatAgentRouteLabel(selectedAgent)} 확인 필요`,
+        detail,
+      }
+    }
+
+    return {
+      tone: 'info' as const,
+      summary: `${chatAgentRouteLabel(selectedAgent)} 준비됨`,
+      detail: chatAgentChoiceLabel(selectedAgent),
+    }
+  }, [selectedAgent, selectedOfficialProviderStatus, aiProviderError, selectedModel, selectedLocalProviderStatus])
+  const chatStatusItems = useMemo(() => {
+    const items: Array<{
+      key: string
+      tone: 'info' | 'warning' | 'error'
+      text: string
+      actionLabel?: string
+      actionPage?: PageId
+    }> = []
+
+    if (selectedAgentNeedsKey) {
+      items.push({
+        key: 'needs-key',
+        tone: 'warning',
+        text: '이 모델은 설정에서 API 키를 연결해야 바로 사용할 수 있습니다.',
+        actionLabel: '설정 열기',
+        actionPage: 'settings',
+      })
+    } else if (selectedAgentUnavailable) {
+      items.push({
+        key: 'agent-unavailable',
+        tone: 'warning',
+        text:
+          selectedAgent?.provider === 'official-router'
+            ? aiProviderError ?? '공식 API 공급자 또는 모델 설정을 먼저 확인해 주세요.'
+            : '선택한 로컬 실행기가 아직 준비되지 않았습니다. 설정에서 상태를 확인해 주세요.',
+        actionLabel: '상태 확인',
+        actionPage: 'settings',
+      })
+    } else if (selectedAgentStatus) {
+      items.push({
+        key: 'agent-status',
+        tone: selectedAgentStatus.tone,
+        text: `${selectedAgentStatus.summary}. ${selectedAgentStatus.detail}`,
+      })
+    }
+
+    if (selectedAgent && !selectedAgentSupportsWorkspaceWrite && (workspaceAbsolutePath || workspaceCurrentPath)) {
+      items.push({
+        key: 'workspace-write-hint',
+        tone: 'info',
+        text: '실제 로컬 파일 수정이 목적이면 채팅 모델을 Codex CLI로 선택해 주세요.',
+      })
+    }
+
+    if (bridgeError) {
+      items.push({
+        key: 'bridge-error',
+        tone: 'error',
+        text: bridgeError,
+      })
+    }
+
+    return items
+  }, [
+    aiProviderError,
+    bridgeError,
+    selectedAgent,
+    selectedAgentNeedsKey,
+    selectedAgentStatus,
+    selectedAgentSupportsWorkspaceWrite,
+    selectedAgentUnavailable,
+    workspaceAbsolutePath,
+    workspaceCurrentPath,
+  ])
 
   useEffect(() => {
     const viewport = threadViewportRef.current
@@ -513,8 +662,9 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
     <section className="page page--chat page--chat-modern">
       <header className="chat-topbar">
         <div className="chat-topbar__copy">
+          <span className="ui-status-pill ui-status-pill--muted">대화 작업면</span>
           <h1>채팅</h1>
-          <p>질문을 남기면 바로 이어서 답합니다.</p>
+          <p>현재 연결된 실행기를 바로 고르고, 같은 작업면 안에서 상태와 대화를 함께 봅니다.</p>
         </div>
         <div className="chat-topbar__actions">
           <div className="model-menu" ref={menuRef}>
@@ -538,9 +688,12 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
               <div aria-label="채팅 모델 선택 메뉴" className="dropdown-menu" id={modelMenuId}>
                 {officialChatAgents.length > 0 ? (
                   <div className="dropdown-menu__group">
-                    <span className="dropdown-menu__title">공식 무료 API 라우터</span>
+                    <span className="dropdown-menu__title">공식 API</span>
                     {officialChatAgents.map((agent) => {
                       const isSelected = selectedAgent?.id === agent.id
+                      const providerStatus = aiProviders.find(
+                        (item) => item.provider === resolveOfficialProviderId(agent.baseUrl),
+                      )
 
                       return (
                         <button
@@ -556,7 +709,9 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
                             <strong>{chatAgentChoiceLabel(agent)}</strong>
                             <small>
                               {chatAgentSecondaryLabel(agent)}
-                              {readyOfficialProviders.length === 0 ? ' / 공급자 설정 필요' : ''}
+                              {!providerStatus?.enabled || !providerStatus?.configured
+                                ? ' / 공급자 설정 필요'
+                                : ''}
                             </small>
                           </span>
                           {isSelected ? <Icon name="check" size={16} /> : null}
@@ -630,64 +785,25 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
         </div>
       </header>
 
-      {selectedAgentNeedsKey ? (
-        <div className="status-banner status-banner--warning">
-          <Icon name="warning" size={16} />
-          <span>이 모델은 설정에서 API 키를 연결해야 바로 사용할 수 있습니다.</span>
-          <button className="ghost-button" onClick={() => onNavigate('settings')} type="button">
-            설정 열기
-          </button>
-        </div>
-      ) : null}
+      <ChatStatusSummary
+        currentModelName={currentModelName}
+        currentRouteLabel={currentRouteLabel}
+        readyCount={bridgeHealth?.providers.filter((item) => item.ready).length ?? 0}
+        threadCount={state.chats.threads.length}
+      />
 
-      {selectedAgentUnavailable ? (
-        <div className="status-banner status-banner--warning">
-          <Icon name="warning" size={16} />
-          <span>
-            {selectedAgent?.provider === 'official-router'
-              ? aiRouteError ?? '공식 공급자가 아직 준비되지 않았습니다. 설정에서 연결 테스트를 먼저 확인해 주세요.'
-              : '선택한 로컬 실행기가 아직 준비되지 않았습니다. 설정에서 상태를 확인해 주세요.'}
-          </span>
-          <button className="ghost-button" onClick={() => onNavigate('settings')} type="button">
-            상태 확인
-          </button>
-        </div>
-      ) : null}
-
-      {selectedAgent && !selectedAgentSupportsWorkspaceWrite ? (
-        <div className="status-banner status-banner--warning">
-          <Icon name="warning" size={16} />
-          <span>실제 로컬 파일 수정이 목적이면 채팅 모델을 Codex CLI로 선택해 주세요.</span>
-        </div>
-      ) : null}
-
-      {bridgeError ? (
-        <div className="status-banner status-banner--error">
-          <Icon name="warning" size={16} />
-          <span>{bridgeError}</span>
-        </div>
-      ) : null}
+      <ChatAlertStack items={chatStatusItems} onNavigate={onNavigate} />
 
       <div className="chat-surface">
         <div className={`chat-surface__body ${isIdleState ? 'chat-surface__body--idle' : ''}`}>
           {isIdleState ? (
-            <div className="chat-empty-state">
-              <h2>바로 시작하세요.</h2>
-              <p>작업을 한 문장으로 적으면 바로 이어서 답합니다.</p>
-              <div className="chat-empty-state__actions chat-empty-state__actions--compact chip-wrap">
-                {chatPromptCards.map((item) => (
-                  <button
-                    key={item.title}
-                    className="chip chat-empty-chip"
-                    onClick={() => setComposerText(item.description)}
-                    title={item.description}
-                    type="button"
-                  >
-                    <span>{item.title}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <ChatIdlePanel
+              currentModelName={currentModelName}
+              currentRouteLabel={currentRouteLabel}
+              onPickPrompt={setComposerText}
+              workspaceLabel={getWorkspaceDisplayLabel(workspaceCurrentPath, workspaceAbsolutePath)}
+              workspaceMeta={getWorkspaceDisplayMeta(workspaceCurrentPath, workspaceAbsolutePath)}
+            />
           ) : null}
 
           <div
@@ -725,7 +841,7 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
                       <span className="message-card__badge">
                         {streamMeta?.top_candidate
                           ? `${streamMeta.top_candidate.provider_label} · ${streamMeta.top_candidate.display_name}`
-                          : '무료 후보 탐색 중'}
+                          : `${selectedOfficialProviderStatus?.label ?? '공식 API'} · ${selectedModel || '모델 확인 중'}`}
                       </span>
                     </div>
                     <span>실시간 스트리밍</span>
@@ -740,7 +856,7 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
                         </span>
                       ) : null}
                       {hasStreamFallback ? (
-                        <span>후보 전환 발생</span>
+                        <span>재시도 발생</span>
                       ) : null}
                     </div>
                   ) : null}
@@ -829,6 +945,23 @@ function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
           </div>
         </form>
       </div>
+
+      {!isIdleState ? (
+        <section className="ui-panel ui-panel--muted chat-contextPanel">
+          <div className="ui-toolbar">
+            <div className="chat-contextPanel__copy">
+              <strong>작업 흐름</strong>
+              <span>대화는 현재 모델과 작업 폴더 기준으로 이어집니다.</span>
+            </div>
+            <div className="chip-wrap">
+              <span className="ui-status-pill ui-status-pill--muted">{currentRouteLabel}</span>
+              <span className="ui-status-pill ui-status-pill--muted">
+                {getWorkspaceDisplayLabel(workspaceCurrentPath, workspaceAbsolutePath)}
+              </span>
+            </div>
+          </div>
+        </section>
+      ) : null}
     </section>
   )
 }

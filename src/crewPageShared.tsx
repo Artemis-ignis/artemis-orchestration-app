@@ -1,5 +1,28 @@
 import type { ReactNode } from 'react'
 import { Icon } from './icons'
+import {
+  EmptyStateCard,
+  NoticeBanner,
+  PageHeader,
+  PanelCard,
+  SectionHeader,
+  SplitPane,
+  StatCard,
+  StatusPill,
+  Toolbar,
+} from './components/ui/primitives'
+
+export {
+  EmptyStateCard as PrimitiveEmptyState,
+  PageHeader as PrimitivePageHeader,
+  PanelCard,
+  NoticeBanner,
+  SectionHeader,
+  SplitPane,
+  StatCard,
+  StatusPill,
+  Toolbar,
+}
 
 export function PageIntro({
   title,
@@ -12,22 +35,7 @@ export function PageIntro({
   icon?: 'insights' | 'settings' | 'agent' | 'signals' | 'tools' | 'files'
   trailing?: ReactNode
 }) {
-  return (
-    <div className="page-intro">
-      <div className="page-intro__main">
-        {icon ? (
-          <span className="page-intro__icon">
-            <Icon name={icon} size={18} />
-          </span>
-        ) : null}
-        <div>
-          <h1>{title}</h1>
-          <p>{description}</p>
-        </div>
-      </div>
-      {trailing ? <div className="page-intro__trailing">{trailing}</div> : null}
-    </div>
-  )
+  return <PageHeader icon={icon} title={title} description={description} actions={trailing} />
 }
 
 export function SearchField({
@@ -40,7 +48,7 @@ export function SearchField({
   placeholder: string
 }) {
   return (
-    <label className="search-field">
+    <label className="ui-search">
       <Icon name="search" size={16} />
       <input
         aria-label={placeholder}
@@ -90,25 +98,14 @@ export function EmptyState({
   onSecondaryAction?: () => void
 }) {
   return (
-    <div className="empty-state">
-      <div aria-hidden="true" className="empty-state__mark" />
-      <h2>{title}</h2>
-      <p>{description}</p>
-      {action || secondaryAction ? (
-        <div className="empty-state__actions">
-          {action ? (
-            <button className="primary-button" onClick={onAction} type="button">
-              {action}
-            </button>
-          ) : null}
-          {secondaryAction ? (
-            <button className="ghost-button" onClick={onSecondaryAction} type="button">
-              {secondaryAction}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
+    <EmptyStateCard
+      action={action}
+      description={description}
+      onAction={onAction}
+      onSecondaryAction={onSecondaryAction}
+      secondaryAction={secondaryAction}
+      title={title}
+    />
   )
 }
 
@@ -126,15 +123,15 @@ export function DisclosureSection({
   children: ReactNode
 }) {
   return (
-    <details className={`disclosure ${className}`.trim()} open={defaultOpen}>
-      <summary className="disclosure__summary">
-        <div className="disclosure__copy">
+    <details className={`ui-disclosure ${className}`.trim()} open={defaultOpen}>
+      <summary className="ui-disclosure__summary">
+        <div className="ui-disclosure__copy">
           <strong>{title}</strong>
           {summary ? <small>{summary}</small> : null}
         </div>
-        <span className="disclosure__meta">펼치기</span>
+        <span className="ui-disclosure__meta">{defaultOpen ? '접힘' : '펼침'}</span>
       </summary>
-      <div className="disclosure__body">{children}</div>
+      <div className="ui-disclosure__body">{children}</div>
     </details>
   )
 }

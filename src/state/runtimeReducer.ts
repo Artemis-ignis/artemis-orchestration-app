@@ -54,6 +54,14 @@ export type Action =
   | { type: 'MARK_INSIGHT'; insightId: string; status: InsightItem['status'] }
   | { type: 'UPDATE_SETTINGS'; patch: Partial<RuntimeState['settings']> }
   | { type: 'SELECT_CHAT_MODEL'; provider: 'ollama' | 'codex'; model: string }
+  | { type: 'SET_ORCHESTRATION_DRAFT'; text: string }
+  | { type: 'SET_ORCHESTRATION_SELECTION'; agentIds: string[] }
+  | {
+      type: 'START_ORCHESTRATION_SESSION'
+      startedAt: string
+      task: string
+      agentIds: string[]
+    }
   | { type: 'ADD_API_KEY'; label: string; key: string; presetId: ApiKeyTargetPresetId }
   | { type: 'REMOVE_API_KEY'; keyId: string }
   | { type: 'ADD_SIGNAL'; title: string; category: string; description: string }
@@ -387,6 +395,37 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
         },
       }
 
+    case 'SET_ORCHESTRATION_DRAFT':
+      return {
+        ...state,
+        orchestration: {
+          ...state.orchestration,
+          draftTask: action.text,
+        },
+      }
+
+    case 'SET_ORCHESTRATION_SELECTION':
+      return {
+        ...state,
+        orchestration: {
+          ...state.orchestration,
+          selectedAgentIds: Array.from(new Set(action.agentIds)),
+        },
+      }
+
+    case 'START_ORCHESTRATION_SESSION':
+      return {
+        ...state,
+        orchestration: {
+          ...state.orchestration,
+          draftTask: '',
+          sessionStartedAt: action.startedAt,
+          sessionTask: action.task,
+          sessionAgentIds: Array.from(new Set(action.agentIds)),
+          selectedAgentIds: Array.from(new Set(action.agentIds)),
+        },
+      }
+
     case 'ADD_API_KEY': {
       const item: ApiKeyItem = {
         id: createId('key'),
@@ -527,6 +566,11 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
           activeAgentId,
           items,
           runs: state.agents.runs.filter((run) => run.agentId !== action.agentId),
+        },
+        orchestration: {
+          ...state.orchestration,
+          selectedAgentIds: state.orchestration.selectedAgentIds.filter((id) => id !== action.agentId),
+          sessionAgentIds: state.orchestration.sessionAgentIds.filter((id) => id !== action.agentId),
         },
         activity: {
           items: pushActivity(state.activity.items, {

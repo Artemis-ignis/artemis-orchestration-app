@@ -20,6 +20,9 @@ import {
   writeWorkspaceFileContent,
 } from './workspace.mjs'
 import { createAiRouter } from './ai/router.mjs'
+import { createAutoPostsScheduler } from './auto-posts/scheduler.mjs'
+import { createPublisherScheduler } from './publisher/scheduler.mjs'
+import { createXAutopostScheduler } from './x-autopost/scheduler.mjs'
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -137,6 +140,8 @@ const signalTranslationInFlight = new Set()
 const signalFeedCache = new Map()
 let cachedSkillCatalog = { generatedAt: '', items: [] }
 let cachedSkillCatalogExpiresAt = 0
+let lastSuccessfulOllamaStatus = null
+let pendingOllamaStatusPromise = null
 const SIGNAL_FETCH_TIMEOUT_MS = 8_000
 const SIGNAL_TRANSLATION_TIMEOUT_MS = 28_000
 const PER_SIGNAL_TRANSLATION_TIMEOUT_MS = 15_000
@@ -145,6 +150,7 @@ const SIGNAL_CACHE_TTL_MS = 45_000
 const EXECUTION_TIMEOUT_MS = 240_000
 const SIGNAL_CODEX_TRANSLATION_MODEL = 'gpt-5.4-mini'
 const OLLAMA_LOCAL_MODEL = 'gemma4-E4B-uncensored-q4fast:latest'
+const OLLAMA_HEALTH_TIMEOUT_MS = Number(process.env.OLLAMA_HEALTH_TIMEOUT_MS ?? 4_000)
 const PUBLIC_INQUIRY_DIRECTORY = path.join(process.cwd(), 'output', 'public-inquiries')
 const PUBLIC_ACCOUNT_DIRECTORY = path.join(process.cwd(), 'output', 'public-accounts')
 const PUBLIC_ACCOUNT_FILE = path.join(PUBLIC_ACCOUNT_DIRECTORY, 'accounts.json')
@@ -176,7 +182,7 @@ function createCorsHeaders(request) {
   const headers = {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS',
     Vary: 'Origin',
   }
 
@@ -194,6 +200,58 @@ function sendJson(request, response, statusCode, payload, extraHeaders = {}) {
     ...extraHeaders,
   })
   response.end(JSON.stringify(payload))
+}
+
+function resolveMimeTypeFromPath(targetPath = '') {
+  const extension = path.extname(targetPath).toLowerCase()
+  switch (extension) {
+    case '.html':
+      return 'text/html; charset=utf-8'
+    case '.json':
+      return 'application/json; charset=utf-8'
+    case '.png':
+      return 'image/png'
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg'
+    case '.gif':
+      return 'image/gif'
+    case '.webp':
+      return 'image/webp'
+    case '.svg':
+      return 'image/svg+xml'
+    case '.mp4':
+      return 'video/mp4'
+    case '.webm':
+      return 'video/webm'
+    default:
+      return 'application/octet-stream'
+  }
+}
+
+async function sendFileResponse(request, response, targetPath) {
+  const fileBuffer = await readFile(targetPath)
+  response.writeHead(200, {
+    'Content-Type': resolveMimeTypeFromPath(targetPath),
+    'Cache-Control': 'public, max-age=300',
+    ...createCorsHeaders(request),
+  })
+  response.end(fileBuffer)
+}
+
+function toPortableRelative(rootPath, targetPath) {
+  return path.relative(rootPath, targetPath).split(path.sep).join('/')
+}
+
+function decorateAutoPostMedia(workspaceRoot, attachments = []) {
+  return attachments.map((item) => ({
+    ...item,
+    previewUrl: item.localPath
+      ? `/api/auto-posts/assets?path=${encodeURIComponent(
+          toPortableRelative(workspaceRoot, item.localPath),
+        )}`
+      : item.thumbnailUrl || item.url || '',
+  }))
 }
 
 function parseCookies(request) {
@@ -486,6 +544,26 @@ const aiRouter = createAiRouter({
   publicSessionSecret: PUBLIC_SESSION_SECRET,
   openRouterTitle: OPENROUTER_APP_TITLE,
   openRouterReferer: OPENROUTER_HTTP_REFERER,
+})
+
+const autoPostsScheduler = createAutoPostsScheduler({
+  resolveWorkspaceRoot: getDefaultWorkspace,
+  collectSignalItems,
+  fetchWithTimeout,
+  revealWorkspacePath,
+  runCodex,
+})
+const xAutopostScheduler = createXAutopostScheduler({
+  resolveWorkspaceRoot: getDefaultWorkspace,
+  collectSignalItems,
+  fetchWithTimeout,
+  runCodex,
+})
+const publisherScheduler = createPublisherScheduler({
+  resolveWorkspaceRoot: getDefaultWorkspace,
+  collectSignalItems,
+  fetchWithTimeout,
+  runCodex,
 })
 
 async function savePublicAccount(payload = {}, options = {}) {
@@ -1107,13 +1185,21 @@ async function translateSignalItem(item, translationModel) {
 }
 
 async function getOllamaTags() {
-  const response = await fetch(`${OLLAMA_URL}/api/tags`)
+  const response = await fetchWithTimeout(
+    `${stripTrailingSlash(OLLAMA_URL)}/api/tags`,
+    undefined,
+    OLLAMA_HEALTH_TIMEOUT_MS,
+  )
 
   if (!response.ok) {
     throw new Error(`Ollama 연결에 실패했습니다. (${response.status})`)
   }
 
-  const data = await response.json()
+  const data = await raceWithTimeout(
+    response.json(),
+    OLLAMA_HEALTH_TIMEOUT_MS,
+    'Ollama 모델 목록 응답 시간이 초과되었습니다.',
+  )
   return Array.isArray(data.models) ? data.models.map((item) => item.name) : []
 }
 
@@ -1123,6 +1209,114 @@ function selectPreferredOllamaModel(models = []) {
   }
 
   return models.find((item) => item === OLLAMA_LOCAL_MODEL) ?? null
+}
+
+function orderOllamaModels(models = []) {
+  if (!Array.isArray(models)) {
+    return []
+  }
+
+  const normalized = models.filter((item) => typeof item === 'string' && item.trim())
+  const preferred = selectPreferredOllamaModel(normalized)
+
+  if (!preferred) {
+    return normalized
+  }
+
+  return [preferred, ...normalized.filter((item) => item !== preferred)]
+}
+
+function sanitizeStatusDetail(value, fallback) {
+  if (typeof value !== 'string') {
+    return fallback
+  }
+
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  return normalized || fallback
+}
+
+function createOllamaStatusSnapshot({
+  available,
+  ready,
+  models,
+  detail,
+  warning = null,
+  lastError = null,
+  stale = false,
+  lastCheckedAt = null,
+  lastSuccessAt = null,
+}) {
+  return {
+    provider: 'ollama',
+    available,
+    ready,
+    models,
+    detail,
+    warning,
+    lastError,
+    stale,
+    lastCheckedAt,
+    lastSuccessAt,
+  }
+}
+
+async function getOllamaStatus() {
+  if (pendingOllamaStatusPromise) {
+    return pendingOllamaStatusPromise
+  }
+
+  pendingOllamaStatusPromise = (async () => {
+    const checkedAt = new Date().toISOString()
+
+    try {
+      const models = orderOllamaModels(await getOllamaTags())
+      const ready = models.length > 0
+      const snapshot = createOllamaStatusSnapshot({
+        available: true,
+        ready,
+        models,
+        detail: ready
+          ? `Ollama ${models[0]} 모델을 사용할 수 있습니다.`
+          : 'Ollama 서버에는 설치된 모델이 없습니다.',
+        lastCheckedAt: checkedAt,
+        lastSuccessAt: checkedAt,
+      })
+
+      lastSuccessfulOllamaStatus = snapshot
+      return snapshot
+    } catch (error) {
+      const lastError = sanitizeStatusDetail(
+        error instanceof Error ? error.message : 'Ollama 상태를 확인하지 못했습니다.',
+        'Ollama 상태를 확인하지 못했습니다.',
+      )
+
+      if (lastSuccessfulOllamaStatus) {
+        return {
+          ...lastSuccessfulOllamaStatus,
+          warning: '최근 확인에 실패해 마지막 정상 상태를 표시 중입니다.',
+          lastError,
+          stale: true,
+          lastCheckedAt: checkedAt,
+        }
+      }
+
+      return createOllamaStatusSnapshot({
+        available: false,
+        ready: false,
+        models: [],
+        detail: 'Ollama 상태를 확인하지 못했습니다.',
+        warning: '최근 확인에 실패했습니다.',
+        lastError,
+        stale: false,
+        lastCheckedAt: checkedAt,
+        lastSuccessAt: null,
+      })
+    } finally {
+      pendingOllamaStatusPromise = null
+    }
+  })()
+
+  return pendingOllamaStatusPromise
 }
 
 function spawnProcess(command, args, options = {}) {
@@ -1602,18 +1796,29 @@ async function runOpenAiCompatible({ prompt, messages, settings, agent, enabledT
 }
 
 async function getHealth() {
-  const [ollamaModelsResult, codexStatusResult] = await Promise.allSettled([
-    getOllamaTags(),
+  const [ollamaStatusResult, codexStatusResult] = await Promise.allSettled([
+    getOllamaStatus(),
     getCodexStatus(),
   ])
-
-  const ollamaModels =
-    ollamaModelsResult.status === 'fulfilled' ? ollamaModelsResult.value : []
-  const ollamaModel = selectPreferredOllamaModel(ollamaModels)
-  const ollamaErrorDetail =
-    ollamaModelsResult.status === 'rejected' && ollamaModelsResult.reason instanceof Error
-      ? ollamaModelsResult.reason.message
-      : null
+  const ollama =
+    ollamaStatusResult.status === 'fulfilled'
+      ? ollamaStatusResult.value
+      : createOllamaStatusSnapshot({
+          available: false,
+          ready: false,
+          models: [],
+          detail: 'Ollama 상태를 확인하지 못했습니다.',
+          warning: '최근 확인에 실패했습니다.',
+          lastError: sanitizeStatusDetail(
+            ollamaStatusResult.reason instanceof Error
+              ? ollamaStatusResult.reason.message
+              : 'Ollama 상태를 확인하지 못했습니다.',
+            'Ollama 상태를 확인하지 못했습니다.',
+          ),
+          stale: false,
+          lastCheckedAt: new Date().toISOString(),
+          lastSuccessAt: lastSuccessfulOllamaStatus?.lastSuccessAt ?? null,
+        })
   const codex =
     codexStatusResult.status === 'fulfilled'
       ? codexStatusResult.value
@@ -1623,21 +1828,18 @@ async function getHealth() {
     ok: true,
     defaultProvider: 'auto',
     providers: [
-      {
-        provider: 'ollama',
-        available: Boolean(ollamaModel),
-        ready: Boolean(ollamaModel),
-        models: ollamaModel ? [ollamaModel] : [],
-        detail: ollamaModel
-          ? 'Ollama ' + ollamaModel + ' 모델을 사용할 수 있습니다.'
-          : ollamaErrorDetail || '사용 가능한 Ollama 모델이 없습니다.',
-      },
+      ollama,
       {
         provider: 'codex',
         available: codex.available,
         ready: codex.ready,
         models: ['gpt-5.4', 'gpt-5.4-mini'],
         detail: codex.detail,
+        warning: null,
+        lastError: null,
+        stale: false,
+        lastCheckedAt: null,
+        lastSuccessAt: null,
       },
     ],
   }
@@ -1842,6 +2044,7 @@ function mixSignalItems(items, category) {
 }
 
 async function fetchHackerNewsSignals(query, category) {
+  const discoveredAt = new Date().toISOString()
   const payload = await fetchJson(
     `https://hn.algolia.com/api/v1/search_by_date?query=${encodeURIComponent(
       query,
@@ -1863,12 +2066,26 @@ async function fetchHackerNewsSignals(query, category) {
       ),
       url: item.url || `https://news.ycombinator.com/item?id=${item.objectID}`,
       source: 'Hacker News',
+      sourceType: 'hackerNews',
+      sourceLabel: SOURCE_LABELS['Hacker News'] ?? 'Hacker News',
       category,
+      categoryLabel: CODE_TO_CATEGORY[category] ?? category,
       publishedAt: item.created_at,
+      discoveredAt,
+      language: 'en',
+      authorOrChannel: item.author || '',
+      rawMeta: {
+        hnObjectId: item.objectID,
+        points: item.points ?? 0,
+        comments: item.num_comments ?? 0,
+        author: item.author ?? '',
+        discussionUrl: `https://news.ycombinator.com/item?id=${item.objectID}`,
+      },
     }))
 }
 
 async function fetchGitHubSignals(query, category) {
+  const discoveredAt = new Date().toISOString()
   const pushedAfter = isoDateDaysAgo(category === 'business' ? 120 : 90)
   const starsThreshold =
     category === 'research' ? 120 : category === 'opensource' ? 250 : 180
@@ -1895,12 +2112,30 @@ async function fetchGitHubSignals(query, category) {
     ),
     url: repo.html_url,
     source: 'GitHub',
+    sourceType: 'github',
+    sourceLabel: SOURCE_LABELS.GitHub ?? 'GitHub',
     category,
+    categoryLabel: CODE_TO_CATEGORY[category] ?? category,
     publishedAt: repo.pushed_at || repo.updated_at,
+    discoveredAt,
+    language: 'en',
+    authorOrChannel: repo.owner?.login || '',
+    rawMeta: {
+      fullName: repo.full_name,
+      stars: repo.stargazers_count ?? 0,
+      forks: repo.forks_count ?? 0,
+      watchers: repo.watchers_count ?? 0,
+      openIssues: repo.open_issues_count ?? 0,
+      language: repo.language ?? '',
+      pushedAt: repo.pushed_at ?? '',
+      owner: repo.owner?.login ?? '',
+      defaultBranch: repo.default_branch ?? '',
+    },
   }))
 }
 
 async function fetchArxivSignals(searchQuery, category) {
+  const discoveredAt = new Date().toISOString()
   const response = await fetchWithTimeout(
     `https://export.arxiv.org/api/query?search_query=${encodeURIComponent(
       searchQuery,
@@ -1918,15 +2153,37 @@ async function fetchArxivSignals(searchQuery, category) {
   return xml
     .split('<entry>')
     .slice(1)
-    .map((entry, index) => ({
-      id: `arxiv-${category}-${index}`,
-      title: stripHtml(extractXmlValue(entry, 'title')),
-      summary: stripHtml(extractXmlValue(entry, 'summary')),
-      url: extractXmlLink(entry),
-      source: 'arXiv',
-      category,
-      publishedAt: extractXmlValue(entry, 'published') || new Date().toISOString(),
-    }))
+    .map((entry, index) => {
+      const title = stripHtml(extractXmlValue(entry, 'title'))
+      const summary = stripHtml(extractXmlValue(entry, 'summary'))
+      const url = extractXmlLink(entry)
+      const publishedAt = extractXmlValue(entry, 'published') || new Date().toISOString()
+      const authors = [...entry.matchAll(/<name>([^<]+)<\/name>/g)].map((match) => stripHtml(match[1]))
+      const arxivId = url.match(/arxiv\.org\/abs\/([^?#]+)/i)?.[1] ?? ''
+      const primaryCategory = entry.match(/<arxiv:primary_category[^>]+term="([^"]+)"/i)?.[1] ?? ''
+
+      return {
+        id: `arxiv-${category}-${index}`,
+        title,
+        summary,
+        url,
+        source: 'arXiv',
+        sourceType: 'arxiv',
+        sourceLabel: SOURCE_LABELS.arXiv ?? 'arXiv',
+        category,
+        categoryLabel: CODE_TO_CATEGORY[category] ?? category,
+        publishedAt,
+        discoveredAt,
+        language: 'en',
+        authorOrChannel: authors.slice(0, 3).join(', '),
+        rawMeta: {
+          arxivId,
+          authors,
+          primaryCategory,
+          pdfUrl: arxivId ? `https://arxiv.org/pdf/${arxivId}.pdf` : '',
+        },
+      }
+    })
     .filter((item) => item.title && item.url)
 }
 
@@ -2177,17 +2434,8 @@ async function translateSignalBatch(items) {
   )
 }
 
-async function buildSignalsFeed(category = '전체') {
+async function collectSignalItems(category = '전체') {
   const normalizedCategory = normalizeCategory(category)
-  const cached = signalFeedCache.get(normalizedCategory)
-
-  if (cached && cached.expiresAt > Date.now()) {
-    return {
-      generatedAt: cached.generatedAt,
-      items: cached.items,
-    }
-  }
-
   const tasks = []
 
   const categories =
@@ -2212,7 +2460,21 @@ async function buildSignalsFeed(category = '전체') {
   const settled = await Promise.allSettled(tasks)
   const merged = settled.flatMap((result) => (result.status === 'fulfilled' ? result.value : []))
   const sorted = dedupeSignalItems(sortSignalItems(merged))
-  const deduped = mixSignalItems(sorted, normalizedCategory)
+  return mixSignalItems(sorted, normalizedCategory)
+}
+
+async function buildSignalsFeed(category = '전체') {
+  const normalizedCategory = normalizeCategory(category)
+  const cached = signalFeedCache.get(normalizedCategory)
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return {
+      generatedAt: cached.generatedAt,
+      items: cached.items,
+    }
+  }
+
+  const deduped = await collectSignalItems(category)
   const items = await translateSignalBatch(deduped)
   const generatedAt = new Date().toISOString()
 
@@ -2514,6 +2776,252 @@ const server = http.createServer(async (request, response) => {
       return
     }
 
+    if (request.method === 'GET' && request.url.startsWith('/api/auto-posts/assets')) {
+      const requestUrl = new URL(request.url, `http://${HOST}:${PORT}`)
+      const assetPath = requestUrl.searchParams.get('path') ?? ''
+      const { rootPath } = await getDefaultWorkspace()
+      const target = resolveWorkspaceTarget(rootPath, assetPath)
+      await sendFileResponse(request, response, target.absolutePath)
+      return
+    }
+
+    if (request.method === 'GET' && request.url.startsWith('/api/auto-posts/state')) {
+      const payload = await autoPostsScheduler.getStatus()
+      sendJson(request, response, 200, { ok: true, ...payload })
+      return
+    }
+
+    if (request.method === 'GET' && request.url.startsWith('/api/auto-posts')) {
+      const requestUrl = new URL(request.url, `http://${HOST}:${PORT}`)
+      const { pathname } = requestUrl
+
+      if (pathname === '/api/auto-posts') {
+        const posts = await autoPostsScheduler.listPosts()
+        const state = await autoPostsScheduler.getStatus()
+        sendJson(request, response, 200, {
+          ok: true,
+          items: posts.items,
+          settings: state.settings,
+          state: state.state,
+        })
+        return
+      }
+
+      const detailMatch = pathname.match(/^\/api\/auto-posts\/([^/]+)$/)
+      if (detailMatch) {
+        const post = await autoPostsScheduler.getPost(decodeURIComponent(detailMatch[1]))
+        if (!post) {
+          sendJson(request, response, 404, { ok: false, error: '게시글을 찾지 못했습니다.' })
+          return
+        }
+
+        const { rootPath } = await getDefaultWorkspace()
+        sendJson(request, response, 200, {
+          ok: true,
+          ...post,
+          mediaAttachments: decorateAutoPostMedia(rootPath, post.mediaAttachments),
+        })
+        return
+      }
+    }
+
+    if (request.method === 'POST' && request.url === '/api/auto-posts/run') {
+      const body = await readBody(request)
+      const result = await autoPostsScheduler.runNow({
+        reason: 'manual',
+        category: body.category || '전체',
+        limit: body.limit,
+        force: Boolean(body.force),
+      })
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    if (request.method === 'PATCH' && request.url === '/api/auto-posts/settings') {
+      const body = await readBody(request)
+      const settings = await autoPostsScheduler.updateSettings(body)
+      const status = await autoPostsScheduler.getStatus()
+      sendJson(request, response, 200, { ok: true, settings, state: status.state })
+      return
+    }
+
+    const autoPostRegenerateMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/auto-posts\/([^/]+)\/regenerate$/)
+        : null
+    if (autoPostRegenerateMatch) {
+      const result = await autoPostsScheduler.regenerate(decodeURIComponent(autoPostRegenerateMatch[1]))
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    const autoPostExportMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/auto-posts\/([^/]+)\/publish-export$/)
+        : null
+    if (autoPostExportMatch) {
+      const body = await readBody(request)
+      const result = await autoPostsScheduler.exportPost(
+        decodeURIComponent(autoPostExportMatch[1]),
+        { format: body.format || 'html' },
+      )
+      sendJson(request, response, 200, { ok: true, ...result })
+      return
+    }
+
+    const autoPostRevealMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/auto-posts\/([^/]+)\/reveal$/)
+        : null
+    if (autoPostRevealMatch) {
+      const result = await autoPostsScheduler.revealPostFolder(decodeURIComponent(autoPostRevealMatch[1]))
+      sendJson(request, response, 200, { ok: true, ...result })
+      return
+    }
+
+    if (request.method === 'GET' && request.url === '/api/publisher/state') {
+      const payload = await publisherScheduler.getStatus()
+      sendJson(request, response, 200, { ok: true, ...payload })
+      return
+    }
+
+    if (request.method === 'GET' && request.url === '/api/publisher/queue') {
+      const payload = await publisherScheduler.listQueue()
+      sendJson(request, response, 200, { ok: true, ...payload })
+      return
+    }
+
+    if (request.method === 'POST' && request.url === '/api/publisher/run') {
+      const body = await readBody(request)
+      const result = await publisherScheduler.runNow({
+        reason: body.reason || 'manual',
+        limit: body.limit,
+        force: Boolean(body.force),
+        seedItems: Array.isArray(body.seedItems) ? body.seedItems : [],
+      })
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    if (request.method === 'PATCH' && request.url === '/api/publisher/settings') {
+      const body = await readBody(request)
+      const payload = await publisherScheduler.updateSettings(body)
+      sendJson(request, response, 200, { ok: true, ...payload })
+      return
+    }
+
+    const publisherApproveMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/publisher\/([^/]+)\/approve$/)
+        : null
+    if (publisherApproveMatch) {
+      const result = await publisherScheduler.approveDraft(decodeURIComponent(publisherApproveMatch[1]))
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    const publisherRejectMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/publisher\/([^/]+)\/reject$/)
+        : null
+    if (publisherRejectMatch) {
+      const body = await readBody(request)
+      const result = await publisherScheduler.rejectDraft(
+        decodeURIComponent(publisherRejectMatch[1]),
+        typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim() : 'operator_rejected',
+      )
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    const publisherPublishMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/publisher\/([^/]+)\/publish$/)
+        : null
+    if (publisherPublishMatch) {
+      const body = await readBody(request)
+      const result = await publisherScheduler.publishDraftNow(
+        decodeURIComponent(publisherPublishMatch[1]),
+        {
+          dryRun: Boolean(body.dryRun),
+        },
+      )
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    if (request.method === 'GET' && request.url === '/api/x-autopost/state') {
+      const payload = await xAutopostScheduler.getStatus()
+      sendJson(request, response, 200, { ok: true, ...payload })
+      return
+    }
+
+    if (request.method === 'GET' && request.url === '/api/x-autopost/queue') {
+      const payload = await xAutopostScheduler.listQueue()
+      sendJson(request, response, 200, { ok: true, ...payload })
+      return
+    }
+
+    if (request.method === 'POST' && request.url === '/api/x-autopost/run') {
+      const body = await readBody(request)
+      const result = await xAutopostScheduler.runNow({
+        category: body.category || '전체',
+        limit: Number(body.limit || 1),
+        force: Boolean(body.force),
+        seedItems: Array.isArray(body.seedItems) ? body.seedItems : [],
+        reason: body.reason || 'manual',
+      })
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    if (request.method === 'PATCH' && request.url === '/api/x-autopost/settings') {
+      const body = await readBody(request)
+      const payload = await xAutopostScheduler.updateSettings(body)
+      sendJson(request, response, 200, { ok: true, ...payload })
+      return
+    }
+
+    const xAutopostApproveMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/x-autopost\/([^/]+)\/approve$/)
+        : null
+    if (xAutopostApproveMatch) {
+      const result = await xAutopostScheduler.approveDraft(decodeURIComponent(xAutopostApproveMatch[1]))
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    const xAutopostRejectMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/x-autopost\/([^/]+)\/reject$/)
+        : null
+    if (xAutopostRejectMatch) {
+      const body = await readBody(request)
+      const result = await xAutopostScheduler.rejectDraft(
+        decodeURIComponent(xAutopostRejectMatch[1]),
+        typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim() : 'operator_rejected',
+      )
+      sendJson(request, response, 200, result)
+      return
+    }
+
+    const xAutopostPublishMatch =
+      request.method === 'POST'
+        ? request.url.match(/^\/api\/x-autopost\/([^/]+)\/publish$/)
+        : null
+    if (xAutopostPublishMatch) {
+      const body = await readBody(request)
+      const result = await xAutopostScheduler.publishDraftNow(
+        decodeURIComponent(xAutopostPublishMatch[1]),
+        {
+          dryRun: Boolean(body.dryRun),
+        },
+      )
+      sendJson(request, response, 200, result)
+      return
+    }
+
     if (request.method === 'GET' && request.url === '/api/skills') {
       const catalog = await listSkills()
       sendJson(request, response, 200, {
@@ -2670,6 +3178,27 @@ const server = http.createServer(async (request, response) => {
       error: error instanceof Error ? error.message : '브리지 내부 오류가 발생했습니다.',
     })
   }
+})
+
+autoPostsScheduler.init().catch((error) => {
+  console.error(
+    '[auto-posts] scheduler init failed',
+    error instanceof Error ? error.message : error,
+  )
+})
+
+xAutopostScheduler.start().catch((error) => {
+  console.error(
+    '[x-autopost] scheduler init failed',
+    error instanceof Error ? error.message : error,
+  )
+})
+
+publisherScheduler.start().catch((error) => {
+  console.error(
+    '[publisher] scheduler init failed',
+    error instanceof Error ? error.message : error,
+  )
 })
 
 server.listen(PORT, HOST, () => {
