@@ -1,4 +1,5 @@
 import type {
+  PublisherDossier,
   PublisherDraft,
   PublisherMetrics,
   PublisherRuntimeStatus,
@@ -75,6 +76,7 @@ export function defaultPublisherMetrics(): PublisherMetrics {
     publishedCount24h: 0,
     publishedCount1h: 0,
     failedCount: 0,
+    dossierCount: 0,
     providerCounts24h: [],
     recentFailures: [],
     publishers: [],
@@ -130,5 +132,16 @@ export function sourceTypeLabel(sourceType: PublisherDraft['sourceType'] | Publi
       return '뉴스'
     default:
       return '피드'
+  }
+}
+
+export function dossierStatusLabel(status: PublisherDossier['status']) {
+  switch (status) {
+    case 'published':
+      return '게시 중'
+    case 'tracking':
+      return '추적 중'
+    default:
+      return '새 이슈'
   }
 }

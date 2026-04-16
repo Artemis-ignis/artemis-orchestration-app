@@ -1,5 +1,35 @@
 # Change Log
 
+## 2026-04-17
+
+### Artemis Wire live dossier clustering
+
+- Added `local-bridge/publisher/dossiers.mjs` to cluster related draft and published records into live Artemis Wire dossiers.
+- Dossier clustering now combines items using:
+  - explicit `dossierId` / `dossierKey`
+  - source identity matches
+  - repeated `topicHash`
+  - overlapping title tokens and tags for the same story thread
+- Scheduler draft creation now stamps `dossierKey` and `dossierId` onto new queue entries so later lifecycle steps keep the story linkage.
+- Internal published records now store `dossierId` and `dossierKey`, allowing one live dossier to track both queued and already-published posts.
+- `GET /api/publisher/state` now returns:
+  - `dossiers`
+  - `metrics.dossierCount`
+- Added dossier coverage to `local-bridge/publisher/pipeline.test.mjs` and verified that a draft plus a related published post merge into one live dossier.
+- Rebuilt the Artemis Wire operator panel so it now shows:
+  - dossier overview
+  - live dossier list
+  - draft queue
+  - published history
+  - a detail pane that switches between dossier, draft, and published views
+- `SignalsPage.tsx` now keeps dossier selection state and lets the operator pivot directly from a dossier to drafts or published history without losing the rest of the Artemis Wire context.
+- `ActivityPage.tsx` now shows a `라이브 dossier` summary block so the tracked-story view is visible outside Signals.
+- Re-verified with:
+  - `npm run lint`
+  - `npm run build`
+  - `node --test local-bridge/ai/router.test.mjs local-bridge/publisher/pipeline.test.mjs`
+  - live browser screenshots under `output/playwright/wire-dossier/`
+
 ## 2026-04-16
 
 ### Source-agnostic publisher

@@ -4,6 +4,8 @@ export type ContentSourceType = 'paper' | 'news' | 'feed'
 
 export type PublishTarget = 'internal' | 'x'
 
+export type PublisherDossierStatus = 'emerging' | 'tracking' | 'published'
+
 export type PublisherDraftStatus =
   | 'draft'
   | 'approved'
@@ -96,6 +98,8 @@ export type PublisherDraft = {
   createdAt: string
   updatedAt: string
   status: PublisherDraftStatus
+  dossierId?: string | null
+  dossierKey?: string | null
   provider: string
   sourceLabel: string
   sourceType: ContentSourceType
@@ -147,6 +151,8 @@ export type PublisherLog = {
 export type PublishedPost = {
   id: string
   draftId: string
+  dossierId?: string | null
+  dossierKey?: string | null
   title: string
   excerpt: string
   body: string
@@ -165,6 +171,40 @@ export type PublishedPost = {
   publishResult: Record<string, unknown> | null
 }
 
+export type PublisherDossierTimelineEntry = {
+  id: string
+  kind: 'draft' | 'scheduled' | 'published' | 'skipped' | 'log'
+  createdAt: string | null
+  title: string
+  provider: string
+  detail: string
+  sourceUrl: string
+  linkedId: string | null
+}
+
+export type PublisherDossier = {
+  id: string
+  dossierKey: string
+  slug: string
+  title: string
+  summary: string
+  lead: string
+  status: PublisherDossierStatus
+  sourceType: ContentSourceType
+  providerLabels: string[]
+  tags: string[]
+  sourceCount: number
+  draftCount: number
+  publishedCount: number
+  lastUpdatedAt: string | null
+  lastPublishedAt: string | null
+  keyPoints: string[]
+  sourceItems: NormalizedContentItem[]
+  linkedDraftIds: string[]
+  linkedPublishedIds: string[]
+  timeline: PublisherDossierTimelineEntry[]
+}
+
 export type PublisherRuntimeStatus = {
   target: PublishTarget
   enabled: boolean
@@ -181,6 +221,7 @@ export type PublisherMetrics = {
   publishedCount24h: number
   publishedCount1h: number
   failedCount: number
+  dossierCount: number
   providerCounts24h: Array<{
     provider: string
     label?: string
@@ -207,6 +248,7 @@ export type PublisherStateResponse = {
   queue: PublisherDraft[]
   logs: PublisherLog[]
   published: PublishedPost[]
+  dossiers: PublisherDossier[]
   metrics: PublisherMetrics
   publishers: PublisherRuntimeStatus[]
 }
@@ -221,6 +263,7 @@ export type PublisherRunResponse = {
   queue: PublisherDraft[]
   logs: PublisherLog[]
   published: PublishedPost[]
+  dossiers: PublisherDossier[]
 }
 
 export type PublisherDraftActionResponse = {

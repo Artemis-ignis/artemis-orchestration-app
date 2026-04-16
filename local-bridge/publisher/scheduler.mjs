@@ -1,4 +1,5 @@
 import { nowIso } from '../auto-posts/normalize.mjs'
+import { buildDossierId, buildDossierKey, buildDossiers } from './dossiers.mjs'
 import { generatePublisherDraft, PUBLISHER_PROMPT_VERSION } from './generator.mjs'
 import {
   buildTopicHash,
@@ -181,7 +182,7 @@ function summarizeProviderWindow(items = [], published = [], providerStats = [])
   return Array.from(providerMap.values()).sort((left, right) => right.publishedCount24h - left.publishedCount24h)
 }
 
-function computeMetrics(queue, published, providerStats, publisherStatuses) {
+function computeMetrics(queue, published, providerStats, publisherStatuses, dossiers = []) {
   const now = Date.now()
   const publishedToday = collectWindowItems(published, 'publishedAt', 86_400_000, now)
   const publishedHour = collectWindowItems(published, 'publishedAt', 3_600_000, now)
@@ -202,6 +203,7 @@ function computeMetrics(queue, published, providerStats, publisherStatuses) {
     publishedCount24h: publishedToday.length,
     publishedCount1h: publishedHour.length,
     failedCount: queue.filter((item) => item.status === 'failed').length,
+    dossierCount: dossiers.length,
     providerCounts24h: summarizeProviderWindow(queue, published, providerStats),
     recentFailures,
     publishers: publisherStatuses,
@@ -268,13 +270,15 @@ export function createPublisherScheduler({ resolveWorkspaceRoot, collectSignalIt
     const workspaceRoot = await getWorkspaceRoot()
     const { settings, state, queue, logs, published } = await store.listState(workspaceRoot)
     const publishers = await getPublisherStatuses(settings)
+    const dossiers = buildDossiers({ queue, published, logs })
     return {
       settings,
       state,
       queue,
       logs,
       published,
-      metrics: computeMetrics(queue, published, state.providerStats || [], publishers),
+      dossiers,
+      metrics: computeMetrics(queue, published, state.providerStats || [], publishers, dossiers),
       publishers,
     }
   }
@@ -417,6 +421,8 @@ export function createPublisherScheduler({ resolveWorkspaceRoot, collectSignalIt
 
     for (const candidate of selectedCandidates) {
       const sourceSnapshot = buildSourceSnapshot(candidate)
+      const dossierKey = buildDossierKey(sourceSnapshot)
+      const dossierId = buildDossierId(dossierKey)
       const gate = force
         ? {
             ok: true,
@@ -436,6 +442,8 @@ export function createPublisherScheduler({ resolveWorkspaceRoot, collectSignalIt
           createdAt: currentTime,
           updatedAt: currentTime,
           status: 'skipped',
+          dossierId,
+          dossierKey,
           provider: sourceSnapshot.provider,
           sourceLabel: sourceLabelForProvider(sourceSnapshot.provider),
           sourceType: sourceSnapshot.sourceType,
@@ -493,6 +501,8 @@ export function createPublisherScheduler({ resolveWorkspaceRoot, collectSignalIt
         createdAt: currentTime,
         updatedAt: currentTime,
         status: settings.mode === 'auto' ? 'approved' : 'draft',
+        dossierId,
+        dossierKey,
         provider: sourceSnapshot.provider,
         sourceLabel: sourceLabelForProvider(sourceSnapshot.provider),
         sourceType: sourceSnapshot.sourceType,
@@ -589,6 +599,7 @@ export function createPublisherScheduler({ resolveWorkspaceRoot, collectSignalIt
     })
 
     const saved = await saveQueueAndState(workspaceRoot, scheduledQueue, published, nextState, settings)
+    const dossiers = buildDossiers({ queue: saved.queue, published, logs: await store.getLogs(workspaceRoot, settings) })
     return {
       ok: true,
       createdCount: createdDrafts.length,
@@ -599,6 +610,7 @@ export function createPublisherScheduler({ resolveWorkspaceRoot, collectSignalIt
       queue: saved.queue,
       logs,
       published,
+      dossiers,
     }
   }
 

@@ -21,6 +21,29 @@
 
 ## Latest Confirmed State
 
+- Artemis Wire now builds live `dossier` clusters from queue and published entries instead of treating every draft as a separate isolated post.
+- Dossier records now track:
+  - linked drafts
+  - linked published posts
+  - source count
+  - timeline entries
+  - key points
+  - provider labels
+  - last updated and last published timestamps
+- The publisher bridge state now returns `dossiers` plus a `dossierCount` metric alongside queue, logs, publisher readiness, and published history.
+- Scheduler draft creation now stamps `dossierId` and `dossierKey` so later approval, publish, and history steps stay attached to the same live story thread.
+- Internal published records now persist their dossier linkage so Artemis Wire can show one continuing story across drafts and published entries.
+- Signals now lets the operator browse Artemis Wire by three layers in one place:
+  - live dossier clusters
+  - draft queue
+  - published history
+- Activity now surfaces recent Artemis Wire live dossiers so the tracked story view is visible outside the Signals page.
+- Browser verification on localhost confirmed:
+  - the `Artemis Wire` tab shows the new dossier lane,
+  - dossier detail renders in the right-side detail panel,
+  - Activity shows the live dossier summary card,
+  - screenshots were saved under `output/playwright/wire-dossier/`.
+
 - `feat/source-agnostic-publisher` now generalizes the older X autopost branch into a content-ingest and internal-publishing pipeline instead of an X-first pipeline.
 - The bridge now exposes source-agnostic publisher APIs:
   - `GET /api/publisher/state`

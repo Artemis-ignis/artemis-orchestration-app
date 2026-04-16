@@ -4,7 +4,7 @@ import { EmptyState, PageIntro, SearchField } from '../crewPageShared'
 import { formatDate, pageLabel } from '../crewPageHelpers'
 import { fetchPublisherState } from '../lib/modelClient'
 import { useArtemisApp } from '../state/context'
-import type { PublisherLog, PublisherMetrics, PublishedPost } from '../types/publisher'
+import type { PublisherDossier, PublisherLog, PublisherMetrics, PublishedPost } from '../types/publisher'
 
 function publisherTargetLabel(target: 'internal' | 'x') {
   return target === 'internal' ? 'Artemis Wire' : 'X'
@@ -17,6 +17,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
   const [publisherMetrics, setPublisherMetrics] = useState<PublisherMetrics | null>(null)
   const [publisherLogs, setPublisherLogs] = useState<PublisherLog[]>([])
   const [publishedPosts, setPublishedPosts] = useState<PublishedPost[]>([])
+  const [recentDossiers, setRecentDossiers] = useState<PublisherDossier[]>([])
   const [publisherError, setPublisherError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
         setPublisherMetrics(response.metrics)
         setPublisherLogs(response.logs.slice(0, 8))
         setPublishedPosts(response.published.slice(0, 4))
+        setRecentDossiers(response.dossiers.slice(0, 3))
         setPublisherError(null)
       } catch (error) {
         if (ignore) {
@@ -138,6 +140,36 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
                 <div className="badge-row">
                   <span className="chip chip--soft">{post.category || 'Artemis Wire'}</span>
                   <span className="chip chip--soft">{post.summaryType}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {recentDossiers.length > 0 ? (
+        <section className="panel-card panel-card--muted">
+          <div className="panel-card__header">
+            <div>
+              <h2>라이브 dossier</h2>
+              <p className="settings-card__lead">Artemis Wire가 지금 추적 중인 주제 묶음을 빠르게 확인할 수 있습니다.</p>
+            </div>
+            <button className="ghost-button" onClick={() => onNavigate('signals')} type="button">
+              Wire 열기
+            </button>
+          </div>
+          <div className="stack-grid">
+            {recentDossiers.map((item) => (
+              <article key={item.id} className="panel-card">
+                <div className="card-topline">
+                  <span className="chip chip--soft">{item.status === 'published' ? '게시 중' : item.status === 'tracking' ? '추적 중' : '새 이슈'}</span>
+                  <small>{item.lastUpdatedAt ? formatDate(item.lastUpdatedAt) : '방금'}</small>
+                </div>
+                <strong>{item.title}</strong>
+                <p>{item.summary}</p>
+                <div className="badge-row">
+                  <span className="chip chip--soft">소스 {item.sourceCount}</span>
+                  <span className="chip chip--soft">게시 {item.publishedCount}</span>
                 </div>
               </article>
             ))}

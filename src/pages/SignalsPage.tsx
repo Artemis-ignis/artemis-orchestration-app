@@ -45,6 +45,7 @@ import type {
   SchedulerState,
 } from '../types/autoPosts'
 import type {
+  PublisherDossier,
   PublisherDraft,
   PublisherSettings,
   PublisherState,
@@ -159,6 +160,8 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
   const [xAutopostMetrics, setXAutopostMetrics] = useState<PublisherMetrics>(defaultPublisherMetrics)
   const [xPublisherStatus, setXPublisherStatus] = useState<PublisherRuntimeStatus>(defaultPublisherRuntimeStatus)
   const [publishedItems, setPublishedItems] = useState<PublishedPost[]>([])
+  const [publisherDossiers, setPublisherDossiers] = useState<PublisherDossier[]>([])
+  const [selectedDossierId, setSelectedDossierId] = useState<string | null>(null)
   const [selectedPublishedId, setSelectedPublishedId] = useState<string | null>(null)
   const [publisherProviderFilter, setPublisherProviderFilter] = useState('all')
   const [publisherStatusFilter, setPublisherStatusFilter] = useState('all')
@@ -247,10 +250,12 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     async ({
       silent = false,
       focusDraftId,
+      focusDossierId,
       focusPublishedId,
     }: {
       silent?: boolean
       focusDraftId?: string | null
+      focusDossierId?: string | null
       focusPublishedId?: string | null
     } = {}) => {
       if (!silent) {
@@ -267,6 +272,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
         setXAutopostLogs(response.logs)
         setXAutopostMetrics(response.metrics)
         setPublishedItems(response.published)
+        setPublisherDossiers(response.dossiers)
         setXPublisherStatus(
           response.publishers.find((item) => item.target === 'internal') ??
             response.publishers[0] ??
@@ -277,9 +283,13 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
         const nextSelectedPublishedId =
           focusPublishedId ??
           (nextSelectedDraftId ? null : selectedPublishedId ?? response.published[0]?.id ?? null)
+        const nextSelectedDossierId =
+          focusDossierId ??
+          (nextSelectedDraftId || nextSelectedPublishedId ? null : selectedDossierId ?? response.dossiers[0]?.id ?? null)
 
         setSelectedDraftId(nextSelectedDraftId)
         setSelectedPublishedId(nextSelectedPublishedId)
+        setSelectedDossierId(nextSelectedDossierId)
       } catch (nextError) {
         if (!silent) {
           setActionMessage(nextError instanceof Error ? nextError.message : 'Artemis Wire 상태를 불러오지 못했습니다.')
@@ -290,7 +300,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
         }
       }
     },
-    [bridgeUrl, selectedDraftId, selectedPublishedId],
+    [bridgeUrl, selectedDossierId, selectedDraftId, selectedPublishedId],
   )
 
   const loadPostDetail = useCallback(
@@ -411,6 +421,26 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     })
   }, [deferredQuery, publishedItems, publisherProviderFilter])
 
+  const filteredDossiers = useMemo(() => {
+    const keyword = deferredQuery.trim().toLowerCase()
+    return publisherDossiers.filter((item) => {
+      if (
+        publisherProviderFilter !== 'all' &&
+        !item.sourceItems.some((source) => source.provider === publisherProviderFilter)
+      ) {
+        return false
+      }
+
+      if (!keyword) {
+        return true
+      }
+
+      return `${item.title} ${item.summary} ${item.lead} ${item.providerLabels.join(' ')} ${item.tags.join(' ')}`
+        .toLowerCase()
+        .includes(keyword)
+    })
+  }, [deferredQuery, publisherDossiers, publisherProviderFilter])
+
   const publisherStatuses = useMemo(() => {
     if (xAutopostMetrics.publishers.length > 0) {
       return xAutopostMetrics.publishers
@@ -461,6 +491,11 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     publishedItems.find((item) => item.id === selectedPublishedId) ??
     null
 
+  const selectedDossier =
+    filteredDossiers.find((item) => item.id === selectedDossierId) ??
+    publisherDossiers.find((item) => item.id === selectedDossierId) ??
+    null
+
   const selectedDraftLogs = useMemo(() => {
     if (!selectedDraft) {
       return xAutopostLogs.slice(0, 16)
@@ -473,6 +508,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
   useEffect(() => {
     if (!selectedDraftId && filteredDrafts[0]) {
       setSelectedDraftId(filteredDrafts[0].id)
+      setSelectedDossierId(null)
       return
     }
 
@@ -482,7 +518,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
   }, [filteredDrafts, selectedDraftId, xQueue])
 
   useEffect(() => {
-    if (selectedDraftId) {
+    if (selectedDraftId || selectedDossierId) {
       return
     }
 
@@ -494,7 +530,22 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     if (selectedPublishedId && !publishedItems.some((item) => item.id === selectedPublishedId)) {
       setSelectedPublishedId(filteredPublishedItems[0]?.id ?? null)
     }
-  }, [filteredPublishedItems, publishedItems, selectedDraftId, selectedPublishedId])
+  }, [filteredPublishedItems, publishedItems, selectedDossierId, selectedDraftId, selectedPublishedId])
+
+  useEffect(() => {
+    if (selectedDraftId || selectedPublishedId) {
+      return
+    }
+
+    if (!selectedDossierId && filteredDossiers[0]) {
+      setSelectedDossierId(filteredDossiers[0].id)
+      return
+    }
+
+    if (selectedDossierId && !publisherDossiers.some((item) => item.id === selectedDossierId)) {
+      setSelectedDossierId(filteredDossiers[0]?.id ?? null)
+    }
+  }, [filteredDossiers, publisherDossiers, selectedDossierId, selectedDraftId, selectedPublishedId])
 
   const executeRunNow = async () => {
     setPostActionLoading(true)
@@ -941,6 +992,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       ) : activeTab === 'publisher' ? (
         <PublisherOperationsPanel
           actionMessage={actionMessage}
+          dossiers={filteredDossiers}
           filteredDrafts={filteredDrafts}
           filteredPublishedItems={filteredPublishedItems}
           internalPublisherStatus={internalPublisherStatus}
@@ -951,12 +1003,19 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
           onRefresh={loadXAutopost}
           onRejectDraft={executeRejectDraft}
           onSaveSettings={executeSaveXSettings}
+          onSelectDossier={(id) => {
+            setSelectedDossierId(id)
+            setSelectedDraftId(null)
+            setSelectedPublishedId(null)
+          }}
           onSelectDraft={(id) => {
             setSelectedDraftId(id)
+            setSelectedDossierId(null)
             setSelectedPublishedId(null)
           }}
           onSelectPublished={(id) => {
             setSelectedPublishedId(id)
+            setSelectedDossierId(null)
             setSelectedDraftId(null)
           }}
           providerFilter={publisherProviderFilter}
@@ -965,6 +1024,8 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
           publisherSettings={xAutopostSettings}
           publisherSettingsDraft={xSettingsDraft}
           publisherState={xAutopostState}
+          selectedDossier={selectedDossier}
+          selectedDossierId={selectedDossierId}
           selectedDraft={selectedDraft}
           selectedDraftId={selectedDraftId}
           selectedDraftLogs={selectedDraftLogs}

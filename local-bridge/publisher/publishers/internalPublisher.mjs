@@ -59,6 +59,8 @@ export function createInternalPublisher({ store }) {
     const postEntry = {
       id: postId,
       draftId: draft.id,
+      dossierId: draft.dossierId || null,
+      dossierKey: draft.dossierKey || null,
       title: draft.sourceTitle,
       excerpt: buildExcerpt(draft.generatedText),
       body: draft.generatedText,
