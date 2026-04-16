@@ -104,11 +104,16 @@
   - summary-type labels,
   - source-type labels,
   - explicit publish target and source metadata for drafts and published entries.
+- The Artemis Wire operator tab in `SignalsPage.tsx` is now split into smaller UI pieces:
+  - `src/features/publisher/PublisherOperationsPanel.tsx` owns the overview, policy, queue, history, and detail rendering,
+  - `src/features/publisher/publisherUi.ts` owns default settings/state values plus shared label helpers.
+- Signals now keeps publisher defaults and operator labels outside the page component so future Artemis Wire changes do not re-expand `SignalsPage.tsx`.
 - Activity now includes an Artemis Wire operations block plus a `최근 Wire 게시물` panel so recent internal posts are visible outside the Signals page.
 - Browser verification on localhost confirmed:
   - the `Artemis Wire` tab heading, copy, and empty states render correctly,
   - the Activity page shows the new Artemis Wire summary language,
-  - full-page screenshots were captured under `output/playwright/wire-verify/`.
+  - full-page screenshots were captured under `output/playwright/wire-verify/`,
+  - the refactored Artemis Wire operator tab still renders overview, policy, provider status, queue, and history sections after extraction.
 - Activity now shows internal publishing health, provider counts, and recent publish failures without assuming X is the primary target.
 - Manual API verification confirmed:
   - `ingest -> draft -> approve -> scheduled -> published` works for internal publishing,

@@ -11,7 +11,13 @@ import {
   formatRelative,
   signalSourceLabel,
 } from '../crewPageHelpers'
-import { PublisherArticle } from '../features/publisher/PublisherArticle'
+import { PublisherOperationsPanel } from '../features/publisher/PublisherOperationsPanel'
+import {
+  defaultPublisherMetrics,
+  defaultPublisherRuntimeStatus,
+  defaultPublisherSettings,
+  defaultPublisherState,
+} from '../features/publisher/publisherUi'
 import { Icon } from '../icons'
 import {
   approvePublisherDraft,
@@ -109,80 +115,6 @@ function defaultSchedulerState(): SchedulerState {
   }
 }
 
-function defaultXAutopostSettings(): PublisherSettings {
-  return {
-    mode: 'approval',
-    publishInternalEnabled: true,
-    publishXEnabled: false,
-    maxPerHour: 10,
-    minIntervalMinutes: 6,
-    maxPerDay: 120,
-    requireSourceUrl: true,
-    requireUniqueTopic: true,
-    minNoveltyScore: 0.72,
-    blockNearDuplicates: true,
-    outputDir: 'publisher',
-    generationModel: 'gpt-5.4-mini',
-    startupDelayMs: 15_000,
-    schedulerPollMs: 60_000,
-    topicCooldownHours: 48,
-    retryLimit: 3,
-    retryBackoffMinutes: 12,
-    maxQueueItems: 400,
-    ingestArxivEnabled: true,
-    ingestCrossrefEnabled: true,
-    ingestSemanticScholarEnabled: true,
-    ingestNewsApiEnabled: false,
-    newsApiKey: '',
-    ingestRssEnabled: false,
-    rssFeeds: [],
-    ingestLegacySignalsEnabled: true,
-    ingestQuery: 'artificial intelligence large language model agent multimodal open source research',
-    defaultQueueLimit: 3,
-  }
-}
-
-function defaultXAutopostState(): PublisherState {
-  return {
-    lastIngestRunAt: null,
-    lastPublishAttemptAt: null,
-    lastPublishedAt: null,
-    nextIngestAt: null,
-    nextPublishAt: null,
-    inProgress: false,
-    lastError: '',
-    lastDraftId: null,
-    publishedDraftIds: [],
-    skippedDraftIds: [],
-    providerStats: [],
-    updatedAt: new Date().toISOString(),
-  }
-}
-
-function defaultXAutopostPublisher(): PublisherRuntimeStatus {
-  return {
-    target: 'internal',
-    enabled: false,
-    configured: false,
-    ready: false,
-    detail: 'Artemis Wire 게시기 상태를 확인하지 못했습니다.',
-  }
-}
-
-function defaultXAutopostMetrics(): PublisherMetrics {
-  return {
-    draftCount: 0,
-    approvedCount: 0,
-    scheduledCount: 0,
-    publishedCount24h: 0,
-    publishedCount1h: 0,
-    failedCount: 0,
-    providerCounts24h: [],
-    recentFailures: [],
-    publishers: [],
-  }
-}
-
 function postStatusLabel(status: GeneratedPost['status']) {
   switch (status) {
     case 'failed':
@@ -191,58 +123,6 @@ function postStatusLabel(status: GeneratedPost['status']) {
       return '초안'
     default:
       return '준비됨'
-  }
-}
-
-function draftStatusLabel(status: PublisherDraft['status']) {
-  switch (status) {
-    case 'approved':
-      return '승인됨'
-    case 'scheduled':
-      return '예약됨'
-    case 'published':
-      return '게시됨'
-    case 'disabled':
-      return '비활성'
-    case 'failed':
-      return '실패'
-    case 'skipped':
-      return '건너뜀'
-    default:
-      return '초안'
-  }
-}
-
-function publisherModeLabel(mode: PublisherSettings['mode']) {
-  switch (mode) {
-    case 'auto':
-      return '자동 게시'
-    case 'dry-run':
-      return '드라이 런'
-    default:
-      return '승인 대기'
-  }
-}
-
-function summaryTypeLabel(summaryType: PublisherDraft['summaryType'] | PublishedPost['summaryType']) {
-  switch (summaryType) {
-    case 'paper-intro':
-      return '논문 소개형'
-    case 'brief-points':
-      return '핵심 포인트형'
-    default:
-      return '속보형'
-  }
-}
-
-function sourceTypeLabel(sourceType: PublisherDraft['sourceType'] | PublishedPost['sourceType']) {
-  switch (sourceType) {
-    case 'paper':
-      return '논문'
-    case 'news':
-      return '뉴스'
-    default:
-      return '피드'
   }
 }
 
@@ -272,12 +152,12 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
   const [settingsDraft, setSettingsDraft] = useState<AutoPostSettings>(defaultAutoPostSettings)
   const [xQueue, setXQueue] = useState<PublisherDraft[]>([])
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
-  const [xAutopostSettings, setXAutopostSettings] = useState<PublisherSettings>(defaultXAutopostSettings)
-  const [xSettingsDraft, setXSettingsDraft] = useState<PublisherSettings>(defaultXAutopostSettings)
-  const [xAutopostState, setXAutopostState] = useState<PublisherState>(defaultXAutopostState)
+  const [xAutopostSettings, setXAutopostSettings] = useState<PublisherSettings>(defaultPublisherSettings)
+  const [xSettingsDraft, setXSettingsDraft] = useState<PublisherSettings>(defaultPublisherSettings)
+  const [xAutopostState, setXAutopostState] = useState<PublisherState>(defaultPublisherState)
   const [xAutopostLogs, setXAutopostLogs] = useState<PublisherLog[]>([])
-  const [xAutopostMetrics, setXAutopostMetrics] = useState<PublisherMetrics>(defaultXAutopostMetrics)
-  const [xPublisherStatus, setXPublisherStatus] = useState<PublisherRuntimeStatus>(defaultXAutopostPublisher)
+  const [xAutopostMetrics, setXAutopostMetrics] = useState<PublisherMetrics>(defaultPublisherMetrics)
+  const [xPublisherStatus, setXPublisherStatus] = useState<PublisherRuntimeStatus>(defaultPublisherRuntimeStatus)
   const [publishedItems, setPublishedItems] = useState<PublishedPost[]>([])
   const [selectedPublishedId, setSelectedPublishedId] = useState<string | null>(null)
   const [publisherProviderFilter, setPublisherProviderFilter] = useState('all')
@@ -390,7 +270,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
         setXPublisherStatus(
           response.publishers.find((item) => item.target === 'internal') ??
             response.publishers[0] ??
-            defaultXAutopostPublisher(),
+            defaultPublisherRuntimeStatus(),
         )
 
         const nextSelectedDraftId = focusDraftId ?? selectedDraftId ?? response.queue[0]?.id ?? null
@@ -786,7 +666,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       setXPublisherStatus(
         response.publishers.find((item) => item.target === 'internal') ??
           response.publishers[0] ??
-          defaultXAutopostPublisher(),
+          defaultPublisherRuntimeStatus(),
       )
       setActionMessage('Artemis Wire 설정을 저장했습니다.')
     } catch (nextError) {
@@ -1059,512 +939,43 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
           )}
         </>
       ) : activeTab === 'publisher' ? (
-        <div className="publisher-shell">
-          <div className="publisher-side">
-            <section className="panel-card">
-              <div className="panel-card__header">
-                <div>
-                  <h2>Artemis Wire 운영</h2>
-                  <p className="settings-card__lead">Artemis Wire 내부 게시를 기본 출력으로 사용하고, X는 선택적 크로스포스트로만 동작합니다.</p>
-                </div>
-                <span className={`chip ${xAutopostState.inProgress ? 'is-active' : 'chip--soft'}`}>
-                  {publisherModeLabel(xAutopostSettings.mode)}
-                </span>
-              </div>
-              <div className="stack-grid stack-grid--compact">
-                <div className="summary-row">
-                  <span>Artemis Wire 게시기</span>
-                  <strong>{internalPublisherStatus.ready ? '준비됨' : internalPublisherStatus.enabled ? '제한됨' : '비활성'}</strong>
-                </div>
-                <div className="summary-row">
-                  <span>X cross-post</span>
-                  <strong>{xCrossPostStatus ? (xCrossPostStatus.ready ? '준비됨' : xCrossPostStatus.enabled ? '비활성 대기' : '사용 안 함') : '사용 안 함'}</strong>
-                </div>
-                <div className="summary-row">
-                  <span>최근 게시</span>
-                  <strong>{xAutopostState.lastPublishedAt ? formatDate(xAutopostState.lastPublishedAt) : '없음'}</strong>
-                </div>
-                <div className="summary-row">
-                  <span>다음 수집</span>
-                  <strong>{xAutopostState.nextIngestAt ? formatDate(xAutopostState.nextIngestAt) : '중지됨'}</strong>
-                </div>
-                <div className="summary-row">
-                  <span>다음 발행</span>
-                  <strong>{xAutopostState.nextPublishAt ? formatDate(xAutopostState.nextPublishAt) : '없음'}</strong>
-                </div>
-              </div>
-              {xAutopostState.lastError ? (
-                <div className="status-banner status-banner--warning">
-                  <Icon name="warning" size={16} />
-                  <span>{xAutopostState.lastError}</span>
-                </div>
-              ) : null}
-              <p className="settings-card__lead">{internalPublisherStatus.detail}</p>
-              {xCrossPostStatus ? (
-                <p className="settings-card__lead">X: {xCrossPostStatus.detail}</p>
-              ) : null}
-              <div className="badge-row">
-                <span className="chip chip--soft">1시간 {xAutopostMetrics.publishedCount1h}/{xAutopostSettings.maxPerHour}</span>
-                <span className="chip chip--soft">24시간 {xAutopostMetrics.publishedCount24h}/{xAutopostSettings.maxPerDay}</span>
-                <span className="chip chip--soft">승인 대기 {xAutopostMetrics.draftCount}</span>
-                <span className="chip chip--soft">예약 {xAutopostMetrics.scheduledCount}</span>
-                <span className="chip chip--soft">실패 {xAutopostMetrics.failedCount}</span>
-              </div>
-              <div className="badge-row">
-                <button className="primary-button" disabled={postActionLoading} onClick={() => void executeCreateDraftFromSignal()} type="button">
-                  현재 카테고리로 Wire 초안 채우기
-                </button>
-                <button className="ghost-button" disabled={postActionLoading} onClick={() => void loadXAutopost()} type="button">
-                  상태 새로고침
-                </button>
-              </div>
-            </section>
-
-            <section className="panel-card">
-              <div className="panel-card__header">
-                <h2>와이어 수집 및 발행 정책</h2>
-                <span className="chip chip--soft">{xSettingsDraft.generationModel}</span>
-              </div>
-              <div className="auto-post-settings-grid">
-                <label className="field">
-                  <span>모드</span>
-                  <select value={xSettingsDraft.mode} onChange={(event) => setXSettingsDraft((current) => ({ ...current, mode: event.target.value as PublisherSettings['mode'] }))}>
-                    <option value="dry-run">dry-run</option>
-                    <option value="approval">approval</option>
-                    <option value="auto">auto</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>생성 모델</span>
-                  <input value={xSettingsDraft.generationModel} onChange={(event) => setXSettingsDraft((current) => ({ ...current, generationModel: event.target.value }))} />
-                </label>
-                <label className="field">
-                  <span>기본 큐 생성 수</span>
-                  <input type="number" min={1} max={20} value={xSettingsDraft.defaultQueueLimit} onChange={(event) => setXSettingsDraft((current) => ({ ...current, defaultQueueLimit: Number(event.target.value || current.defaultQueueLimit) }))} />
-                </label>
-                <label className="field">
-                  <span>시간당 최대</span>
-                  <input type="number" min={1} max={24} value={xSettingsDraft.maxPerHour} onChange={(event) => setXSettingsDraft((current) => ({ ...current, maxPerHour: Number(event.target.value || current.maxPerHour) }))} />
-                </label>
-                <label className="field">
-                  <span>최소 간격(분)</span>
-                  <input type="number" min={1} value={xSettingsDraft.minIntervalMinutes} onChange={(event) => setXSettingsDraft((current) => ({ ...current, minIntervalMinutes: Number(event.target.value || current.minIntervalMinutes) }))} />
-                </label>
-                <label className="field">
-                  <span>일일 최대</span>
-                  <input type="number" min={1} value={xSettingsDraft.maxPerDay} onChange={(event) => setXSettingsDraft((current) => ({ ...current, maxPerDay: Number(event.target.value || current.maxPerDay) }))} />
-                </label>
-                <label className="field">
-                  <span>최소 novelty</span>
-                  <input type="number" step="0.01" min={0} max={1} value={xSettingsDraft.minNoveltyScore} onChange={(event) => setXSettingsDraft((current) => ({ ...current, minNoveltyScore: Number(event.target.value || current.minNoveltyScore) }))} />
-                </label>
-                <label className="field">
-                  <span>Artemis Wire 게시</span>
-                  <select value={xSettingsDraft.publishInternalEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, publishInternalEnabled: event.target.value === 'enabled' }))}>
-                    <option value="enabled">활성</option>
-                    <option value="disabled">비활성</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>X cross-post</span>
-                  <select value={xSettingsDraft.publishXEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, publishXEnabled: event.target.value === 'enabled' }))}>
-                    <option value="disabled">비활성</option>
-                    <option value="enabled">활성</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>arXiv</span>
-                  <select value={xSettingsDraft.ingestArxivEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, ingestArxivEnabled: event.target.value === 'enabled' }))}>
-                    <option value="enabled">활성</option>
-                    <option value="disabled">비활성</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Crossref</span>
-                  <select value={xSettingsDraft.ingestCrossrefEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, ingestCrossrefEnabled: event.target.value === 'enabled' }))}>
-                    <option value="enabled">활성</option>
-                    <option value="disabled">비활성</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Semantic Scholar</span>
-                  <select value={xSettingsDraft.ingestSemanticScholarEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, ingestSemanticScholarEnabled: event.target.value === 'enabled' }))}>
-                    <option value="enabled">활성</option>
-                    <option value="disabled">비활성</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>News API</span>
-                  <select value={xSettingsDraft.ingestNewsApiEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, ingestNewsApiEnabled: event.target.value === 'enabled' }))}>
-                    <option value="disabled">비활성</option>
-                    <option value="enabled">활성</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>RSS / Atom</span>
-                  <select value={xSettingsDraft.ingestRssEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, ingestRssEnabled: event.target.value === 'enabled' }))}>
-                    <option value="disabled">비활성</option>
-                    <option value="enabled">활성</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Legacy signals</span>
-                  <select value={xSettingsDraft.ingestLegacySignalsEnabled ? 'enabled' : 'disabled'} onChange={(event) => setXSettingsDraft((current) => ({ ...current, ingestLegacySignalsEnabled: event.target.value === 'enabled' }))}>
-                    <option value="enabled">활성</option>
-                    <option value="disabled">비활성</option>
-                  </select>
-                </label>
-                <label className="field field--full">
-                  <span>수집 질의</span>
-                  <input value={xSettingsDraft.ingestQuery} onChange={(event) => setXSettingsDraft((current) => ({ ...current, ingestQuery: event.target.value }))} />
-                </label>
-                <label className="field field--full">
-                  <span>RSS / Atom 피드</span>
-                  <textarea rows={3} value={xSettingsDraft.rssFeeds.join('\n')} onChange={(event) => setXSettingsDraft((current) => ({ ...current, rssFeeds: event.target.value.split(/\r?\n/).map((entry) => entry.trim()).filter(Boolean) }))} />
-                </label>
-              </div>
-              <div className="badge-row">
-                <button className="primary-button" disabled={postActionLoading} onClick={() => void executeSaveXSettings()} type="button">
-                  설정 저장
-                </button>
-              </div>
-            </section>
-
-            <section className="panel-card">
-              <div className="panel-card__header">
-                <h2>활성 소스 현황</h2>
-                <span className="chip chip--soft">{xAutopostState.providerStats.length}개</span>
-              </div>
-              {xAutopostState.providerStats.length > 0 ? (
-                <div className="run-card__logs">
-                  {xAutopostState.providerStats.map((stat) => (
-                    <div key={stat.provider} className={`run-log run-log--${stat.lastError ? 'error' : stat.enabled ? 'success' : 'info'}`}>
-                      <span>{stat.label}</span>
-                      <p>
-                        수집 {stat.lastFetchedCount} / draft {stat.lastDraftCount} / skip {stat.lastSkippedCount}
-                        {stat.lastFetchedAt ? ` · 최근 ${formatRelative(stat.lastFetchedAt)}` : ''}
-                        {stat.lastError ? ` · 오류: ${stat.lastError}` : ''}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  description="한 번 이상 수집이 실행되면 소스별 수집 수와 오류 상태가 여기에 기록됩니다."
-                  title="소스 기록이 없습니다"
-                />
-              )}
-            </section>
-
-            <section className="panel-card">
-              <div className="panel-card__header">
-                <h2>와이어 승인 큐</h2>
-                <span className="chip chip--soft">{filteredDrafts.length}개</span>
-              </div>
-              <div className="auto-post-settings-grid">
-                <label className="field">
-                  <span>소스 필터</span>
-                  <select value={publisherProviderFilter} onChange={(event) => setPublisherProviderFilter(event.target.value)}>
-                    <option value="all">전체</option>
-                    {providerOptions.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>상태 필터</span>
-                  <select value={publisherStatusFilter} onChange={(event) => setPublisherStatusFilter(event.target.value)}>
-                    <option value="all">전체</option>
-                    <option value="draft">초안</option>
-                    <option value="approved">승인됨</option>
-                    <option value="scheduled">예약됨</option>
-                    <option value="published">게시됨</option>
-                    <option value="failed">실패</option>
-                    <option value="skipped">건너뜀</option>
-                    <option value="disabled">비활성</option>
-                  </select>
-                </label>
-              </div>
-              {filteredDrafts.length > 0 ? (
-                <div className="publisher-queue">
-                  {filteredDrafts.map((item) => (
-                    <button
-                      key={item.id}
-                      className={`auto-post-card ${selectedDraftId === item.id ? 'is-active' : ''}`}
-                      onClick={() => {
-                        setSelectedDraftId(item.id)
-                        setSelectedPublishedId(null)
-                      }}
-                      type="button"
-                    >
-                      <div className="auto-post-card__body">
-                        <div className="card-topline">
-                          <span className="chip chip--soft">{item.sourceLabel || item.provider}</span>
-                          <small>{formatDate(item.updatedAt)}</small>
-                        </div>
-                        <strong>{item.sourceTitle}</strong>
-                        <p>{compactText(item.generatedText || item.sourceSummary, 140)}</p>
-                        <div className="badge-row">
-                          <span className="chip chip--soft">{draftStatusLabel(item.status)}</span>
-                          <span className="chip chip--soft">{sourceTypeLabel(item.sourceType)}</span>
-                          <span className="chip chip--soft">{item.category}</span>
-                          <span className="chip chip--soft">novelty {item.noveltyScore.toFixed(2)}</span>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  description="실시간 시그널에서 초안을 만들거나 현재 카테고리로 큐를 채우면 여기에 쌓입니다."
-                  action="지금 Wire 초안 만들기"
-                  onAction={() => void executeCreateDraftFromSignal()}
-                  title="Artemis Wire 큐가 비어 있습니다"
-                />
-              )}
-            </section>
-
-            <section className="panel-card">
-              <div className="panel-card__header">
-                <h2>Artemis Wire 게시 이력</h2>
-                <span className="chip chip--soft">{filteredPublishedItems.length}개</span>
-              </div>
-              {filteredPublishedItems.length > 0 ? (
-                <div className="publisher-queue">
-                  {filteredPublishedItems.slice(0, 24).map((item) => (
-                    <button
-                      key={item.id}
-                      className={`auto-post-card ${selectedPublishedId === item.id ? 'is-active' : ''}`}
-                      onClick={() => {
-                        setSelectedPublishedId(item.id)
-                        setSelectedDraftId(null)
-                      }}
-                      type="button"
-                    >
-                      <div className="auto-post-card__body">
-                        <div className="card-topline">
-                          <span className="chip chip--soft">{item.sourceLabel || item.provider}</span>
-                          <small>{formatDate(item.publishedAt)}</small>
-                        </div>
-                        <strong>{item.title}</strong>
-                        <p>{compactText(item.excerpt, 140)}</p>
-                        <div className="badge-row">
-                          <span className="chip chip--soft">{item.category || 'Artemis Wire'}</span>
-                          <span className="chip chip--soft">{summaryTypeLabel(item.summaryType)}</span>
-                          <span className="chip chip--soft">{sourceTypeLabel(item.sourceType)}</span>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  description="승인된 초안을 발행하면 내부 웹사이트용 게시 이력이 여기에 남습니다."
-                  title="Artemis Wire 게시 이력이 없습니다"
-                />
-              )}
-            </section>
-          </div>
-
-          <div className="publisher-detail">
-            {actionMessage ? (
-              <div className="status-banner status-banner--info">
-                <Icon name="spark" size={16} />
-                <span>{actionMessage}</span>
-              </div>
-            ) : null}
-            {selectedDraft ? (
-              <>
-                <section className="panel-card">
-                  <div className="panel-card__header">
-                    <div>
-                      <h2>{selectedDraft.sourceTitle}</h2>
-                      <p className="settings-card__lead">{selectedDraft.sourceLabel} / {selectedDraft.category} / novelty {selectedDraft.noveltyScore.toFixed(2)}</p>
-                    </div>
-                    <div className="badge-row">
-                      <span className="chip chip--soft">{draftStatusLabel(selectedDraft.status)}</span>
-                      <span className="chip chip--soft">{summaryTypeLabel(selectedDraft.summaryType)}</span>
-                      <span className="chip chip--soft">{sourceTypeLabel(selectedDraft.sourceType)}</span>
-                      {selectedDraft.scheduledAt ? <span className="chip chip--soft">예약 {formatDate(selectedDraft.scheduledAt)}</span> : null}
-                      {selectedDraft.publishedAt ? <span className="chip chip--soft">게시 {formatDate(selectedDraft.publishedAt)}</span> : null}
-                    </div>
-                  </div>
-                  <div className="badge-row">
-                    {selectedDraft.status === 'draft' ? (
-                      <button className="primary-button" disabled={postActionLoading} onClick={() => void executeApproveDraft(selectedDraft.id)} type="button">
-                        승인
-                      </button>
-                    ) : null}
-                    {selectedDraft.status !== 'published' && selectedDraft.status !== 'skipped' && selectedDraft.status !== 'disabled' ? (
-                      <button className="ghost-button" disabled={postActionLoading} onClick={() => void executePublishDraft(selectedDraft.id)} type="button">
-                        지금 게시
-                      </button>
-                    ) : null}
-                    {selectedDraft.status !== 'published' ? (
-                      <button className="ghost-button" disabled={postActionLoading} onClick={() => void executeRejectDraft(selectedDraft.id)} type="button">
-                        제외
-                      </button>
-                    ) : null}
-                    {selectedDraft.sourceUrl ? (
-                      <button className="ghost-button" onClick={() => window.open(selectedDraft.sourceUrl, '_blank', 'noopener,noreferrer')} type="button">
-                        원문 열기
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="stack-grid stack-grid--compact">
-                    <div className="summary-row summary-row--soft">
-                      <span>게시 대상</span>
-                      <strong>{selectedDraft.publishTarget === 'internal' ? 'Artemis Wire' : 'X'}</strong>
-                    </div>
-                    <div className="summary-row summary-row--soft">
-                      <span>topic hash</span>
-                      <strong>{selectedDraft.topicHash.slice(0, 16)}…</strong>
-                    </div>
-                    <div className="summary-row summary-row--soft">
-                      <span>원문 시각</span>
-                      <strong>{selectedDraft.sourcePublishedAt ? formatDate(selectedDraft.sourcePublishedAt) : '없음'}</strong>
-                    </div>
-                    {selectedDraft.authors.length > 0 ? (
-                      <div className="summary-row summary-row--soft">
-                        <span>저자</span>
-                        <strong>{selectedDraft.authors.slice(0, 4).join(', ')}</strong>
-                      </div>
-                    ) : null}
-                    {selectedDraft.doi ? (
-                      <div className="summary-row summary-row--soft">
-                        <span>DOI</span>
-                        <strong>{selectedDraft.doi}</strong>
-                      </div>
-                    ) : null}
-                    {selectedDraft.arxivId ? (
-                      <div className="summary-row summary-row--soft">
-                        <span>arXiv</span>
-                        <strong>{selectedDraft.arxivId}</strong>
-                      </div>
-                    ) : null}
-                  </div>
-                  {selectedDraft.errorReason ? (
-                    <div className="status-banner status-banner--warning">
-                      <Icon name="warning" size={16} />
-                      <span>{selectedDraft.errorReason}</span>
-                    </div>
-                  ) : null}
-                </section>
-
-                <section className="panel-card">
-                  <div className="panel-card__header">
-                    <h2>Artemis Wire 초안</h2>
-                    <span className="chip chip--soft">{selectedDraft.generationModel}</span>
-                  </div>
-                  <PublisherArticle
-                    authors={selectedDraft.authors}
-                    body={selectedDraft.generatedText}
-                    category={selectedDraft.category}
-                    excerpt={compactText(selectedDraft.sourceSummary, 180)}
-                    publishedAt={selectedDraft.scheduledAt || selectedDraft.sourcePublishedAt}
-                    sourceLabel={selectedDraft.sourceLabel}
-                    sourceUrl={selectedDraft.sourceUrl}
-                    summaryType={selectedDraft.summaryType}
-                    tags={selectedDraft.tags}
-                    title={selectedDraft.sourceTitle}
-                  />
-                </section>
-
-                <section className="panel-card">
-                  <div className="panel-card__header">
-                    <h2>Wire 최근 로그</h2>
-                    <span className="chip chip--soft">{selectedDraftLogs.length}개</span>
-                  </div>
-                  <div className="run-card__logs">
-                    {selectedDraftLogs.map((log) => (
-                      <div key={log.id} className={`run-log run-log--${log.level === 'warning' ? 'error' : log.level}`}>
-                        <span>{formatDate(log.createdAt)}</span>
-                        <p>{log.message}</p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              </>
-            ) : selectedPublished ? (
-              <>
-                <section className="panel-card">
-                  <div className="panel-card__header">
-                    <div>
-                      <h2>{selectedPublished.title}</h2>
-                      <p className="settings-card__lead">
-                        {selectedPublished.sourceLabel || selectedPublished.provider} / {selectedPublished.category || 'Artemis Wire'}
-                      </p>
-                    </div>
-                    <div className="badge-row">
-                      <span className="chip chip--soft">게시 완료</span>
-                      <span className="chip chip--soft">{summaryTypeLabel(selectedPublished.summaryType)}</span>
-                      <span className="chip chip--soft">{sourceTypeLabel(selectedPublished.sourceType)}</span>
-                      <span className="chip chip--soft">{formatDate(selectedPublished.publishedAt)}</span>
-                    </div>
-                  </div>
-                  <p className="settings-card__lead">{selectedPublished.excerpt}</p>
-                  <div className="badge-row">
-                    {selectedPublished.sourceUrl ? (
-                      <button className="ghost-button" onClick={() => window.open(selectedPublished.sourceUrl, '_blank', 'noopener,noreferrer')} type="button">
-                        원문 열기
-                      </button>
-                    ) : null}
-                  </div>
-                  {selectedPublished.authors.length > 0 ? (
-                    <div className="summary-row summary-row--soft">
-                      <span>저자</span>
-                      <strong>{selectedPublished.authors.slice(0, 5).join(', ')}</strong>
-                    </div>
-                  ) : null}
-                  <div className="stack-grid stack-grid--compact">
-                    <div className="summary-row summary-row--soft">
-                      <span>게시 대상</span>
-                      <strong>Artemis Wire</strong>
-                    </div>
-                    <div className="summary-row summary-row--soft">
-                      <span>소스 유형</span>
-                      <strong>{sourceTypeLabel(selectedPublished.sourceType)}</strong>
-                    </div>
-                    <div className="summary-row summary-row--soft">
-                      <span>출처 공급자</span>
-                      <strong>{selectedPublished.provider}</strong>
-                    </div>
-                    <div className="summary-row summary-row--soft">
-                      <span>원문 링크</span>
-                      <strong>{selectedPublished.canonicalUrl || selectedPublished.sourceUrl}</strong>
-                    </div>
-                  </div>
-                </section>
-
-                <section className="panel-card">
-                  <div className="panel-card__header">
-                    <h2>Artemis Wire 게시물</h2>
-                    <span className="chip chip--soft">{selectedPublished.provider}</span>
-                  </div>
-                  <PublisherArticle
-                    authors={selectedPublished.authors}
-                    body={selectedPublished.body}
-                    category={selectedPublished.category || 'Artemis Wire'}
-                    excerpt={selectedPublished.excerpt}
-                    publishedAt={selectedPublished.publishedAt}
-                    sourceLabel={selectedPublished.sourceLabel || selectedPublished.provider}
-                    sourceUrl={selectedPublished.sourceUrl}
-                    summaryType={selectedPublished.summaryType}
-                    tags={selectedPublished.tags}
-                    title={selectedPublished.title}
-                  />
-                </section>
-              </>
-            ) : (
-              <EmptyState
-                description="왼쪽에서 Wire 초안이나 게시 이력을 선택하면 생성문, 게시 결과, 실패 이유, 최근 로그를 볼 수 있습니다."
-                title="Wire 초안 또는 게시물을 선택해 주세요"
-              />
-            )}
-          </div>
-        </div>
+        <PublisherOperationsPanel
+          actionMessage={actionMessage}
+          filteredDrafts={filteredDrafts}
+          filteredPublishedItems={filteredPublishedItems}
+          internalPublisherStatus={internalPublisherStatus}
+          isWorking={postActionLoading}
+          onApproveDraft={executeApproveDraft}
+          onCreateDraft={executeCreateDraftFromSignal}
+          onPublishDraft={executePublishDraft}
+          onRefresh={loadXAutopost}
+          onRejectDraft={executeRejectDraft}
+          onSaveSettings={executeSaveXSettings}
+          onSelectDraft={(id) => {
+            setSelectedDraftId(id)
+            setSelectedPublishedId(null)
+          }}
+          onSelectPublished={(id) => {
+            setSelectedPublishedId(id)
+            setSelectedDraftId(null)
+          }}
+          providerFilter={publisherProviderFilter}
+          providerOptions={providerOptions}
+          publisherMetrics={xAutopostMetrics}
+          publisherSettings={xAutopostSettings}
+          publisherSettingsDraft={xSettingsDraft}
+          publisherState={xAutopostState}
+          selectedDraft={selectedDraft}
+          selectedDraftId={selectedDraftId}
+          selectedDraftLogs={selectedDraftLogs}
+          selectedPublished={selectedPublished}
+          selectedPublishedId={selectedPublishedId}
+          setProviderFilter={setPublisherProviderFilter}
+          setPublisherSettingsDraft={setXSettingsDraft}
+          setStatusFilter={setPublisherStatusFilter}
+          statusFilter={publisherStatusFilter}
+          xCrossPostStatus={xCrossPostStatus}
+        />
       ) : (
         <div className="auto-posts-shell">
           <div className="auto-posts-side">

@@ -377,6 +377,17 @@
   - Playwright browser checks on `#/signals` and `#/activity`
   - full-page screenshots saved to `output/playwright/wire-verify/signals-wire.png` and `output/playwright/wire-verify/activity-wire.png`
 
+### Artemis Wire operator refactor
+
+- Extracted the Artemis Wire operator tab out of `src/pages/SignalsPage.tsx` into `src/features/publisher/PublisherOperationsPanel.tsx`.
+- Moved generic publisher defaults and shared label copy into `src/features/publisher/publisherUi.ts` so the page no longer owns fallback state factories and status-label helpers.
+- Kept the operator behavior unchanged while making the page shell smaller and easier to maintain.
+- Re-verified after extraction with:
+  - `npm run lint`
+  - `npm run build`
+  - `node --test local-bridge/ai/router.test.mjs local-bridge/publisher/pipeline.test.mjs`
+  - a browser smoke check on `#/signals` confirming the Artemis Wire tab still shows overview, policy, provider status, queue, and history sections.
+
 ### Service usability pass
 
 - Added a chat status banner for the currently selected model so the user can see whether Ollama, Codex CLI, or the official free router is actually ready before sending a message.
