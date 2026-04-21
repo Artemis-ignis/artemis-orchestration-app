@@ -347,28 +347,11 @@
   background: linear-gradient(180deg, rgba(8, 13, 21, 0.94), rgba(5, 9, 16, 0.98));
 }
 
-.auto-post-inline-article main {
-  max-width: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-.auto-post-inline-article article {
-  margin: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  background: transparent !important;
-}
-
-.auto-post-inline-article .summary-box {
-  margin-bottom: 0;
-}
-
-.auto-post-inline-article .hero-media,
-.auto-post-inline-article .gallery-item,
-.auto-post-inline-article .summary-box {
-  overflow: hidden;
+.auto-post-inline-article__frame {
+  width: 100%;
+  display: block;
+  border: 0;
+  background: transparent;
 }
 
 .activity-summary-strip {
@@ -687,9 +670,6 @@
     grid-template-columns: 14px minmax(0, 1fr);
   }
 
-  .auto-post-inline-article article {
-    padding-inline: 24px !important;
-  }
 }
 
 /* Artemis clean pass */
@@ -1068,7 +1048,7 @@
 }
 
 .signals-post-body .auto-post-inline-article {
-  max-width: 980px;
+  max-width: none;
   margin: 0 auto;
 }
 

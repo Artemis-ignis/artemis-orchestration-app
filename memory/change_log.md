@@ -1224,3 +1224,19 @@
     - `signals-posts-mobile.png`
     - `orchestration-results-desktop.png`
     - `orchestration-results-mobile.png`
+
+## 2026-04-22 Workspace UX Reset - Pass 5
+
+- Root-caused the remaining generated-posts layout failure to style leakage from generated article HTML. The old `AutoPostArticle` renderer extracted `<style>` tags and inserted them directly into the host page, which allowed article rules like `main { max-width: 820px; margin: 48px auto; }` to collapse the Artemis shell itself.
+- Replaced that renderer with an isolated `iframe srcDoc` preview in `src/features/autoPosts/AutoPostArticle.tsx`.
+- Added height synchronization for the embedded preview so long posts expand naturally without nested scroll traps.
+- Simplified `src/styles/pages/support.css` to treat generated posts as an embedded frame instead of trying to override arbitrary article DOM from the host stylesheet.
+- Verification:
+  - `npm run lint`
+  - `npm run build`
+  - browser metrics after selecting `생성 글`
+    - `.app-shell__main` width `1278px`, max-width `none`
+    - `.signals-ops-shell--posts` width `1204px`
+    - `.signals-posts-workspace` width `852px`
+  - headless Playwright capture:
+    - `output/playwright/workspace-ux-reset-pass5/signals-posts-desktop.png`

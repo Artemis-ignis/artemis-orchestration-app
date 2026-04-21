@@ -702,3 +702,19 @@
   - `output/playwright/workspace-ux-reset-pass4/signals-posts-mobile.png`
   - `output/playwright/workspace-ux-reset-pass4/orchestration-results-desktop.png`
   - `output/playwright/workspace-ux-reset-pass4/orchestration-results-mobile.png`
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 5
+
+- Reproduced the remaining `Signals > 생성 글` defect in the browser and confirmed the page was still collapsing because generated post HTML leaked a global `main { max-width: 820px; margin: 48px auto; }` rule into the host app.
+- Replaced `src/features/autoPosts/AutoPostArticle.tsx` DOM style injection with an isolated `iframe srcDoc` preview so generated article CSS can no longer affect the Artemis shell.
+- The iframe now:
+  - injects a `<base target="_blank">` tag for outbound links,
+  - measures the embedded document height,
+  - resizes itself after load, image load, and layout changes.
+- Updated `src/styles/pages/support.css` to remove the old direct-DOM article overrides and style the embedded frame instead.
+- Verified the shell width recovered after the fix:
+  - `.app-shell__main` = `1278px`, `max-width: none`
+  - `.signals-ops-shell--posts` = `1204px`
+  - `.signals-posts-workspace` = `852px`
+- Verification capture:
+  - `output/playwright/workspace-ux-reset-pass5/signals-posts-desktop.png`
