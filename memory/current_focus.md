@@ -592,3 +592,28 @@
 - 오케스트레이션은 기존 최소 표면 패스를 유지하면서 빌드 경고와 라우팅 보조 상태를 정리했다.
 - 최종 검증 캡처는 `output/playwright/workspace-overhaul-final/`에 저장했다.
 - 인라인 이미지 전송 규칙은 유지한다: 긴 경로 금지, 짧은 경로 markdown 이미지만 사용.
+
+## 2026-04-22 Workspace UX Reset Branch
+
+- 새 브랜치 `codex/workspace-ux-reset`에서 `오케스트레이션 / 스킬 / 활동` 세 화면을 다시 정리 중이다.
+- 이번 패스의 기준 레퍼런스는 다음과 같이 고정했다:
+  - Linear: 작업 인박스와 절제된 운영형 정보 밀도
+  - Vercel dashboard navigation refresh: 숨길 수 있는 보조 맥락과 우선순위 중심 네비게이션
+  - ChatGPT product surface: 입력과 결과가 먼저 보이는 대화형 첫 화면
+- 스킬 화면은 `아이콘 + 스킬명 + 한 줄 설명 + 출처/상태`를 첫 화면에 두고, 경로와 예시는 접힘 상세로만 남겼다.
+- 활동 화면은 카드 더미 대신 `요약 수치 + 최근 실행 흐름 + 지금 봐야 할 묶음 + 운영 상태`로 재구성했다.
+- 오케스트레이션은 다음 원칙으로 다시 정리했다:
+  - 오른쪽은 `실행 준비` 하나만 남김
+  - 결과 카드에서 raw JSON 오류를 사람이 읽는 문장으로 치환
+  - 모델 선택 칩 이름을 줄여 첫 화면 잡음을 감소
+  - 상세는 접힘 영역으로만 유지
+- 이번 패스용 스타일은 공용 `support.css`에 더 얹지 않고 새 파일로 분리했다:
+  - `src/styles/pages/skills.css`
+  - `src/styles/pages/activity.css`
+- 브라우저 검증 캡처는 `output/playwright/workspace-ux-reset/`에 저장했다:
+  - `orchestration-desktop.png`
+  - `skills-desktop.png`
+  - `activity-desktop.png`
+  - `orchestration-mobile.png`
+  - `skills-mobile.png`
+  - `activity-mobile.png`

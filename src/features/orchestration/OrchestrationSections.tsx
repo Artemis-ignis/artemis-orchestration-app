@@ -1,9 +1,28 @@
 import type { ReactNode } from 'react'
 import type { PageId } from '../../crewData'
-import { EmptyState, DisclosureSection } from '../../crewPageShared'
-import { changeTypeLabel, executionProviderLabel, formatDate, formatFriendlyModelName } from '../../crewPageHelpers'
 import { FormattedText } from '../../components/ui/FormattedText'
 import { NoticeBanner, PanelCard, SectionHeader, SplitPane, StatusPill, Toolbar } from '../../components/ui/primitives'
+import { changeTypeLabel, executionProviderLabel, formatDate, formatFriendlyModelName } from '../../crewPageHelpers'
+import { DisclosureSection, EmptyState } from '../../crewPageShared'
+
+function prettifyRunBody(value: string) {
+  const trimmed = value.trim()
+
+  if (!trimmed) {
+    return '아직 이 모델의 결과가 도착하지 않았습니다.'
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as { ok?: boolean; error?: string; message?: string }
+    if (parsed && typeof parsed === 'object' && parsed.ok === false) {
+      return parsed.error || parsed.message || '실행 중 오류가 발생했습니다.'
+    }
+  } catch {
+    // plain text
+  }
+
+  return trimmed
+}
 
 export function OrchestrationStage({
   canvas,
@@ -13,13 +32,13 @@ export function OrchestrationStage({
   controls: ReactNode
 }) {
   return (
-    <PanelCard className="orchestration-stage orchestration-stage--poster">
+    <section className="orchestration-stage">
       <SplitPane
-        className="orchestration-stage__split"
+        className="orchestration-stage__split orchestration-stage__split--workspace"
         primary={<div className="orchestration-stage__canvasPane">{canvas}</div>}
         secondary={<div className="orchestration-stage__controlPane">{controls}</div>}
       />
-    </PanelCard>
+    </section>
   )
 }
 
@@ -36,8 +55,7 @@ export function OrchestrationAlerts({
   }>
   onNavigate: (page: PageId) => void
 }) {
-  const priorityAlerts = alerts.filter((alert) => alert.tone !== 'info')
-  const visibleAlerts = priorityAlerts.slice(0, 1)
+  const visibleAlerts = alerts.filter((alert) => alert.tone !== 'info').slice(0, 1)
 
   if (visibleAlerts.length === 0) {
     return null
@@ -72,15 +90,22 @@ export function OrchestrationControls({
   actions: ReactNode
 }) {
   return (
-    <div className="orchestration-controlStack orchestration-dock">
-      <PanelCard className="orchestration-inline-dock orchestration-dock__section" tone="muted">
-        <div className="orchestration-inline-dock__selection">{enabledAgentToggles}</div>
-        <div className="orchestration-controlForm">
-          {taskField}
-          {actions}
-        </div>
-      </PanelCard>
-    </div>
+    <PanelCard
+      className="orchestration-inline-dock orchestration-dock"
+      title="실행 준비"
+      description="모델을 고르고 작업 지시를 적으면 바로 실행합니다."
+      tone="muted"
+    >
+      <div className="orchestration-inline-dock__selectionHeader">
+        <strong>이번 실행에 포함할 모델</strong>
+        <span>필요한 모델만 남겨서 바로 돌립니다.</span>
+      </div>
+      <div className="orchestration-inline-dock__selection">{enabledAgentToggles}</div>
+      <div className="orchestration-controlForm">
+        {taskField}
+        {actions}
+      </div>
+    </PanelCard>
   )
 }
 
@@ -100,12 +125,12 @@ export function OrchestrationResultsPanel({
   }
 
   return (
-    <PanelCard className="orchestration-live-panel orchestration-live-panel--stream">
-      <SectionHeader
-        title="결과"
-        description={sessionRunning ? hint : undefined}
-        actions={<StatusPill tone={sessionRunning ? 'accent' : 'muted'}>{sessionRunning ? '진행 중' : '최근 세션'}</StatusPill>}
-      />
+    <PanelCard
+      className="orchestration-live-panel orchestration-live-panel--stream"
+      title="결과"
+      description={sessionRunning ? hint : '최근 실행 결과를 모델별로 나눠 보여줍니다.'}
+      actions={<StatusPill tone={sessionRunning ? 'accent' : 'muted'}>{sessionRunning ? '실행 중' : '최근 실행'}</StatusPill>}
+    >
       {cards}
     </PanelCard>
   )
@@ -148,14 +173,14 @@ export function OrchestrationResultCard({
         {elapsedLabel ? <StatusPill tone="muted">{elapsedLabel}</StatusPill> : null}
       </div>
       <div className="orchestration-run-card__body">
-        <FormattedText text={body} />
+        <FormattedText text={prettifyRunBody(body)} />
       </div>
       {logs?.length ? (
         <div className="orchestration-run-card__logs">
           {logs.map((log) => (
             <div key={log.id} className={`run-log run-log--${log.level}`}>
               <span>{formatDate(log.createdAt)}</span>
-              <p>{log.message}</p>
+              <p>{prettifyRunBody(log.message)}</p>
             </div>
           ))}
         </div>
@@ -194,10 +219,10 @@ export function OrchestrationDetails({
   statusTiles: ReactNode
 }) {
   return (
-    <DisclosureSection className="disclosure--soft" title="자세히 보기">
+    <DisclosureSection className="disclosure--soft orchestration-detail-disclosure" title="자세히 보기" summary="모델 상태와 최근 변경">
       <div className="orchestration-detail-grid">
         <section className="orchestration-detail-block">
-          <SectionHeader title="선택한 모델" actions={<StatusPill tone="muted">{selectedAgents.length}개</StatusPill>} />
+          <SectionHeader title="이번 실행 구성" actions={<StatusPill tone="muted">{selectedAgents.length}개</StatusPill>} />
           <div className="chip-wrap">
             {selectedAgents.length > 0 ? (
               selectedAgents.map((agent) => (
@@ -206,12 +231,12 @@ export function OrchestrationDetails({
                 </StatusPill>
               ))
             ) : (
-              <StatusPill tone="muted">선택된 모델 없음</StatusPill>
+              <StatusPill tone="muted">선택한 모델 없음</StatusPill>
             )}
           </div>
           <div className="stack-grid stack-grid--compact orchestration-detail-stats">
             <div className="summary-row">
-              <span>구독 중인 시그널</span>
+              <span>구독 중 시그널</span>
               <strong>{signalCount}개</strong>
             </div>
             <div className="summary-row">
@@ -227,8 +252,8 @@ export function OrchestrationDetails({
             <div className="orchestration-statusGrid orchestration-statusGrid--detail">{statusTiles}</div>
           ) : (
             <EmptyState
-              title="상태를 볼 모델이 없습니다"
-              description="오른쪽에서 모델을 고르면 연결 상태와 최근 실행 상태가 여기에 표시됩니다."
+              title="아직 선택한 모델이 없습니다"
+              description="오른쪽 실행 레일에서 모델을 고르면 여기에서 상태를 바로 볼 수 있습니다."
             />
           )}
         </section>
@@ -241,7 +266,7 @@ export function OrchestrationDetails({
           {latestAgentExecution ? (
             <>
               <div className="summary-row">
-                <span>최근 실제 실행</span>
+                <span>마지막 실행 모델</span>
                 <strong>
                   {executionProviderLabel(latestAgentExecution.provider)} · {formatFriendlyModelName(latestAgentExecution.model)}
                 </strong>
@@ -263,8 +288,8 @@ export function OrchestrationDetails({
             </>
           ) : (
             <EmptyState
-              title="아직 실제 실행 기록이 없습니다"
-              description="병렬 실행을 시작하면 최근 결과와 변경 파일이 여기에 쌓입니다."
+              title="아직 실행 기록이 없습니다"
+              description="모델을 실행하면 최근 결과와 변경 파일이 여기에 남습니다."
             />
           )}
 
@@ -277,12 +302,12 @@ export function OrchestrationDetails({
                     right={<small>{formatDate(run.startedAt)}</small>}
                     className="run-card__topline"
                   />
-                  <FormattedText text={run.output || '아직 결과가 기록되지 않았습니다.'} />
+                  <FormattedText text={prettifyRunBody(run.output)} />
                   <div className="run-card__logs">
                     {run.logs.slice(-2).map((log) => (
                       <div key={log.id} className={`run-log run-log--${log.level}`}>
                         <span>{formatDate(log.createdAt)}</span>
-                        <p>{log.message}</p>
+                        <p>{prettifyRunBody(log.message)}</p>
                       </div>
                     ))}
                   </div>

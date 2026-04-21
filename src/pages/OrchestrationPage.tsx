@@ -61,6 +61,24 @@ function resolveOfficialProviderId(baseUrl: string) {
   return 'openrouter'
 }
 
+function conciseAgentLabel(agent: AgentItem) {
+  const model = agent.model.trim().toLowerCase()
+
+  if (agent.provider === 'official-router') {
+    return '공식 라우터'
+  }
+
+  if (agent.provider === 'codex' && model.includes('gpt-5.4')) {
+    return 'GPT-5.4'
+  }
+
+  if (agent.provider === 'ollama' && model.includes('gemma4-e4b')) {
+    return 'gemma4'
+  }
+
+  return agent.name.length > 18 ? agent.name.slice(0, 18).trimEnd() : agent.name
+}
+
 export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
   const {
     activeAgent,
@@ -538,7 +556,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                       onClick={() => toggleSelectedAgent(agent.id)}
                     >
                       <span className={`orchestration-agent-chip__dot ${availability?.runnable ? 'is-ready' : 'is-blocked'}`} />
-                      <span className="orchestration-agent-chip__label">{agent.name}</span>
+                      <span className="orchestration-agent-chip__label">{conciseAgentLabel(agent)}</span>
                     </button>
                   )
                 })}

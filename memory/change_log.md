@@ -1113,3 +1113,41 @@
     - `activity-final.png`
     - `signals-publisher-final.png`
     - `orchestration-final.png`
+
+## 2026-04-22 Workspace UX Reset
+
+- Created a new cleanup branch: `codex/workspace-ux-reset`.
+- Added dedicated page stylesheet imports in `src/App.css` for:
+  - `src/styles/pages/skills.css`
+  - `src/styles/pages/activity.css`
+- Rewrote `src/pages/SkillsPage.tsx` again around a stricter operator-friendly surface:
+  - icon
+  - skill name
+  - one-line summary
+  - source/state pills
+  - single toggle action
+  - collapsed detail for path/example only
+- Rewrote `src/pages/ActivityPage.tsx` into a smaller operations inbox:
+  - summary strip
+  - recent execution flow
+  - live tracked dossier list
+  - runtime status stack
+- Reworked orchestration support surfaces in `src/features/orchestration/OrchestrationSections.tsx`:
+  - the dock is now one `실행 준비` block,
+  - result cards parse and de-noise raw JSON error payloads,
+  - detail disclosure copy was rewritten in clean Korean.
+- Tightened the orchestration first-screen scan in `src/pages/OrchestrationPage.tsx`:
+  - shortened selected model chip labels,
+  - kept only two starter templates,
+  - preserved direct run flow.
+- Added final orchestration style overrides in `src/styles/pages/orchestration.css` to make the board + dock composition flatter and less card-heavy.
+- Verified the reset branch with:
+  - `npm run lint`
+  - `npm run build`
+  - headless Playwright captures under `output/playwright/workspace-ux-reset/`
+    - `orchestration-desktop.png`
+    - `skills-desktop.png`
+    - `activity-desktop.png`
+    - `orchestration-mobile.png`
+    - `skills-mobile.png`
+    - `activity-mobile.png`
