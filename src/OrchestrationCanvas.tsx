@@ -614,7 +614,7 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
       >
         <Background
           className="orchestration-flow__background"
-          color="rgba(218, 229, 255, 0.12)"
+          color="rgba(255, 255, 255, 0.08)"
           gap={30}
           size={1}
         />

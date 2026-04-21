@@ -18,6 +18,7 @@
 - Keep orchestration interactive and execution-first instead of decorative.
 - Keep the Hermes-style Codex workflow files usable for future sessions.
 - Keep the premium UI shell consistent across chat, files, settings, and orchestration.
+- Keep assistant-delivered screenshots reliable inside the Windows Codex app by sending them through markdown image destinations that contain no spaces.
 
 ## Latest Confirmed State
 
@@ -43,6 +44,24 @@
   - dossier detail renders in the right-side detail panel,
   - Activity shows the live dossier summary card,
   - screenshots were saved under `output/playwright/wire-dossier/`.
+- Assistant image delivery inside the Windows Codex desktop app is now treated as a markdown destination spacing issue first:
+  - the app image component can read real local filesystem paths through `read-file-binary`,
+  - but CommonMark percent-encodes spaces inside markdown image destinations such as `![alt](<C:/.../Codex Workspace/...png>)`,
+  - once the workspace moved under `Codex Workspace`, that encoding changed the real path into `Codex%20Workspace` and the local file read started failing,
+  - raw HTML `<img ...>` is not a usable fallback in this app because assistant replies render that tag as literal text,
+  - future screenshot replies should still use markdown image syntax, but only with a path that contains no spaces,
+  - hard rule for future replies:
+    - always send inline images with the no-space short-path markdown form first,
+    - never send long local paths that still contain spaces,
+    - never fall back to raw HTML, `file:///`, `/@fs/`, or data-URI screenshots unless the user explicitly asks for a different experiment,
+  - the delivery rule is now:
+    - prefer the real file's Windows short path such as `C:/Users/.../CODEXW~1/.../CHAT-D~1.PNG`,
+    - if a usable short path is unavailable, copy the image to a no-space cache path and send that cache path instead,
+    - keep the original source as a normal file link/card alongside the inline image when needed,
+  - `scripts/build-inline-image-preview.ps1` now emits:
+    - a no-space markdown image line,
+    - the matching original file-link line,
+    - the chosen delivery mode (`short-path` or `staged-copy`).
 
 - `feat/source-agnostic-publisher` now generalizes the older X autopost branch into a content-ingest and internal-publishing pipeline instead of an X-first pipeline.
 - The bridge now exposes source-agnostic publisher APIs:
@@ -118,6 +137,17 @@
   - `심층 리포트`
 - The Artemis Wire tab now uses publisher-specific layout class names instead of the older `x-autopost-*` CSS naming.
 - The article reader now:
+- Deep report generation now prefers Korean article output even when the upstream source metadata is mostly English:
+  - selected auto-post candidates are re-localized before article generation when title/summary still lack enough Korean text,
+  - generated titles, leads, plain summaries, and three-line summaries now fall back to Korean article wording when the model returns English-heavy output,
+  - GitHub-style repository names and Hacker News `Launch HN` titles now get cleaner Korean fallback headlines.
+- The deep report reader no longer uses a cramped iframe:
+  - `src/features/autoPosts/AutoPostArticle.tsx` now renders stored article HTML inline inside the Signals detail panel,
+  - browser verification confirmed the deep report tab now shows a readable article body with section headings and source footer.
+- Activity and Signals wording is now more consistently Korean:
+  - `Artemis Wire` user-facing status strings were changed to `아르테미스 와이어`,
+  - recent Wire history labels and empty-state copy were localized.
+- Auto-post scheduler startup now clears stale `inProgress` state after a bridge restart so deep reports do not remain stuck in a permanent running state when a previous generation was interrupted.
   - merges broken line-wraps into readable paragraphs,
   - accepts markdown-style headings,
   - accepts bullet markers including `•`,
@@ -137,6 +167,48 @@
   - the Activity page shows the new Artemis Wire summary language,
   - full-page screenshots were captured under `output/playwright/wire-verify/`,
   - the refactored Artemis Wire operator tab still renders overview, policy, provider status, queue, and history sections after extraction.
+- The chat page is now intentionally conversation-first again:
+  - the global top status row is hidden on `#/chat`,
+  - the sidebar footer status card is hidden on `#/chat`,
+  - the chat page no longer shows the old runtime summary cards, alert stack, or bottom workflow panel,
+  - the empty state now keeps only a short starter prompt block plus quick actions,
+  - the main surface stays focused on the message list and composer.
+- Chat route structure is now smaller and easier to extend:
+  - `src/CrewPages.tsx` is back to a page-switch shell,
+  - chat-specific state, model menu logic, and message rendering now live in `src/features/chat/ChatPage.tsx`.
+- The chat idle state no longer renders an empty message-thread container just to fill space:
+  - the starter panel now sits in a dedicated idle stage above the composer,
+  - desktop and mobile first-screen checks were re-captured under `output/playwright/chat-cleanup/`,
+  - a desktop live-thread check confirmed the layout still flips into the message stack when switching to `Codex CLI` and sending a prompt.
+- Chat now has a stronger premium visual language without restoring the old dashboard clutter:
+  - the chat surface uses a layered grid-and-glow backdrop,
+  - the idle hero shows route/model context as one focused opening block,
+  - quick starts now read as action tiles instead of plain chips,
+  - the composer and send button carry more visual weight than the surrounding chrome.
+- The narrow-width idle state was compressed again so the mobile starter hero stays above the composer:
+  - the mobile layout now hides the idle meta row,
+  - mobile action tiles collapse to title-first buttons,
+  - updated captures live under `output/playwright/chat-style/`.
+- The live conversation state now has its own clearer rhythm instead of reusing the idle feel:
+  - a sticky live-thread ribbon keeps route/model context visible while scrolling,
+  - master messages use a compact top metadata row,
+  - live assistant/master bubbles are width-capped for better reading density,
+  - the live composer dock is shorter so more of the conversation stays visible.
+- Live message bubbles now shrink to their content again instead of stretching across the lane like full-width panels.
+- The idle blocked-composer state is now compact again instead of reusing the full writable dock:
+  - unavailable models show a slim status strip plus a disabled single-line field,
+  - the blocked hint now carries the recovery message directly,
+  - the blocked composer re-check now lives under `output/playwright/chat-disabled-pass/`.
+- The shell and chat cleanup pass pushed the Netflix direction closer to a quieter operator surface:
+  - sidebar chrome is flatter and less blue-glow driven,
+  - the `새 채팅` action is still primary but no longer carries the earlier heavy shadow treatment,
+  - chat idle state now uses only route/model chips plus three compact starter rows instead of the older meta-card and `예시 더 보기` stack,
+  - the embedded composer and model trigger now sit on darker matte surfaces with less visual noise,
+  - refreshed captures live under `output/playwright/netflix-clean-pass/`.
+- Browser verification for the live-thread pass now lives under `output/playwright/chat-live-pass/`:
+  - desktop
+  - tablet
+  - mobile
 - Activity now shows internal publishing health, provider counts, and recent publish failures without assuming X is the primary target.
 - Manual API verification confirmed:
   - `ingest -> draft -> approve -> scheduled -> published` works for internal publishing,
@@ -211,6 +283,56 @@
 - The public settings screenshot was regenerated after the local runtime stability fix.
 - The premium shell branch now has a second UI pass focused on consistency instead of one-off styling:
   - `SettingsPage.tsx` was reduced to a tab shell, and the models tab moved into `src/features/settings/SettingsModelsPane.tsx`.
+- The premium UI shell now uses a calmer Artemis palette instead of the earlier glow-heavy bronze/blue mix:
+  - borders and shadows are lower-contrast,
+  - shared headers, panels, chips, and stat tiles now read as one restrained system,
+  - settings/activity/signals surfaces follow the same quieter operator tone.
+- The chat route is now intentionally moving toward an Open WebUI-like feel rather than a stylized premium dashboard:
+  - single-column content width,
+  - minimal idle hero,
+  - flatter message/composer surfaces,
+  - less shell chrome competing with the conversation area.
+- The visible chrome was reduced again after review:
+  - sidebar context and shortcut aids are hidden by default,
+  - mobile top bar shows only menu plus page title,
+  - chat starter prompts are partially collapsed,
+  - blocked chat state is one compact strip instead of stacked helper cards.
+- The sidebar navigation itself is now quieter by default:
+  - only `chat`, `files`, and `orchestration` stay visible at rest,
+  - support routes moved behind a single `more` toggle,
+  - the support toggle stays highlighted on support pages without auto-expanding the whole menu,
+  - desktop and mobile drawer captures for this pass live under `output/playwright/declutter-pass2/`.
+- The workspace shell now leans into a Netflix-like cinema console instead of the earlier neutral premium palette:
+  - matte black surfaces,
+  - warm off-white text,
+  - red CTA and active-state accents,
+  - reduced blue carry-over on shared shells and route panels.
+- Chat now reads more like a title screen than a utility dashboard:
+  - the idle hero is flatter and poster-like,
+  - starter tiles no longer keep the older blue tint,
+  - the composer and message states follow the same black/red system.
+- Settings, orchestration, signals, and activity now share the same cinema-dark surface language instead of mixing route-specific blue gradients back into the UI.
+- Browser verification for the Netflix theme pass now lives under `output/playwright/netflix-theme-pass/`:
+  - `chat-desktop-netflix.png`
+  - `chat-mobile-netflix.png`
+  - `settings-desktop-netflix.png`
+  - `orchestration-desktop-netflix.png`
+  - `signals-desktop-netflix.png`
+  - `activity-desktop-netflix.png`
+- `npm run lint` and `npm run build` pass on the current Netflix-theme state.
+- The chat route is visually cleaner again after the last shell pass regression:
+  - the late-loading legacy warm background/composer overrides are neutralized,
+  - the mobile model selector no longer expands to `220px` height,
+  - the idle hero now stays close to the top of the first screen on mobile.
+- Recent browser verification for the clean-theme pass now lives under `output/playwright/theme-clean-pass/`:
+  - desktop chat
+  - mobile chat
+  - desktop settings
+  - desktop signals
+  - desktop activity
+- UI verification now uses hidden preview and bridge processes for this workspace so screenshot checks do not open visible PowerShell or preview windows on the desktop.
+- Recent Open WebUI-direction captures now live under `output/playwright/openwebui-pass/`.
+- Recent declutter captures now live under `output/playwright/declutter-pass/`.
   - `SettingsProfilePane.tsx` and `SettingsPreferencesPane.tsx` were rewritten with cleaner copy and calmer panel hierarchy.
   - Chat now shortens visible workspace context to a folder label instead of exposing a full absolute path in the idle workspace card and bottom context rail.
   - Chat idle state now uses a proper hero block plus a quieter side context panel instead of looking like a large empty void.
@@ -245,9 +367,10 @@
 - Re-check whether the worker badge copy should stay `execution standby` or become a shorter label after more live use.
 - Revisit provider preflight detail strings stored in bridge state so stale saved status text also loses the legacy free-candidate wording at the API level.
 - Decide later whether the chat workspace-write hint should become prompt-aware instead of always showing for non-Codex models when a workspace is connected.
-- Decide later whether the sidebar itself should collapse secondary menus by default; this pass reduced density but did not change the navigation model yet.
-- Split `CrewPages.tsx` further if another chat-focused pass is scheduled; the chat page now uses extracted sections but the file is still large.
+- Decide later whether the collapsed support group should stay as one `more` toggle or become a command-style overflow menu.
+- Split `src/features/chat/ChatPage.tsx` further only if the chat route grows again; `CrewPages.tsx` is already reduced back to a thin page shell.
 - Split the managed-agent settings section further only if agent editing grows again; it is smaller now but still one of the denser settings areas.
+- Decide later whether the Netflix-like shell should stay product-wide or become an optional theme preset once the rest of the workspace stabilizes.
 
 ## 2026-04-15 Follow-up
 
@@ -308,3 +431,95 @@
 - Watch whether hourly generation time stays acceptable when the bridge is also serving chat and orchestration traffic.
 - Decide whether the default generation model should stay `gpt-5.4-mini` or become configurable per category with a lighter fallback chain.
 - Consider trimming absolute local file paths from detailed auto-post API responses if the same API is ever exposed outside localhost.
+- Keep the chat screen constrained to one viewport so the composer stays visible and the message list scrolls internally instead of pushing the whole page.
+- Keep the chat header minimal so only the model selector remains prominent, with tighter message density and less visual noise above the conversation.
+- Keep the chat idle state compact and the composer hint short so the first screen feels like a real chat surface instead of a dashboard.
+- Re-check the stacked mobile shell later if the sidebar/navigation itself gets another responsive pass; the chat surface is compact now, but total first-screen height still depends on the shell above it.
+- Watch whether the sticky live-thread ribbon still feels worth keeping once real longer chat histories accumulate.
+
+## 2026-04-20 UI density follow-up
+
+- The orchestration page now has a more intentional premium shell without changing its structure:
+  - the stage header, canvas frame, sticky control rail, status tiles, and result cards now share the same layered surface language,
+  - desktop and mobile screenshots were re-reviewed under `output/playwright/orchestration-settings-pass/`.
+- The settings models/runtime page now has a denser summary-and-selection rhythm:
+  - overview cards carry clearer hierarchy,
+  - local and official provider cards use stronger internal status surfaces,
+  - official target tiles and managed-agent selections now read as deliberate selection panels,
+  - tablet and mobile screenshots were re-reviewed under `output/playwright/orchestration-settings-pass/`.
+- The shell now has a stronger shared identity across routes:
+  - desktop keeps a richer sidebar context block and shortcut rail,
+  - compact widths use a top mobile bar plus drawer instead of stacking the navigation above content,
+  - the duplicated in-frame status strip is gone so page identity and runtime state live in one place.
+- Shared primitives now carry the premium surface language across routes:
+  - page headers,
+  - panels,
+  - status pills,
+  - stat cards,
+  - empty states.
+- Browser verification for the shell consistency pass now lives under `output/playwright/site-polish/`:
+  - chat desktop
+  - settings desktop
+  - orchestration desktop
+  - files desktop
+  - settings mobile closed/open drawer
+- `npm run lint` and `npm run build` now pass again on the current workspace state.
+- Signals and Activity now share the same operator-surface direction instead of mixing older `panel-card` stacks with the new shell:
+  - activity uses a summary strip, spotlight lanes, provider meta blocks, and timeline journals,
+  - signals uses stronger tab/filter bars, denser feed cards, and a shared rail/detail shell across feed, wire, and report tabs.
+- The publisher lane no longer reads like reused auto-post cards everywhere:
+  - wire queue cards are text-first,
+  - wire detail blocks have clearer internal section framing,
+  - the right-side inspector is visually closer to the rest of the workspace shell.
+- Compact-shell drawer accessibility is now materially stronger:
+  - menu trigger exposes expanded/controls state,
+  - the drawer uses modal dialog semantics,
+  - focus is trapped while open and restored on close,
+  - `body` and `html` scrolling lock during the drawer session.
+- Browser verification for this second polish pass now lives under `output/playwright/site-polish-pass2/`:
+  - `signals-feed-desktop.png`
+  - `signals-publisher-desktop.png`
+  - `signals-posts-desktop.png`
+  - `activity-desktop.png`
+  - `signals-mobile-closed.png`
+  - `signals-mobile-open.png`
+
+## 2026-04-21 Orchestration Cleanup Follow-up
+
+- The orchestration first viewport is now flatter and simpler again:
+  - the right rail was reduced from three stacked cards to one compact `지금 실행` dock,
+  - model-status tiles moved out of the first viewport into `자세히 보기`,
+  - the canvas frame lost extra decorative chrome and gained more width,
+  - the intro and run copy were shortened so the route reads more like an operator tool than a dashboard.
+- Browser verification for this orchestration cleanup pass now lives under `output/playwright/orchestration-clean-pass/`:
+  - `orchestration-desktop-clean.png`
+  - `orchestration-mobile-clean.png`
+- Assistant screenshot handling now needs one more operational guard:
+  - the working user-facing transport is still the no-space short-path markdown image rule,
+  - but internal long-path image previews triggered during verification can also surface as broken images in the desktop app,
+  - future verification should stay text-only unless a screenshot must be explicitly shown to the user with the short-path markdown form,
+  - if internal image inspection is unavoidable, run `scripts/build-inline-image-preview.ps1` first and use only the emitted `SAFE_LOCAL_PATH`,
+  - never call `view_image` with the original `SOURCE` path when that path contains spaces.
+
+## 2026-04-21 Netflix Final Theme Pass
+
+- The workspace shell is now aligned to one clearer Netflix-like system instead of a generic dark premium mix:
+  - `src/styles/shell.css` now uses matte black surfaces, restrained red highlights, flatter active navigation, and a quieter frame/sidebar treatment,
+  - the old cool-blue focus feel in the shell was removed in favor of the same red-accent language.
+- Shared primitives were pushed into the same system through `src/styles/primitives.css`:
+  - panels, pills, buttons, inputs, disclosures, stat cards, and notices now read as darker neutral surfaces first,
+  - red is reserved for primary action and active/running states instead of leaking into every surface,
+  - leftover cold info styling was flattened back toward neutral.
+- The orchestration route now finally matches that direction instead of fighting it:
+  - `src/styles/pages/orchestration.css` reduced decorative chrome and glassiness across the stage, canvas shell, inline dock, and detail panels,
+  - `src/OrchestrationCanvas.tsx` now uses a neutral white-dot background instead of the earlier cool blue board tint.
+- The last major mismatch was the flow canvas legacy override layer:
+  - `src/styles/legacy.css` now force-overrides the late orchestration flow styles so hub, nodes, badges, controls, and edges no longer fall back to the old blue/cold treatment,
+  - the hub now reads red-dark, worker nodes are matte black, and the flow edges use neutral or red states instead of icy blue.
+- Verification for this final theme pass lives under `output/playwright/netflix-final-pass/`:
+  - `orchestration-desktop-final.png`
+  - `settings-desktop-final.png`
+  - `chat-desktop-final.png`
+- Keep the screenshot rule unchanged while reviewing these captures:
+  - do not send or inspect long paths with spaces,
+  - if a screenshot must be shown, generate and use the script-emitted short no-space path only.

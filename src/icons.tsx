@@ -39,6 +39,7 @@ export type IconName =
   | 'user'
   | 'memory'
   | 'route'
+  | 'menu'
   | 'warning'
   | 'check'
 
@@ -307,6 +308,8 @@ export function Icon({
             <path d="M8.5 12H17" {...common} />
           </>
         )
+      case 'menu':
+        return <path d="M4 7.5h16M4 12h16M4 16.5h16" {...common} />
       case 'warning':
         return (
           <>

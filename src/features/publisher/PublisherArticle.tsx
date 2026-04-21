@@ -71,6 +71,52 @@ function createEmptySection(index: number, title: string | null = null): Publish
   }
 }
 
+function extractStructuredHeader(text: string, fallbackTitle: string, fallbackExcerpt?: string | null) {
+  const lines = normalizeLines(text)
+  let title = fallbackTitle
+  let lead = fallbackExcerpt ? normalizeParagraphText(fallbackExcerpt) : ''
+  const remaining: string[] = []
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+    if (!line) {
+      continue
+    }
+
+    const inlineTitle = line.match(/^제목[:：]\s*(.+)$/)
+    if (inlineTitle && !title) {
+      title = normalizeParagraphText(inlineTitle[1])
+      continue
+    }
+
+    if (line === '제목' && lines[index + 1]) {
+      title = normalizeParagraphText(lines[index + 1]) || title
+      index += 1
+      continue
+    }
+
+    const inlineLead = line.match(/^(리드|의미|요약|한줄요약|핵심)[:：]\s*(.+)$/)
+    if (inlineLead && !lead) {
+      lead = normalizeParagraphText(inlineLead[2])
+      continue
+    }
+
+    if ((line === '의미' || line === '요약' || line === '리드') && lines[index + 1] && !lead) {
+      lead = normalizeParagraphText(lines[index + 1])
+      index += 1
+      continue
+    }
+
+    remaining.push(line)
+  }
+
+  return {
+    title,
+    lead,
+    body: remaining.join('\n').trim(),
+  }
+}
+
 function buildPublisherArticleSections(text: string) {
   const lines = normalizeLines(text)
   const sections: PublisherArticleSection[] = []
@@ -182,7 +228,8 @@ export function PublisherArticle({
   authors?: string[]
   tags?: string[]
 }) {
-  const sections = buildPublisherArticleSections(body)
+  const header = extractStructuredHeader(body, title, excerpt)
+  const sections = buildPublisherArticleSections(header.body)
   const resolvedSourceUrl = extractSourceUrl(sections, sourceUrl)
 
   return (
@@ -193,8 +240,8 @@ export function PublisherArticle({
           {sourceLabel ? <span>{sourceLabel}</span> : null}
           {publishedAt ? <span>{new Date(publishedAt).toLocaleString('ko-KR')}</span> : null}
         </div>
-        <h3>{title}</h3>
-        {excerpt ? <p className="publisher-article__lead">{excerpt}</p> : null}
+        <h3>{header.title}</h3>
+        {header.lead ? <p className="publisher-article__lead">{header.lead}</p> : null}
         <div className="publisher-article__meta">
           {summaryType ? <span className="chip chip--soft">{summaryType}</span> : null}
           {authors.length > 0 ? <span className="chip chip--soft">{authors.slice(0, 4).join(', ')}</span> : null}
@@ -226,7 +273,7 @@ export function PublisherArticle({
 
       {resolvedSourceUrl ? (
         <footer className="publisher-article__footer">
-          <span>원문 출처</span>
+          <span>원문 링크</span>
           <a href={resolvedSourceUrl} rel="noreferrer" target="_blank">
             {resolvedSourceUrl}
           </a>

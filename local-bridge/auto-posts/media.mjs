@@ -4,7 +4,6 @@ import {
   buildMediaCacheFileName,
   canonicalizeUrl,
   extractYouTubeVideoId,
-  guessFileExtension,
   hashText,
   hostnameFromUrl,
   sanitizeFileSegment,
@@ -20,6 +19,51 @@ function stripHtml(value = '') {
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function stripNonReadableBlocks(html = '') {
+  return String(html ?? '')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, ' ')
+}
+
+function looksReadableSentence(sentence = '') {
+  const normalized = String(sentence ?? '').trim()
+  if (!normalized || normalized.length < 28) {
+    return false
+  }
+
+  if (
+    /@context|schema\.org|application\/ld\+json|\"@type\"|\"@id\"|window\.|document\.|function\(|xmlns|viewbox|fill-rule|stroke-width/i.test(
+      normalized,
+    )
+  ) {
+    return false
+  }
+
+  const symbolCount = (normalized.match(/[{}[\]<>=$]/g) ?? []).length
+  if (symbolCount >= 6) {
+    return false
+  }
+
+  return true
+}
+
+function extractReadableSnippet(html = '') {
+  const plain = stripHtml(stripNonReadableBlocks(html))
+  if (!plain) {
+    return ''
+  }
+
+  const sentences = plain
+    .split(/(?<=[.!?。다])\s+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter(looksReadableSentence)
+
+  return sentences.join(' ').slice(0, 1200).trim()
 }
 
 function extractMeta(html = '') {
@@ -73,15 +117,19 @@ export async function fetchPageMetadata(url, { fetchWithTimeout, timeoutMs = 15_
   }
 
   try {
-    const response = await fetchWithTimeout(url, {
-      headers: {
-        Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
-        'User-Agent': 'Artemis Auto Posts',
+    const response = await fetchWithTimeout(
+      url,
+      {
+        headers: {
+          Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
+          'User-Agent': 'Artemis Auto Posts',
+        },
       },
-    }, timeoutMs)
+      timeoutMs,
+    )
 
     if (!response.ok) {
-      throw new Error(`메타데이터 요청 실패 (${response.status})`)
+      throw new Error(`메타데이터 요청에 실패했습니다. (${response.status})`)
     }
 
     const html = await response.text()
@@ -105,7 +153,7 @@ export async function fetchPageMetadata(url, { fetchWithTimeout, timeoutMs = 15_
       embedHtml: meta.get('twitter:player') || '',
       siteName: meta.get('og:site_name') || '',
       author: meta.get('author') || '',
-      htmlSnippet: stripHtml(html).slice(0, 1200),
+      htmlSnippet: extractReadableSnippet(html),
     }
   } catch (error) {
     return {
@@ -158,7 +206,7 @@ async function fetchOEmbed(url, { fetchWithTimeout, timeoutMs = 12_000 } = {}) {
               : '',
       }
     } catch {
-      // Ignore oEmbed errors and keep falling back.
+      // oEmbed is optional.
     }
   }
 
@@ -170,15 +218,19 @@ async function cacheRemoteAsset(url, cacheDir, { fetchWithTimeout, fallbackBase 
     return null
   }
 
-  const response = await fetchWithTimeout(url, {
-    headers: {
-      Accept: 'image/*,video/*,*/*;q=0.8',
-      'User-Agent': 'Artemis Auto Posts',
+  const response = await fetchWithTimeout(
+    url,
+    {
+      headers: {
+        Accept: 'image/*,video/*,*/*;q=0.8',
+        'User-Agent': 'Artemis Auto Posts',
+      },
     },
-  }, 20_000)
+    20_000,
+  )
 
   if (!response.ok) {
-    throw new Error(`원격 자산 다운로드 실패 (${response.status})`)
+    throw new Error(`원격 자산 다운로드에 실패했습니다. (${response.status})`)
   }
 
   const buffer = Buffer.from(await response.arrayBuffer())
@@ -235,7 +287,7 @@ async function createScreenshotAttachment(candidate, cacheDir) {
       height: null,
       provider: guessProvider(candidate.url),
       title: `${candidate.title} 스크린샷`,
-      description: '대표 이미지가 없어 페이지 스크린샷을 저장했습니다.',
+      description: '대표 이미지를 확보하지 못해 페이지 화면을 스크린샷으로 저장했습니다.',
       localPath: targetPath,
       mimeType: 'image/png',
       priority: 1,
@@ -263,40 +315,53 @@ function buildAttachmentBase(kind, candidate, payload = {}, priority = 1) {
   }
 }
 
-export async function buildMediaAttachments(candidate, {
-  fetchWithTimeout,
-  cacheDir,
-  screenshotFallback = true,
-} = {}) {
+export async function buildMediaAttachments(
+  candidate,
+  {
+    fetchWithTimeout,
+    cacheDir,
+    screenshotFallback = true,
+  } = {},
+) {
   const attachments = []
   const pageMeta = candidate.rawMeta?.pageMeta ?? null
   const oEmbed = await fetchOEmbed(candidate.url, { fetchWithTimeout }).catch(() => null)
 
   if (oEmbed?.embedHtml) {
     attachments.push(
-      buildAttachmentBase('embed', candidate, {
-        url: candidate.url,
-        embedHtml: oEmbed.embedHtml,
-        thumbnailUrl: oEmbed.thumbnailUrl,
-        provider: oEmbed.provider,
-        title: oEmbed.title,
-        description: oEmbed.description,
-        width: oEmbed.width,
-        height: oEmbed.height,
-      }, 4),
+      buildAttachmentBase(
+        'embed',
+        candidate,
+        {
+          url: candidate.url,
+          embedHtml: oEmbed.embedHtml,
+          thumbnailUrl: oEmbed.thumbnailUrl,
+          provider: oEmbed.provider,
+          title: oEmbed.title,
+          description: oEmbed.description,
+          width: oEmbed.width,
+          height: oEmbed.height,
+        },
+        4,
+      ),
     )
   }
 
   const videoUrl = pageMeta?.videoUrl || ''
   if (videoUrl) {
     attachments.push(
-      buildAttachmentBase('video', candidate, {
-        url: videoUrl,
-        thumbnailUrl: pageMeta?.thumbnailUrl || '',
-        provider: guessProvider(videoUrl),
-        title: pageMeta?.title || candidate.title,
-        description: pageMeta?.description || '',
-      }, 5),
+      buildAttachmentBase(
+        'video',
+        candidate,
+        {
+          url: videoUrl,
+          thumbnailUrl: pageMeta?.thumbnailUrl || '',
+          provider: guessProvider(videoUrl),
+          title: pageMeta?.title || candidate.title,
+          description: pageMeta?.description || '',
+        },
+        5,
+      ),
     )
   }
 
@@ -349,7 +414,8 @@ export async function buildMediaAttachments(candidate, {
 }
 
 export function pickHeroMedia(attachments = []) {
-  return [...attachments].sort((left, right) => Number(right.priority ?? 0) - Number(left.priority ?? 0))[0] ?? null
+  return [...attachments]
+    .sort((left, right) => Number(right.priority ?? 0) - Number(left.priority ?? 0))[0] ?? null
 }
 
 export function pickSecondaryMedia(attachments = [], limit = 3) {

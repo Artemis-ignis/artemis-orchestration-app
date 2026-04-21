@@ -799,13 +799,13 @@ export function createPublisherScheduler({ resolveWorkspaceRoot, collectSignalIt
       if (xResult && !xResult.ok && !xResult.disabled) {
         await appendLog(
           workspaceRoot,
-          createPublisherLog(
-            'warning',
-            'cross-post-failed',
-            `${draft.sourceTitle} 내부 게시는 성공했지만 X cross-post는 실패했습니다.`,
-            id,
-            { message: xResult.error?.message || xResult.detail || 'x cross-post failed' },
-          ),
+            createPublisherLog(
+              'warning',
+              'cross-post-failed',
+              `${draft.sourceTitle} 내부 게시는 성공했지만 X 크로스포스트는 실패했습니다.`,
+              id,
+              { message: xResult.error?.message || xResult.detail || 'X 크로스포스트 실패' },
+            ),
           settings,
         )
       }

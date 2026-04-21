@@ -5,32 +5,17 @@ import { changeTypeLabel, executionProviderLabel, formatDate, formatFriendlyMode
 import { NoticeBanner, PanelCard, SectionHeader, SplitPane, StatusPill, Toolbar } from '../../components/ui/primitives'
 
 export function OrchestrationStage({
-  summary,
   canvas,
   controls,
 }: {
-  summary: {
-    selectedCount: number
-    runnableCount: number
-    workspaceStatusLabel: string
-  }
   canvas: ReactNode
   controls: ReactNode
 }) {
   return (
     <PanelCard className="orchestration-stage orchestration-stage--premium">
       <SectionHeader
-        title="실행 결과 개요"
-        description="캔버스가 전체 흐름을 보여주고, 오른쪽에서 이번 실행 조합과 지시를 바로 조정합니다."
-        actions={
-          <div className="orchestration-summary-bar">
-            <StatusPill tone={summary.selectedCount > 0 ? 'accent' : 'muted'}>선택 {summary.selectedCount}개</StatusPill>
-            <StatusPill tone={summary.runnableCount > 0 ? 'success' : 'warning'}>실행 {summary.runnableCount}개</StatusPill>
-            <StatusPill tone={summary.workspaceStatusLabel === '폴더 연결' ? 'muted' : 'warning'}>
-              {summary.workspaceStatusLabel}
-            </StatusPill>
-          </div>
-        }
+        title="실행 흐름"
+        description="왼쪽에서 흐름을 보고, 오른쪽에서 선택과 지시만 바로 조정합니다."
       />
       <SplitPane
         className="orchestration-stage__split"
@@ -79,27 +64,21 @@ export function OrchestrationAlerts({
 
 export function OrchestrationControls({
   enabledAgentToggles,
-  statusTiles,
   taskField,
   actions,
 }: {
   enabledAgentToggles: ReactNode
-  statusTiles: ReactNode
   taskField: ReactNode
   actions: ReactNode
 }) {
   return (
     <div className="orchestration-controlStack">
-      <PanelCard tone="muted">
-        <SectionHeader title="이번 실행" description="체크한 모델만 돌리고 결과는 아래 카드에 고정됩니다." />
+      <PanelCard className="orchestration-inline-dock" tone="muted">
+        <SectionHeader
+          title="지금 실행"
+          description="모델을 고르고 지시를 넣으면 바로 병렬 실행합니다."
+        />
         <div className="orchestration-inline-dock__selection">{enabledAgentToggles}</div>
-      </PanelCard>
-      <PanelCard tone="muted">
-        <SectionHeader title="모델 상태" description="연결 상태와 최근 실행 요약을 함께 봅니다." />
-        <div className="orchestration-statusGrid">{statusTiles}</div>
-      </PanelCard>
-      <PanelCard tone="muted">
-        <SectionHeader title="작업 지시" description="같은 지시를 여러 모델에 동시에 보냅니다." />
         <div className="orchestration-controlForm">
           {taskField}
           {actions}
@@ -126,12 +105,19 @@ export function OrchestrationResultsPanel({
         title="실행 결과"
         description={hint}
         actions={
-          <StatusPill tone={sessionRunning ? 'accent' : sessionHasResults ? 'muted' : 'muted'}>
+          <StatusPill tone={sessionRunning ? 'accent' : 'muted'}>
             {sessionRunning ? '진행 중' : sessionHasResults ? '최근 세션' : '대기 중'}
           </StatusPill>
         }
       />
-      {sessionHasResults ? cards : <EmptyState title="결과는 여기 쌓입니다" description="모델을 실행하면 각 결과와 최근 로그가 이 영역에 바로 추가됩니다." />}
+      {sessionHasResults ? (
+        cards
+      ) : (
+        <EmptyState
+          title="결과는 여기로 모입니다"
+          description="모델을 실행하면 각 결과와 최근 로그가 이 영역에 바로 쌓입니다."
+        />
+      )}
     </PanelCard>
   )
 }
@@ -194,6 +180,7 @@ export function OrchestrationDetails({
   latestAgentExecution,
   latestChangedFiles,
   sessionRuns,
+  statusTiles,
 }: {
   selectedAgents: Array<{ id: string; name: string }>
   signalCount: number
@@ -212,22 +199,27 @@ export function OrchestrationDetails({
     output: string
     logs: Array<{ id: string; createdAt: string; message: string; level: 'info' | 'success' | 'error' }>
   }>
+  statusTiles: ReactNode
 }) {
   return (
-    <DisclosureSection className="disclosure--soft" summary="최근 결과, 변경 파일, 병렬 실행 로그" title="더보기">
+    <DisclosureSection className="disclosure--soft" summary="모델 상태, 최근 결과, 변경 파일" title="자세히 보기">
       <div className="orchestration-detail-grid">
         <PanelCard>
           <SectionHeader title="선택 모델" actions={<StatusPill tone="muted">{selectedAgents.length}개</StatusPill>} />
           <div className="chip-wrap">
-            {selectedAgents.map((agent) => (
-              <StatusPill key={agent.id} tone="muted">
-                {agent.name}
-              </StatusPill>
-            ))}
+            {selectedAgents.length > 0 ? (
+              selectedAgents.map((agent) => (
+                <StatusPill key={agent.id} tone="muted">
+                  {agent.name}
+                </StatusPill>
+              ))
+            ) : (
+              <StatusPill tone="muted">선택한 모델 없음</StatusPill>
+            )}
           </div>
           <div className="stack-grid stack-grid--compact orchestration-detail-stats">
             <div className="summary-row">
-              <span>구독 시그널</span>
+              <span>구독 신호</span>
               <strong>{signalCount}개</strong>
             </div>
             <div className="summary-row">
@@ -235,6 +227,18 @@ export function OrchestrationDetails({
               <strong>{activeToolCount}개</strong>
             </div>
           </div>
+        </PanelCard>
+
+        <PanelCard>
+          <SectionHeader title="모델 상태" description="첫 화면에서 뺀 상태 정보는 여기서 한 번에 확인합니다." />
+          {selectedAgents.length > 0 ? (
+            <div className="orchestration-statusGrid orchestration-statusGrid--detail">{statusTiles}</div>
+          ) : (
+            <EmptyState
+              title="상태를 볼 모델이 없습니다"
+              description="오른쪽 실행 도크에서 모델을 고르면 연결 상태와 최근 실행 상태가 여기로 모입니다."
+            />
+          )}
         </PanelCard>
 
         <PanelCard>
@@ -266,7 +270,10 @@ export function OrchestrationDetails({
               </div>
             </>
           ) : (
-            <EmptyState description="채팅이나 오케스트레이션을 한 번 실행하면 실제 결과와 변경 파일이 여기에 쌓입니다." title="아직 실제 실행 기록이 없습니다" />
+            <EmptyState
+              title="아직 실제 실행 기록이 없습니다"
+              description="병렬 실행을 한 번 돌리면 최근 실행 결과와 변경 파일이 여기로 모입니다."
+            />
           )}
 
           {sessionRuns.length > 0 ? (
@@ -291,7 +298,10 @@ export function OrchestrationDetails({
               ))}
             </div>
           ) : (
-            <EmptyState description="모델을 병렬 실행하면 최근 로그가 여기에 간단히 쌓입니다." title="아직 실행 로그가 없습니다" />
+            <EmptyState
+              title="아직 실행 로그가 없습니다"
+              description="모델을 병렬 실행하면 최근 로그가 이 영역에 간단히 쌓입니다."
+            />
           )}
         </PanelCard>
       </div>

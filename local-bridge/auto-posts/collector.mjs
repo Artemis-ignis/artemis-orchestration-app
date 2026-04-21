@@ -20,15 +20,15 @@ function stripHtml(value = '') {
 function sourceLabelForType(sourceType, fallback = '') {
   switch (sourceType) {
     case 'hackerNews':
-      return 'Hacker News'
+      return '해커 뉴스'
     case 'github':
-      return 'GitHub'
+      return '깃허브'
     case 'arxiv':
       return 'arXiv'
     case 'rss':
       return 'RSS'
     default:
-      return fallback || 'Web'
+      return fallback || '웹'
   }
 }
 
@@ -47,11 +47,28 @@ function categoryLabel(category) {
   }
 }
 
+function preferLocalizedValue(currentValue, nextValue) {
+  const current = stripHtml(currentValue)
+  const next = stripHtml(nextValue)
+
+  if (!next) {
+    return current
+  }
+  if (!current) {
+    return next
+  }
+  if (/[가-힣]/.test(current) && !/[가-힣]/.test(next)) {
+    return current
+  }
+
+  return next
+}
+
 export function toSignalCandidate(item) {
   const sourceType = detectSourceType(item)
   const discoveredAt = item.discoveredAt || nowIso()
-  const title = stripHtml(item.originalTitle || item.title || '')
-  const summary = stripHtml(item.originalSummary || item.summary || '')
+  const title = stripHtml(item.title || item.originalTitle || '')
+  const summary = stripHtml(item.summary || item.originalSummary || '')
   const canonicalUrl = canonicalizeUrl(item.url)
 
   return {
@@ -71,6 +88,8 @@ export function toSignalCandidate(item) {
     rawMeta: {
       ...(item.rawMeta ?? {}),
       originalSource: item.source,
+      originalTitle: item.originalTitle || '',
+      originalSummary: item.originalSummary || '',
     },
     slug: slugify(title || item.id),
   }
@@ -82,7 +101,11 @@ async function enrichHackerNewsCandidate(candidate, { fetchWithTimeout }) {
 
   if (hnId) {
     try {
-      const response = await fetchWithTimeout(`https://hn.algolia.com/api/v1/items/${encodeURIComponent(hnId)}`, undefined, 10_000)
+      const response = await fetchWithTimeout(
+        `https://hn.algolia.com/api/v1/items/${encodeURIComponent(hnId)}`,
+        undefined,
+        10_000,
+      )
       if (response.ok) {
         const payload = await response.json()
         candidate.rawMeta = {
@@ -95,7 +118,7 @@ async function enrichHackerNewsCandidate(candidate, { fetchWithTimeout }) {
         candidate.authorOrChannel = candidate.authorOrChannel || payload.author || ''
       }
     } catch {
-      // Keep original feed data if the HN item API fails.
+      // HN item expansion is optional.
     }
   }
 
@@ -107,7 +130,7 @@ async function enrichHackerNewsCandidate(candidate, { fetchWithTimeout }) {
   }
 
   if (pageMeta?.description) {
-    candidate.summary = pageMeta.description
+    candidate.summary = preferLocalizedValue(candidate.summary, pageMeta.description)
   }
   if (pageMeta?.author) {
     candidate.authorOrChannel = candidate.authorOrChannel || pageMeta.author
@@ -151,10 +174,10 @@ async function enrichGitHubCandidate(candidate, { fetchWithTimeout }) {
         homepage: repoPayload.homepage ?? '',
       }
       candidate.authorOrChannel = candidate.authorOrChannel || repoPayload.owner?.login || ''
-      candidate.summary = stripHtml(repoPayload.description || candidate.summary)
+      candidate.summary = preferLocalizedValue(candidate.summary, repoPayload.description)
     }
   } catch {
-    // Ignore GitHub API failures and keep the search result data.
+    // GitHub API expansion is optional.
   }
 
   try {
@@ -205,6 +228,7 @@ async function enrichArxivCandidate(candidate, { fetchWithTimeout }) {
       const summary = stripHtml(xml.match(/<summary>([\s\S]*?)<\/summary>/i)?.[1] ?? '')
       const title = stripHtml(xml.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? '')
       const primaryCategory = xml.match(/<arxiv:primary_category[^>]+term="([^"]+)"/i)?.[1] ?? ''
+
       candidate.rawMeta = {
         ...candidate.rawMeta,
         arxivId,
@@ -212,12 +236,12 @@ async function enrichArxivCandidate(candidate, { fetchWithTimeout }) {
         primaryCategory,
         pdfUrl: `https://arxiv.org/pdf/${arxivId}.pdf`,
       }
-      candidate.title = title || candidate.title
-      candidate.summary = summary || candidate.summary
+      candidate.title = preferLocalizedValue(candidate.title, title)
+      candidate.summary = preferLocalizedValue(candidate.summary, summary)
       candidate.authorOrChannel = candidate.authorOrChannel || authors.slice(0, 3).join(', ')
     }
   } catch {
-    // Keep the original arXiv feed payload if expansion fails.
+    // arXiv expansion is optional.
   }
 
   candidate.rawMeta = {
@@ -235,10 +259,10 @@ async function enrichWebCandidate(candidate, { fetchWithTimeout }) {
   }
 
   if (pageMeta?.title) {
-    candidate.title = pageMeta.title
+    candidate.title = preferLocalizedValue(candidate.title, pageMeta.title)
   }
   if (pageMeta?.description) {
-    candidate.summary = pageMeta.description
+    candidate.summary = preferLocalizedValue(candidate.summary, pageMeta.description)
   }
   if (pageMeta?.author) {
     candidate.authorOrChannel = candidate.authorOrChannel || pageMeta.author
@@ -247,11 +271,14 @@ async function enrichWebCandidate(candidate, { fetchWithTimeout }) {
   return candidate
 }
 
-export async function enrichSignalCandidate(candidate, {
-  fetchWithTimeout,
-  mediaCacheDir,
-  screenshotFallback = true,
-} = {}) {
+export async function enrichSignalCandidate(
+  candidate,
+  {
+    fetchWithTimeout,
+    mediaCacheDir,
+    screenshotFallback = true,
+  } = {},
+) {
   const next = {
     ...candidate,
     rawMeta: { ...(candidate.rawMeta ?? {}) },
@@ -286,11 +313,14 @@ export async function enrichSignalCandidates(candidates, options) {
   return settled.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []))
 }
 
-export function selectTopCandidates(candidates, {
-  topK = 2,
-  categoryWeights,
-  processedUrlHashes = [],
-} = {}) {
+export function selectTopCandidates(
+  candidates,
+  {
+    topK = 2,
+    categoryWeights,
+    processedUrlHashes = [],
+  } = {},
+) {
   const seenDedupeKeys = new Set(processedUrlHashes)
   return rankSignalCandidates(candidates, {
     categoryWeights,

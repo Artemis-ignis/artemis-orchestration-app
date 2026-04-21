@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { PageId } from '../crewData'
-import { fetchAiProviders, type AiProviderState } from '../lib/aiRoutingClient'
 import { PageIntro } from '../crewPageShared'
 import { executionProviderLabel } from '../crewPageHelpers'
 import {
@@ -11,14 +10,15 @@ import {
   OrchestrationResultsPanel,
   OrchestrationStage,
 } from '../features/orchestration/OrchestrationSections'
+import { fetchAiProviders, type AiProviderState } from '../lib/aiRoutingClient'
 import { OrchestrationCanvas } from '../OrchestrationCanvas'
-import type { AgentItem, AgentRun } from '../state/types'
 import { useArtemisApp } from '../state/context'
+import type { AgentItem, AgentRun } from '../state/types'
 
 function displayRunStatusLabel(status?: string) {
   switch (status) {
     case 'running':
-      return '실시간 생성 중'
+      return '실행 중'
     case 'success':
       return '응답 완료'
     case 'error':
@@ -40,10 +40,10 @@ function formatElapsedSeconds(totalSeconds: number) {
 
 function runningHint(provider: string) {
   if (provider === 'codex' || provider === 'ollama') {
-    return '이 실행기는 토큰을 조금씩 보내기보다 최종 결과를 한 번에 돌려줍니다. 대신 아래 로그와 상태가 먼저 갱신됩니다.'
+    return '이 실행기는 토큰을 조금씩 흘리기보다 최종 결과를 한 번에 올립니다. 대신 아래 로그와 상태가 먼저 갱신됩니다.'
   }
 
-  return '스트리밍 가능한 공급자는 생성 중 로그와 함께 응답이 순차적으로 갱신됩니다.'
+  return '스트리밍이 가능한 공급자는 생성 중 로그와 부분 응답을 순차적으로 갱신합니다.'
 }
 
 function canAgentUseApiKey(agent: AgentItem, apiKeyIds: Set<string>) {
@@ -71,13 +71,15 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     runAgentTask,
     setOrchestrationDraft,
     setOrchestrationSelection,
-    state,
     startOrchestrationSession,
+    state,
     workspaceAbsolutePath,
     workspaceError,
   } = useArtemisApp()
+
   const [aiProviders, setAiProviders] = useState<AiProviderState[]>([])
   const [runClock, setRunClock] = useState(() => Date.now())
+
   const task = state.orchestration.draftTask
   const selectedAgentIds = state.orchestration.selectedAgentIds
   const sessionStartedAt = state.orchestration.sessionStartedAt
@@ -88,14 +90,15 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     () => state.agents.items.filter((item) => item.enabled),
     [state.agents.items],
   )
+  const enabledAgentIds = useMemo(() => new Set(enabledAgents.map((agent) => agent.id)), [enabledAgents])
   const apiKeyIds = useMemo(() => new Set(state.apiKeys.map((item) => item.id)), [state.apiKeys])
   const activeTools = state.tools.items.filter((item) => item.enabled)
-  const latestMasterMessage = [...state.chats.threads.find((thread) => thread.id === state.chats.activeThreadId)?.messages ?? []]
+  const latestMasterMessage = [...(state.chats.threads.find((thread) => thread.id === state.chats.activeThreadId)?.messages ?? [])]
     .reverse()
     .find((message) => message.role === 'master')
   const latestAgentExecution = latestExecution?.source === 'agent' ? latestExecution : null
   const latestChangedFiles = latestAgentExecution?.workspace.changedFiles ?? []
-  const enabledAgentIds = useMemo(() => new Set(enabledAgents.map((agent) => agent.id)), [enabledAgents])
+
   const effectiveSelectedAgentIds = useMemo(() => {
     const preserved = selectedAgentIds.filter((id) => enabledAgentIds.has(id))
 
@@ -143,15 +146,16 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     }
 
     void loadProviders()
+
     return () => {
       active = false
     }
   }, [needsOfficialProviders, state.settings.bridgeUrl])
 
-  const codexReady =
-    bridgeHealth?.providers.find((item) => item.provider === 'codex')?.ready ?? false
-  const ollamaReady =
-    bridgeHealth?.providers.find((item) => item.provider === 'ollama')?.ready ?? false
+  const codexStatus = bridgeHealth?.providers.find((item) => item.provider === 'codex') ?? null
+  const ollamaStatus = bridgeHealth?.providers.find((item) => item.provider === 'ollama') ?? null
+  const codexReady = codexStatus?.ready ?? false
+  const ollamaReady = ollamaStatus?.ready ?? false
 
   const selectedAgents = useMemo(
     () => enabledAgents.filter((agent) => effectiveSelectedAgentIds.includes(agent.id)),
@@ -168,12 +172,12 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       }
 
       if (agent.provider === 'ollama') {
-        map.set(agent.id, { runnable: ollamaReady, reason: ollamaReady ? null : 'Ollama 미준비' })
+        map.set(agent.id, { runnable: ollamaReady, reason: ollamaReady ? null : 'Ollama 준비 필요' })
         return
       }
 
       if (agent.provider === 'codex') {
-        map.set(agent.id, { runnable: codexReady, reason: codexReady ? null : 'Codex 미준비' })
+        map.set(agent.id, { runnable: codexReady, reason: codexReady ? null : 'Codex 준비 필요' })
         return
       }
 
@@ -195,9 +199,6 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   }, [enabledAgents, apiKeyIds, ollamaReady, codexReady, aiProviders])
 
   const selectedAgentStatusItems = useMemo(() => {
-    const codexStatus = bridgeHealth?.providers.find((item) => item.provider === 'codex') ?? null
-    const ollamaStatus = bridgeHealth?.providers.find((item) => item.provider === 'ollama') ?? null
-
     return selectedAgents.map((agent) => {
       if (agent.provider === 'codex') {
         return {
@@ -231,14 +232,13 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
         const officialStatus =
           aiProviders.find((item) => item.provider === resolveOfficialProviderId(agent.baseUrl)) ?? null
         const ready = Boolean(officialStatus?.enabled && officialStatus?.configured && agent.model.trim())
+
         return {
           id: agent.id,
           tone: ready ? 'info' : officialStatus ? 'warning' : 'error',
-          summary: ready ? '준비됨' : officialStatus ? '재확인 필요' : '미설정',
+          summary: ready ? '준비됨' : officialStatus ? '설정 필요' : '미설정',
           detail:
-            (ready && officialStatus
-              ? `${officialStatus.label} · ${agent.model}`
-              : null) ||
+            (ready && officialStatus ? `${officialStatus.label} · ${agent.model}` : null) ||
             officialStatus?.last_test_message ||
             officialStatus?.detail ||
             '공식 API 공급자를 아직 확인하지 못했습니다.',
@@ -254,7 +254,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
         label: agent.name,
       }
     })
-  }, [selectedAgents, bridgeHealth, codexReady, ollamaReady, aiProviders])
+  }, [selectedAgents, codexReady, codexStatus, ollamaReady, ollamaStatus, aiProviders])
 
   const runnableSelectedAgents = useMemo(
     () => selectedAgents.filter((agent) => agentAvailability.get(agent.id)?.runnable),
@@ -265,6 +265,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     () => selectedAgents.filter((agent) => !agentAvailability.get(agent.id)?.runnable),
     [selectedAgents, agentAvailability],
   )
+
   const canvasAgentStates = useMemo(
     () =>
       selectedAgents.map((agent) => ({
@@ -394,7 +395,6 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   }, [sessionRunning])
 
   const hasWorkspaceConnection = Boolean(workspaceAbsolutePath)
-  const workspaceStatusLabel = hasWorkspaceConnection ? '폴더 연결' : '폴더 필요'
   const canRunTask =
     Boolean(task.trim()) &&
     runnableSelectedAgents.length > 0 &&
@@ -405,20 +405,21 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   const taskTemplates = useMemo(
     () => [
       {
-        label: '소식 브리핑',
-        value: 'AI 관련 소식을 요약해서 브리핑 문서로 정리해줘.',
+        label: '브리프 정리',
+        value: 'AI 관련 소식을 요약해서 짧은 브리프 문서로 정리해 줘.',
       },
       {
         label: '다음 작업',
-        value: '최근 실행 결과를 바탕으로 다음 작업 순서를 정리해줘.',
+        value: '최근 실행 결과를 바탕으로 다음 작업 순서를 정리해 줘.',
       },
       {
         label: '자동화 설계',
-        value: '현재 활성 모델들을 병렬로 돌려서 자동화 흐름 초안을 제안해줘.',
+        value: '현재 선택한 모델을 병렬로 돌릴 자동화 흐름 초안을 제안해 줘.',
       },
     ],
     [],
   )
+
   const runnerAlerts = useMemo(() => {
     const alerts: Array<{
       key: string
@@ -432,7 +433,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       alerts.push({
         key: 'session-summary',
         tone: sessionErrorCount > 0 ? 'warning' : 'info',
-        text: `최근 실행 · 성공 ${sessionSuccessCount} · 실패 ${sessionErrorCount} · 실행 중 ${sessionRunningCount}${sessionSkippedCount > 0 ? ` · 제외 ${sessionSkippedCount}` : ''}`,
+        text: `최근 실행 · 성공 ${sessionSuccessCount} · 실패 ${sessionErrorCount} · 진행 중 ${sessionRunningCount}${sessionSkippedCount > 0 ? ` · 제외 ${sessionSkippedCount}` : ''}`,
       })
     }
 
@@ -468,7 +469,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       alerts.push({
         key: 'skipped-agents',
         tone: 'warning',
-        text: `${skippedSelectedAgents.length}개 모델은 아직 연결이 덜 끝나 이번 실행에서 제외됩니다.`,
+        text: `${skippedSelectedAgents.length}개 모델은 아직 연결 조건이 맞지 않아 이번 실행에서 제외됩니다.`,
       })
     }
 
@@ -513,23 +514,31 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       task: nextTask,
       agentIds: selectedAgents.map((agent) => agent.id),
     })
+
     await Promise.allSettled(runnableSelectedAgents.map((agent) => runAgentTask(agent.id, nextTask)))
   }
+
+  const statusTiles = (
+    <>
+      {visibleAgentStatusItems.map((item) => (
+        <article key={item.id} className={`orchestration-statusTile orchestration-statusTile--${item.tone}`}>
+          <strong>{item.label}</strong>
+          <span>{item.summary}</span>
+          <p>{item.detail}</p>
+        </article>
+      ))}
+    </>
+  )
 
   return (
     <section className="page">
       <PageIntro
-        description="같은 지시를 여러 실행기에 동시에 보내고, 결과를 한 화면에서 바로 비교합니다."
+        description="여러 실행기를 한 번에 돌리고 결과만 빠르게 비교합니다."
         icon="agent"
         title="오케스트레이션"
       />
 
       <OrchestrationStage
-        summary={{
-          selectedCount: selectedAgents.length,
-          runnableCount: runnableSelectedAgents.length,
-          workspaceStatusLabel,
-        }}
         canvas={
           <div className="orchestration-stage__canvasShell">
             <div className="orchestration-stage__canvas">
@@ -555,15 +564,16 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                 {enabledAgents.map((agent) => {
                   const availability = agentAvailability.get(agent.id)
                   const selected = effectiveSelectedAgentIds.includes(agent.id)
+
                   return (
                     <button
                       key={agent.id}
+                      type="button"
                       aria-pressed={selected}
                       className={`chip orchestration-agent-chip ${
                         selected ? 'is-active' : 'chip--soft'
                       } ${availability?.runnable ? '' : 'is-blocked'}`.trim()}
                       onClick={() => toggleSelectedAgent(agent.id)}
-                      type="button"
                     >
                       <span className={`orchestration-agent-chip__dot ${availability?.runnable ? 'is-ready' : 'is-blocked'}`} />
                       {agent.name}
@@ -572,28 +582,14 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                 })}
               </div>
             }
-            statusTiles={
-              <>
-                {visibleAgentStatusItems.map((item) => (
-                  <article
-                    key={item.id}
-                    className={`orchestration-statusTile orchestration-statusTile--${item.tone}`}
-                  >
-                    <strong>{item.label}</strong>
-                    <span>{item.summary}</span>
-                    <p>{item.detail}</p>
-                  </article>
-                ))}
-              </>
-            }
             taskField={
               <label className="field field--full orchestration-inline-dock__field">
                 <span>작업 지시</span>
                 <textarea
-                  onChange={(event) => setOrchestrationDraft(event.target.value)}
-                  placeholder="예: AI 관련 소식을 요약해서 브리핑 문서로 정리해줘."
                   rows={3}
                   value={task}
+                  onChange={(event) => setOrchestrationDraft(event.target.value)}
+                  placeholder="예: AI 관련 소식을 요약해서 브리프 문서로 정리해 줘."
                 />
               </label>
             }
@@ -604,22 +600,22 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                   {taskTemplates.map((template) => (
                     <button
                       key={template.label}
+                      type="button"
                       className="chip orchestration-template"
                       onClick={() => setOrchestrationDraft(template.value)}
-                      type="button"
                     >
                       {template.label}
                     </button>
                   ))}
                 </div>
                 <button
+                  type="button"
                   className="primary-button orchestration-dock__submit"
                   disabled={!canRunTask}
                   onClick={runSelectedAgents}
-                  type="button"
                 >
                   {sessionRunning
-                    ? `병렬 실행 중... ${latestRunElapsedLabel || ''}`.trim()
+                    ? `병렬 실행 중 · ${latestRunElapsedLabel || ''}`.trim()
                     : `${Math.max(runnableSelectedAgents.length, 1)}개 모델 실행`}
                 </button>
               </>
@@ -632,7 +628,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
         hint={
           sessionRuns[0]
             ? runningHint(sessionRuns[0].provider)
-            : '실행을 시작하면 각 모델 결과가 이 영역에 바로 나타납니다.'
+            : '실행을 시작하면 각 모델 결과가 이 영역에 바로 쌓입니다.'
         }
         sessionHasResults={sessionHasResults}
         sessionRunning={sessionRunning}
@@ -643,20 +639,14 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
               const latestLog = run?.logs[run.logs.length - 1]
               const elapsedLabel =
                 run && run.status === 'running'
-                  ? formatElapsedSeconds(
-                      Math.max(0, Math.floor((runClock - Date.parse(run.startedAt)) / 1000)),
-                    )
+                  ? formatElapsedSeconds(Math.max(0, Math.floor((runClock - Date.parse(run.startedAt)) / 1000)))
                   : ''
 
               return (
                 <OrchestrationResultCard
                   key={agent.id}
-                  body={run?.output ? run.output : latestLog?.message || '아직 이 모델의 결과가 도착하지 않았습니다.'}
-                  elapsedLabel={elapsedLabel}
-                  logs={run?.logs.slice(-3)}
-                  model={agent.model}
+                  title={agent.name}
                   provider={executionProviderLabel(agent.provider)}
-                  startedAt={run?.startedAt}
                   statusLabel={
                     run
                       ? displayRunStatusLabel(run.status)
@@ -664,7 +654,11 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                         ? '제외됨'
                         : '대기'
                   }
-                  title={agent.name}
+                  model={agent.model}
+                  startedAt={run?.startedAt}
+                  elapsedLabel={elapsedLabel}
+                  body={run?.output ? run.output : latestLog?.message || '아직 이 모델의 결과가 도착하지 않았습니다.'}
+                  logs={run?.logs.slice(-3)}
                 />
               )
             })}
@@ -673,13 +667,14 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       />
 
       <OrchestrationDetails
+        selectedAgents={selectedAgents}
+        signalCount={state.signals.items.filter((item) => item.subscribed).length}
         activeToolCount={activeTools.length}
+        sessionStatus={sessionRuns[0] ? displayRunStatusLabel(sessionRuns[0].status) : undefined}
         latestAgentExecution={latestAgentExecution}
         latestChangedFiles={latestChangedFiles}
-        selectedAgents={selectedAgents}
         sessionRuns={sessionRuns}
-        sessionStatus={sessionRuns[0]?.status}
-        signalCount={state.signals.items.filter((item) => item.subscribed).length}
+        statusTiles={statusTiles}
       />
     </section>
   )

@@ -64,7 +64,7 @@ export function defaultPublisherRuntimeStatus(): PublisherRuntimeStatus {
     enabled: false,
     configured: false,
     ready: false,
-    detail: 'Artemis Wire 게시기 상태를 확인하지 못했습니다.',
+    detail: '아르테미스 와이어 게시기 상태를 아직 확인하지 못했습니다.',
   }
 }
 
@@ -107,7 +107,7 @@ export function publisherModeLabel(mode: PublisherSettings['mode']) {
     case 'auto':
       return '자동 게시'
     case 'dry-run':
-      return '드라이 런'
+      return '시뮬레이션'
     default:
       return '승인 대기'
   }

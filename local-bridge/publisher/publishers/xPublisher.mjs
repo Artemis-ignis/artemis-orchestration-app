@@ -92,7 +92,7 @@ export function createOptionalXPublisher({ fetchWithTimeout }) {
   async function getStatus() {
     const credentials = getCredentials()
     if (!credentials.enabled) {
-      return buildStatus('X cross-post publisher가 비활성화되어 있습니다.')
+      return buildStatus('X 크로스포스트 게시기가 비활성화되어 있습니다.')
     }
 
     if (credentials.accessToken || cachedAccessToken) {
@@ -114,7 +114,7 @@ export function createOptionalXPublisher({ fetchWithTimeout }) {
     }
 
     if (credentials.bearerToken) {
-      return buildStatus('bearer token만 있어 실제 게시 대신 disabled 상태로 유지합니다.', {
+      return buildStatus('bearer token만 있어 실제 게시 대신 비활성 상태로 유지합니다.', {
         enabled: true,
         configured: true,
         ready: false,
@@ -122,7 +122,7 @@ export function createOptionalXPublisher({ fetchWithTimeout }) {
       })
     }
 
-    return buildStatus('X 인증 정보가 없어 cross-post는 비활성 상태입니다.', {
+    return buildStatus('X 인증 정보가 없어 크로스포스트는 비활성 상태입니다.', {
       enabled: true,
       configured: false,
       ready: false,
@@ -142,7 +142,7 @@ export function createOptionalXPublisher({ fetchWithTimeout }) {
         xPostId: null,
         postedAt: null,
         detail: dryRun
-          ? 'dry-run 모드에서는 X cross-post를 실행하지 않습니다.'
+          ? '시뮬레이션 모드에서는 X 크로스포스트를 실행하지 않습니다.'
           : status.detail,
       }
     }
@@ -155,7 +155,7 @@ export function createOptionalXPublisher({ fetchWithTimeout }) {
         disabled: true,
         xPostId: null,
         postedAt: null,
-        detail: '실제 게시 토큰을 얻지 못해 X cross-post를 건너뜁니다.',
+        detail: '실제 게시 토큰을 얻지 못해 X 크로스포스트를 건너뜁니다.',
       }
     }
 
@@ -206,7 +206,7 @@ export function createOptionalXPublisher({ fetchWithTimeout }) {
       disabled: false,
       xPostId: String(payload?.data?.id ?? ''),
       postedAt: startedAt,
-      detail: '공식 X API로 cross-post를 완료했습니다.',
+      detail: '공식 X API로 크로스포스트를 완료했습니다.',
       payload,
     }
   }

@@ -11,6 +11,7 @@ import {
   formatRelative,
   signalSourceLabel,
 } from '../crewPageHelpers'
+import { AutoPostArticle } from '../features/autoPosts/AutoPostArticle'
 import { PublisherOperationsPanel } from '../features/publisher/PublisherOperationsPanel'
 import {
   defaultPublisherMetrics,
@@ -292,7 +293,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
         setSelectedDossierId(nextSelectedDossierId)
       } catch (nextError) {
         if (!silent) {
-          setActionMessage(nextError instanceof Error ? nextError.message : 'Artemis Wire 상태를 불러오지 못했습니다.')
+          setActionMessage(nextError instanceof Error ? nextError.message : '아르테미스 와이어 상태를 불러오지 못했습니다.')
         }
       } finally {
         if (!silent) {
@@ -684,7 +685,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       })
       setActionMessage(
         response.createdCount > 0
-          ? `${response.createdCount}개의 Artemis Wire 초안을 큐에 추가했습니다.`
+          ? `${response.createdCount}개의 아르테미스 와이어 초안을 큐에 추가했습니다.`
           : response.skippedCount > 0
             ? `${response.skippedCount}개의 후보가 guardrail에 걸려 건너뛰었습니다.`
             : '새로 큐에 넣을 초안이 없었습니다.',
@@ -719,9 +720,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
           response.publishers[0] ??
           defaultPublisherRuntimeStatus(),
       )
-      setActionMessage('Artemis Wire 설정을 저장했습니다.')
+      setActionMessage('아르테미스 와이어 설정을 저장했습니다.')
     } catch (nextError) {
-      setActionMessage(nextError instanceof Error ? nextError.message : 'Artemis Wire 설정 저장에 실패했습니다.')
+      setActionMessage(nextError instanceof Error ? nextError.message : '아르테미스 와이어 설정 저장에 실패했습니다.')
     } finally {
       setPostActionLoading(false)
     }
@@ -773,7 +774,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
           ? response.detail
           : response.simulated
           ? '실제 인증이 없어 dry-run으로 게시 시뮬레이션을 완료했습니다.'
-          : 'Artemis Wire 게시를 완료했습니다.',
+          : '아르테미스 와이어 게시를 완료했습니다.',
       )
       await loadXAutopost({
         focusDraftId: response.item.status === 'published' ? null : response.item.id,
@@ -788,9 +789,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
   }
 
   return (
-    <section className="page">
+    <section className="page signals-page">
       <PageIntro
-        description="실시간 소스, 심층 리포트, 그리고 Artemis Wire 내부 게시 큐를 한 화면에서 운영합니다. Wire 탭에서는 초안 생성, 승인, 예약, 즉시 게시, 최근 로그를 직접 관리할 수 있습니다."
+        description="실시간 소스, 심층 리포트, 그리고 아르테미스 와이어 내부 게시 큐를 한 화면에서 운영합니다. 와이어 탭에서는 초안 생성, 승인, 예약, 즉시 게시, 최근 로그를 직접 관리할 수 있습니다."
         icon="signals"
         title="시그널"
         trailing={
@@ -802,9 +803,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                   : '실시간 피드를 준비하고 있습니다.'
                 : activeTab === 'publisher'
                   ? xAutopostState.inProgress
-                    ? 'Artemis Wire 수집기와 스케줄러가 실행 중입니다.'
+                    ? '아르테미스 와이어 수집기와 스케줄러가 실행 중입니다.'
                     : xAutopostState.lastPublishedAt
-                      ? `최근 Wire 게시 ${formatDate(xAutopostState.lastPublishedAt)}`
+                      ? `최근 와이어 게시 ${formatDate(xAutopostState.lastPublishedAt)}`
                       : internalPublisherStatus.detail
                 : schedulerState.inProgress
                   ? '자동 게시글 생성이 실행 중입니다.'
@@ -831,8 +832,8 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
         }
       />
 
-      <div className="signals-toolbar">
-        <div className="chip-wrap">
+      <div className="signals-toolbar signals-toolbar--primary">
+        <div className="chip-wrap signals-tabs">
           <button
             className={`chip ${activeTab === 'feed' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('feed')}
@@ -845,7 +846,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
             onClick={() => setActiveTab('publisher')}
             type="button"
           >
-            Artemis Wire
+            아르테미스 와이어
           </button>
           <button
             className={`chip ${activeTab === 'posts' ? 'is-active' : ''}`}
@@ -855,10 +856,10 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
             심층 리포트
           </button>
         </div>
-        <div className="signals-toolbar__actions">
+        <div className="signals-toolbar__actions signals-toolbar__actions--search">
           <SearchField
             onChange={setQuery}
-            placeholder={activeTab === 'feed' ? '시그널 검색...' : activeTab === 'publisher' ? 'Wire 검색...' : '리포트 검색...'}
+            placeholder={activeTab === 'feed' ? '시그널 검색...' : activeTab === 'publisher' ? '와이어 검색...' : '리포트 검색...'}
             value={query}
           />
         </div>
@@ -866,8 +867,8 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
 
       {activeTab === 'feed' ? (
         <>
-          <div className="signals-toolbar">
-            <div className="chip-wrap">
+          <div className="signals-toolbar signals-toolbar--secondary">
+            <div className="chip-wrap signals-categoryRail">
               {signalCategories.map((item) => (
                 <button
                   key={item}
@@ -886,7 +887,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
             </div>
           </div>
 
-          <section className="panel-card panel-card--muted signals-source-strip">
+          <section className="panel-card panel-card--muted signals-source-strip signals-source-strip--overview">
             <div className="badge-row">
               {sourceSummary.map(([label, count]) => (
                 <span key={label} className="chip chip--soft">
@@ -895,7 +896,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
               ))}
             </div>
             <p>
-              실시간 탭은 원문 소스 목록입니다. 심층 리포트와 Artemis Wire 게시 흐름은 각각 별도 탭에서 이어서 관리합니다.
+              실시간 탭은 원문 소스 목록입니다. 심층 리포트와 아르테미스 와이어 게시 흐름은 각각 별도 탭에서 이어서 관리합니다.
             </p>
           </section>
 
@@ -907,9 +908,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
           ) : null}
 
           {feedLoading && feed.length === 0 ? (
-            <div className="panel-card panel-card--muted">실시간 시그널을 불러오는 중입니다...</div>
+            <div className="panel-card panel-card--muted signals-loadingCard">실시간 시그널을 불러오는 중입니다...</div>
           ) : filteredFeed.length > 0 ? (
-            <div className="signals-feed signals-feed--single">
+            <div className="signals-feed signals-feed--single signals-feed-list">
               {filteredFeed.map((item) => {
                 const translationLabel =
                   item.translationSource === 'codex'
@@ -921,7 +922,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                         : '원문'
 
                 return (
-                  <article key={item.id} className="signal-card signal-card--feed">
+                  <article key={item.id} className="signal-card signal-card--feed signals-feed-card">
                     <div className="signal-card__meta">
                       <div className="badge-row">
                         <span className="chip chip--soft">{item.category}</span>
@@ -944,7 +945,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                     ) : null}
                     <p>{item.summary}</p>
 
-                    <div className="badge-row">
+                    <div className="badge-row signal-card__actions">
                       <button
                         className="ghost-button"
                         onClick={() => {
@@ -968,7 +969,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                         onClick={() => void executeCreateDraftFromSignal(item)}
                         type="button"
                       >
-                        Wire 초안 생성
+                        와이어 초안 생성
                       </button>
                       <button
                         className="primary-button"
@@ -1038,9 +1039,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
           xCrossPostStatus={xCrossPostStatus}
         />
       ) : (
-        <div className="auto-posts-shell">
-          <div className="auto-posts-side">
-            <section className="panel-card">
+        <div className="auto-posts-shell signals-ops-shell">
+          <div className="auto-posts-side signals-ops-side">
+            <section className="panel-card signals-panel signals-panel--overview">
               <div className="panel-card__header">
                 <h2>스케줄러 상태</h2>
                 <span className={`chip ${schedulerState.inProgress ? 'is-active' : 'chip--soft'}`}>
@@ -1087,7 +1088,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
               </div>
             </section>
 
-            <section className="panel-card">
+            <section className="panel-card signals-panel signals-panel--settings">
               <div className="panel-card__header">
                 <h2>자동 생성 설정</h2>
                 <span className="chip chip--soft">{autoPostSettings.generationModel}</span>
@@ -1266,7 +1267,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
               </div>
             </section>
 
-            <section className="panel-card">
+            <section className="panel-card signals-panel signals-panel--list">
               <div className="panel-card__header">
                 <h2>게시글 목록</h2>
                 <span className="chip chip--soft">{filteredPosts.length}개</span>
@@ -1309,7 +1310,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                   ))}
                 </div>
               ) : postsLoading ? (
-                <div className="panel-card panel-card--muted">자동 생성 게시글을 불러오는 중입니다...</div>
+                <div className="panel-card panel-card--muted signals-loadingCard">자동 생성 게시글을 불러오는 중입니다...</div>
               ) : (
                 <EmptyState
                   description="아직 저장된 자동 생성 게시글이 없습니다. 지금 실행을 눌러 첫 배치를 생성하세요."
@@ -1321,7 +1322,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
             </section>
           </div>
 
-          <div className="auto-posts-detail">
+          <div className="auto-posts-detail signals-ops-detail">
             {actionMessage ? (
               <div className="status-banner status-banner--info">
                 <Icon name="spark" size={16} />
@@ -1330,7 +1331,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
             ) : null}
             {selectedPost ? (
               <>
-                <section className="panel-card">
+                <section className="panel-card signals-post-hero">
                   <div className="panel-card__header">
                     <div>
                       <h2>{selectedPost.title}</h2>
@@ -1384,22 +1385,18 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                   </div>
                 </section>
 
-                <section className="panel-card">
+                <section className="panel-card signals-post-body">
                   <div className="panel-card__header">
-                    <h2>HTML 미리보기</h2>
+                    <h2>기사 본문</h2>
                     <span className="chip chip--soft">
                       {selectedPostSummary ? formatDate(selectedPostSummary.updatedAt) : formatDate(selectedPost.updatedAt)}
                     </span>
                   </div>
-                  <iframe
-                    className="auto-post-preview-frame"
-                    srcDoc={selectedPost.html}
-                    title={selectedPost.title}
-                  />
+                  <AutoPostArticle html={selectedPost.html} title={selectedPost.title} />
                 </section>
 
                 <div className="auto-post-detail-grid">
-                  <section className="panel-card">
+                  <section className="panel-card signals-post-support">
                     <div className="panel-card__header">
                       <h2>대표 미디어</h2>
                       <span className="chip chip--soft">{selectedPost.mediaAttachments.length}개</span>
@@ -1443,7 +1440,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                     )}
                   </section>
 
-                  <section className="panel-card">
+                  <section className="panel-card signals-post-support">
                     <div className="panel-card__header">
                       <h2>원문과 로그</h2>
                       <span className="chip chip--soft">{selectedPost.sourceItems.length}개 출처</span>
