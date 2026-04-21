@@ -22,6 +22,11 @@
 
 ## Latest Confirmed State
 
+- Activity now reads more like an inbox surface:
+  - core metrics are summarized up top,
+  - recent execution, event, and publish items are collapsed into one stream,
+  - live issue dossiers are grouped separately,
+  - long English body text is clipped on the default view so the first screen stays clean.
 - Artemis Wire now builds live `dossier` clusters from queue and published entries instead of treating every draft as a separate isolated post.
 - Dossier records now track:
   - linked drafts
@@ -574,3 +579,16 @@
   - long agent chip labels now truncate instead of stretching the rail.
 - Browser verification for this pass now lives under `output/playwright/orchestration-mobile-pass3/`:
   - `orchestration-mobile-pass3.png`
+
+## 2026-04-21 Workspace Overhaul Final
+
+- 사용자가 직접 확인한 문제를 기준으로 화면 구조를 다시 정리했다.
+- 채팅/오케스트레이션/시그널/스킬/활동 화면을 화면별 작업 도구 관점으로 단순화했다.
+- `src/components/ui/FormattedText.tsx`를 추가해 채팅과 오케스트레이션 결과에서 raw markdown(`**`, 리스트, 코드 블록)이 그대로 노출되던 문제를 막았다.
+- `src/state/AppState.tsx`와 `local-bridge/workspace.mjs`에 workspace root fallback을 넣어, 저장된 작업 폴더가 사라져도 기본 작업 폴더로 복귀하도록 보정했다.
+- 스킬 화면은 raw 메타(`name:`/경로) 중심 리스트에서 `아이콘 + 스킬명 + 한 줄 설명 + 토글` 구조로 다시 정리했다.
+- 활동 화면은 카드 더미 대신 `최근 실행 흐름 + 라이브 이슈 묶음` 구조로 줄였다.
+- 시그널 화면은 탭 카피를 `실시간 / 게시 큐 / 생성 글`로 정리했고, 발행 패널은 `발행 운영 / 검토 대기 / 주제 묶음 / 발행 기록` 중심으로 다시 구성했다.
+- 오케스트레이션은 기존 최소 표면 패스를 유지하면서 빌드 경고와 라우팅 보조 상태를 정리했다.
+- 최종 검증 캡처는 `output/playwright/workspace-overhaul-final/`에 저장했다.
+- 인라인 이미지 전송 규칙은 유지한다: 긴 경로 금지, 짧은 경로 markdown 이미지만 사용.

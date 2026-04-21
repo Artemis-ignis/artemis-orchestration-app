@@ -10,6 +10,7 @@ import {
   type AiStreamMetaEvent,
 } from '../../lib/aiRoutingClient'
 import { formatDate, formatFriendlyModelName, providerLabel } from '../../crewPageHelpers'
+import { FormattedText } from '../../components/ui/FormattedText'
 import { Icon } from '../../icons'
 import { useArtemisApp } from '../../state/context'
 import type { AgentItem } from '../../state/types'
@@ -110,7 +111,7 @@ function MessageCard({
             <span>{formatDate(createdAt)}</span>
           </div>
         ) : null}
-        <p>{text}</p>
+        <FormattedText className="message-card__content" text={text} />
         {role === 'assistant' && routingMeta && hasRoutingFallback ? (
           <div className="message-routeMeta">
             <button

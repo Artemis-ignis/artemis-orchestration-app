@@ -83,8 +83,8 @@ function buildPromptHistory(
   messages: Array<{ role: string; text: string }>,
   limit: number,
 ): Array<{ role: 'master'; text: string }> {
-  // 이전 assistant 응답은 다음 모델 호출에 섞이지 않도록 하고,
-  // 사용자의 최근 요청만 컨텍스트로 전달합니다.
+  // ??怨몄쓧 assistant ??얜Ŧ堉?? ???깅쾳 嶺뚮ㅄ維???筌뤾쑵?????濡?턄嶺뚯솘? ???낆┣?????겶?
+  // ??????踰?嶺뚣끉裕????븐슙?뺟춯????쳜????덈콦???熬곣뫀堉??紐껊퉵??
   return messages
     .filter((message) => message.role === 'master')
     .slice(-limit)
@@ -95,11 +95,11 @@ function buildPromptHistory(
 }
 
 const RUN_PROGRESS_LOG_STEPS = [
-  { delayMs: 2_000, message: '실행기가 요청을 확인하는 중입니다.' },
-  { delayMs: 6_000, message: '응답 초안을 준비하는 중입니다.' },
-  { delayMs: 14_000, message: '최종 응답을 모으는 중입니다. 조금만 기다려 주세요.' },
-  { delayMs: 30_000, message: '지연이 길어지고 있습니다. 완료될 때까지 계속 상태를 갱신합니다.' },
-  { delayMs: 60_000, message: '응답이 늦어지고 있습니다. 타임아웃 전까지 대기합니다.' },
+  { delayMs: 2_000, message: '???덈뺄?リ옇?? ??븐슙????筌먦끉逾??濡ル츎 繞벿살탳????덈펲.' },
+  { delayMs: 6_000, message: '??얜Ŧ堉??貫?녽뇡??繞벿뮻???들뇡??繞벿살탳????덈펲.' },
+  { delayMs: 14_000, message: '嶺뚣끉裕뉏펺???얜Ŧ堉??嶺뚮ㅄ維???繞벿살탳????덈펲. ?브퀗??臾뺤춹??リ옇?????낅슣?섋땻??' },
+  { delayMs: 30_000, message: '嶺뚯솘???⑥щ턄 ?ル梨룟젆源띿???????곕????덈펲. ?熬곣뫁???????긺춯?뼿 ??ｌ뫒????⑤객臾???띠룄????紐껊퉵??' },
+  { delayMs: 60_000, message: '??얜Ŧ堉?????됯퉵彛??????곕????덈펲. ???熬곣뫖????熬곥룊?긺춯?뼿 ???リ옇?ч뜮????덈펲.' },
 ]
 
 function shouldAttachSignalsContext(task: string) {
@@ -113,7 +113,7 @@ function buildSignalsContext(
   }>,
 ) {
   return items
-    .map((item, index) => `${index + 1}. ${item.title}\n- 요약: ${item.summary}`)
+    .map((item, index) => `${index + 1}. ${item.title}\n- ??븐슜?? ${item.summary}`)
     .join('\n')
 }
 
@@ -145,7 +145,7 @@ function resolveOfficialProviderId(baseUrl: string) {
 
 function describeRoutingMeta(meta: AiStreamMetaEvent) {
   if (meta.routing_mode === 'manual' && meta.top_candidate) {
-    return '직접 호출 - ' + meta.top_candidate.provider_label + ' - ' + meta.top_candidate.display_name
+    return '직접 호출 · ' + meta.top_candidate.provider_label + ' · ' + meta.top_candidate.display_name
   }
 
   return meta.routing_mode + ' · 후보 ' + meta.candidate_count + '개'
@@ -161,7 +161,6 @@ function describeRoutingAttemptFailure(attempt: AiStreamAttemptEvent) {
   const reason = attempt.fallback_reason || attempt.error_message || '다음 후보로 전환'
   return `${attempt.attempt_index}차 실패 · ${attempt.provider} · ${label} · ${reason}`
 }
-
 function loadWorkspacePrefs() {
   if (typeof window === 'undefined') {
     return { rootPath: '', currentPath: '', showSystemEntries: false }
@@ -203,7 +202,7 @@ function saveWorkspacePrefs(rootPath: string, currentPath: string, showSystemEnt
         }),
     )
   } catch (error) {
-    console.warn('Artemis ?묒뾽 ?대뜑 ?곹깭 ??μ뿉 ?ㅽ뙣?덉뒿?덈떎.', error)
+    console.warn('Artemis ??????????????ㅺ컼???????묎덩?????됰꽡???怨?????덊렡.', error)
   }
 }
 
@@ -315,7 +314,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       applyWorkspaceListing(listing)
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : '?묒뾽 ?대뜑瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??'
+        error instanceof Error ? error.message : '???????????얜봾????됰씭????? 癲ル슢履뉑쾮?彛??????'
       setWorkspaceError(message)
     } finally {
       setWorkspaceLoading(false)
@@ -333,7 +332,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       applyWorkspaceListing(listing)
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : '?묒뾽 ?대뜑 ?곌껐???ㅽ뙣?덉뒿?덈떎.'
+        error instanceof Error ? error.message : '??????????????ㅼ뒦???????됰꽡???怨?????덊렡.'
       setWorkspaceError(message)
       throw error
     } finally {
@@ -359,7 +358,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       setWorkspaceShowSystemEntries(visible)
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : '?묒뾽 ?대뜑 ?쒖떆 ?듭뀡??諛섏쁺?섏? 紐삵뻽?듬땲??'
+        error instanceof Error ? error.message : '?????????????筌?六????????袁⑸즵????? 癲ル슢履뉑쾮?彛??????'
       setWorkspaceError(message)
     } finally {
       setWorkspaceLoading(false)
@@ -436,7 +435,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       const nextHealth = await fetchBridgeHealth(state.settings.bridgeUrl)
       applyBridgeHealthSuccess(nextHealth)
     } catch (error) {
-      applyBridgeHealthFailure(error, '紐⑤뜽 釉뚮━吏 ?곹깭瑜??뺤씤?섏? 紐삵뻽?듬땲??')
+      applyBridgeHealthFailure(error, '癲ル슢?꾤땟?????怨쀫뮛??⑥궡?? ???ㅺ컼????嶺뚮Ĳ?됮??? 癲ル슢履뉑쾮?彛??????')
     }
   }
 
@@ -449,7 +448,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       })
       setBridgeError(null)
     } catch (error) {
-      setBridgeError(error instanceof Error ? error.message : '?ㅽ궗 紐⑸줉??遺덈윭?ㅼ? 紐삵뻽?듬땲??')
+      setBridgeError(error instanceof Error ? error.message : '???袁る?癲ル슢?꾤땟戮⑤뭄????됰씭????? 癲ル슢履뉑쾮?彛??????')
     }
   }
 
@@ -471,7 +470,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       if (healthResult.status === 'fulfilled') {
         applyBridgeHealthSuccess(healthResult.value)
       } else {
-        applyBridgeHealthFailure(healthResult.reason, '珥덇린 ?곌껐 ?곹깭瑜?以鍮꾪븯吏 紐삵뻽?듬땲??')
+        applyBridgeHealthFailure(healthResult.reason, '?縕?猿녿뎨????ㅼ뒦?????ㅺ컼???濚욌꼬裕뼘????ㅻ눀?壤? 癲ル슢履뉑쾮?彛??????')
       }
 
       if (skillResult.status === 'fulfilled') {
@@ -480,7 +479,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           items: skillResult.value.items.map((item) => ({ ...item, enabled: false })),
         })
       } else {
-        console.warn('Artemis ?ㅽ궗 紐⑸줉??遺덈윭?ㅼ? 紐삵뻽?듬땲??', skillResult.reason)
+        console.warn('Artemis ???袁る?癲ル슢?꾤땟戮⑤뭄????됰씭????? 癲ル슢履뉑쾮?彛??????', skillResult.reason)
       }
 
       if (aiSettingsResult.status === 'fulfilled') {
@@ -517,42 +516,45 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       setWorkspaceShowSystemEntries(initialShowSystemEntries)
 
       if (!initialRoot) {
-        setWorkspaceError('?묒뾽 ?대뜑瑜??뺤씤?섏? 紐삵뻽?듬땲??')
+        setWorkspaceError('?臾믩씜 ???묊몴?筌≪뼚? 筌륁궢六??щ빍??')
         return
       }
 
-      try {
-        const listing = await fetchWorkspaceListing({
-          bridgeUrl: state.settings.bridgeUrl,
-          rootPath: initialRoot,
-          currentPath: initialPath,
-          includeSystem: initialShowSystemEntries,
-        })
-        if (active) {
-          applyWorkspaceListing(listing)
-        }
-      } catch (error) {
+      const workspaceCandidates = [
+        { rootPath: initialRoot, currentPath: initialPath },
+        { rootPath: initialRoot, currentPath: '' },
+        ...(fallbackRoot && fallbackRoot !== initialRoot
+          ? [{ rootPath: fallbackRoot, currentPath: '' }]
+          : []),
+      ]
+
+      let lastWorkspaceError: unknown = null
+
+      for (const candidate of workspaceCandidates) {
         try {
           const listing = await fetchWorkspaceListing({
             bridgeUrl: state.settings.bridgeUrl,
-            rootPath: initialRoot,
-            currentPath: '',
+            rootPath: candidate.rootPath,
+            currentPath: candidate.currentPath,
             includeSystem: initialShowSystemEntries,
           })
           if (active) {
             applyWorkspaceListing(listing)
           }
-        } catch (fallbackError) {
-          if (active) {
-            setWorkspaceError(
-              fallbackError instanceof Error
-                ? fallbackError.message
-                : '?묒뾽 ?대뜑瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??',
-            )
-          }
-          console.warn('Artemis ?묒뾽 ?대뜑 珥덇린?붿뿉 ?ㅽ뙣?덉뒿?덈떎.', error)
+          return
+        } catch (error) {
+          lastWorkspaceError = error
         }
       }
+
+      if (active) {
+        setWorkspaceError(
+          lastWorkspaceError instanceof Error
+            ? lastWorkspaceError.message
+            : '?臾믩씜 ???묊몴?筌≪뼚? 筌륁궢六??щ빍??',
+        )
+      }
+
     }
 
     void bootstrap()
@@ -702,7 +704,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           const finalPayload = finalEvent as AiStreamFinalEvent | null
 
           if (!finalPayload) {
-            throw new Error('?ㅽ듃由щ컢? ?곌껐?먯?留?理쒖쥌 ?묐떟??留덈Т由ы븯吏 紐삵뻽?듬땲??')
+            throw new Error('????덉쉐?域밸Ŧ留⑶뜮?? ???ㅼ뒦????癲?癲ル슔?됭짆?륂렭????쑩?젆??癲ル슢??袁ъÞ?域밸Ŧ肉ョ뵳?異?堉온 癲ル슢履뉑쾮?彛??????')
           }
 
           const routingMeta: AiRoutingMessageMeta = {
@@ -743,14 +745,14 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           selectedAgent?.provider === 'openai-compatible' &&
           !state.apiKeys.find((item) => item.id === selectedAgent.apiKeyId)
         ) {
-          throw new Error('???먯씠?꾪듃??API ?ㅺ? ?꾩슂?⑸땲?? ?ㅼ젙?먯꽌 癒쇱? ?곌껐??二쇱꽭??')
+          throw new Error('????????ш낄援θキ??API ??? ??ш끽維???筌뤾퍓??? ???源놁젳??????沃섅굥?? ???ㅼ뒦?????낆뒩??뗫빝??')
         }
 
         if (
           selectedAgent?.provider === 'anthropic' &&
           !state.apiKeys.find((item) => item.id === selectedAgent.apiKeyId)
         ) {
-          throw new Error('Claude ?먯씠?꾪듃??API ?ㅺ? ?꾩슂?⑸땲?? ?ㅼ젙?먯꽌 癒쇱? ?곌껐??二쇱꽭??')
+          throw new Error('Claude ??????ш낄援θキ??API ??? ??ш끽維???筌뤾퍓??? ???源놁젳??????沃섅굥?? ???ㅼ뒦?????낆뒩??뗫빝??')
         }
 
         const response = await executeModelPrompt({
@@ -784,7 +786,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         await refreshWorkspace(workspaceCurrentPath)
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : '紐⑤뜽 ?ㅽ뻾 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.'
+          error instanceof Error ? error.message : '癲ル슢?꾤땟???????덈틖 濚?????곸씔??좊읈? ?袁⑸즵獒뺣뎾????怨?????덊렡.'
         dispatch({ type: 'APPEND_CHAT_ERROR', prompt: nextPrompt, error: message })
       } finally {
         setIsGenerating(false)
@@ -831,7 +833,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         agent.provider === 'openai-compatible' &&
         !state.apiKeys.find((item) => item.id === agent.apiKeyId)
       ) {
-        setBridgeError('???먯씠?꾪듃??API ?ㅺ? ?꾩슂?⑸땲?? ?ㅼ젙?먯꽌 癒쇱? ?곌껐??二쇱꽭??')
+        setBridgeError('????????ш낄援θキ??API ??? ??ш끽維???筌뤾퍓??? ???源놁젳??????沃섅굥?? ???ㅼ뒦?????낆뒩??뗫빝??')
         return
       }
 
@@ -839,7 +841,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         agent.provider === 'anthropic' &&
         !state.apiKeys.find((item) => item.id === agent.apiKeyId)
       ) {
-        setBridgeError('Claude ?먯씠?꾪듃??API ?ㅺ? ?꾩슂?⑸땲?? ?ㅼ젙?먯꽌 癒쇱? ?곌껐??二쇱꽭??')
+        setBridgeError('Claude ??????ш낄援θキ??API ??? ??ш끽維???筌뤾퍓??? ???源놁젳??????沃섅굥?? ???ㅼ뒦?????낆뒩??뗫빝??')
         return
       }
 
@@ -860,7 +862,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
             id: createId('log'),
             createdAt: startedAt,
             level: 'info',
-            message: `${agent.name} 실행을 시작했습니다.`,
+            message: `${agent.name} ???덈뺄????戮곗굚???곕????덈펲.`,
           },
         ],
       }
@@ -890,7 +892,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         let taskPrompt = nextTask
 
         if (shouldAttachSignalsContext(nextTask)) {
-          pushRunLog('info', '최신 신호를 확인하고 있습니다.')
+          pushRunLog('info', '嶺뚣끉裕????ル쪇源???筌먦끉逾???겶????곕????덈펲.')
           try {
             const signalFeed = await fetchSignalsFeed({
               bridgeUrl: state.settings.bridgeUrl,
@@ -901,17 +903,17 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
               taskPrompt = [
                 nextTask,
                 '',
-                '[참고 신호]',
+                '[嶺뚣볝늾????ル쪇源?',
                 buildSignalsContext(contextItems),
                 '',
-                '위 신호를 참고해 최신 판단만 짧고 선명하게 정리해 주세요.',
+                '????ル쪇源??嶺뚣볝늾???嶺뚣끉裕?????堉딁춯?嶺뚯쉧猷????ル봿援???우벟 ?筌먲퐘遊???낅슣?섋땻??',
               ].join('\n')
-              pushRunLog('info', `최신 신호 ${contextItems.length}건을 참고 문맥으로 연결했습니다.`)
+              pushRunLog('info', `嶺뚣끉裕????ル쪇源?${contextItems.length}濾곌쑬???嶺뚣볝늾????쒖굡???怨쀬Ŧ ??⑤슡????곕????덈펲.`)
             } else {
-              pushRunLog('info', '연결할 최신 신호가 없어 현재 요청만 그대로 실행합니다.')
+              pushRunLog('info', '??⑤슡???嶺뚣끉裕????ル쪇源덃뤆?쎛 ??怨룹꽑 ?熬곣뫗????븐슙?뺟춯??잙갭梨??????덈뺄??紐껊퉵??')
             }
           } catch {
-            pushRunLog('info', '최신 신호를 불러오지 못해 현재 요청만 그대로 실행합니다.')
+            pushRunLog('info', '嶺뚣끉裕????ル쪇源???釉띾쐞???? 嶺뚮쪇沅?뜮??熬곣뫗????븐슙?뺟춯??잙갭梨??????덈뺄??紐껊퉵??')
           }
         }
 
@@ -969,7 +971,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           const finalPayload = finalEvent as AiStreamFinalEvent | null
 
           if (!finalPayload) {
-            throw new Error('?ㅼ??ㅽ듃?덉씠???쇱슦?곌? 理쒖쥌 ?묐떟??留뚮뱾吏 紐삵뻽?듬땲??')
+            throw new Error('???????덉쉐???源낇꼧????繹먮끏裕??? 癲ル슔?됭짆?륂렭????쑩?젆??癲ル슢???????? 癲ル슢履뉑쾮?彛??????')
           }
 
           dispatch({
@@ -996,11 +998,11 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           return
         }
 
-        pushRunLog('info', `${agent.name} ?ㅽ뻾湲곗뿉 ?묒뾽???꾨떖?덉뒿?덈떎.`)
+        pushRunLog('info', `${agent.name} ????덈틖??れ삀?節덇덩??????????ш끽維????怨?????덊렡.`)
         if (agent.provider === 'codex' || agent.provider === 'ollama') {
           pushRunLog(
             'info',
-            '???ㅽ뻾湲곕뒗 寃곌낵瑜???踰덉뿉 諛섑솚?⑸땲?? 理쒖쥌 ?듬? ?꾧퉴吏??吏꾪뻾 濡쒓렇媛 癒쇱? 媛깆떊?⑸땲??',
+            '??????덈틖??れ삀????濡ろ뜏???醫듽걫????類???산덩??袁⑸즵????筌뤾퍓??? 癲ル슔?됭짆?륂렭???? ??ш낄猷?湲븐땡?堉온??癲ル슣???몄춿??棺??짆??癒?씀? ?沃섅굥?? ??좊즲????筌뤾퍓???',
           )
         }
 
@@ -1048,7 +1050,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         await refreshWorkspace(workspaceCurrentPath)
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : '?먯씠?꾪듃 ?ㅽ뻾 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.'
+          error instanceof Error ? error.message : '??????ш낄援θキ?????덈틖 濚?????곸씔??좊읈? ?袁⑸즵獒뺣뎾????怨?????덊렡.'
         dispatch({ type: 'FAIL_AGENT_RUN', runId, agentId, error: message })
       }
     },

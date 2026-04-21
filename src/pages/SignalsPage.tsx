@@ -58,6 +58,18 @@ import type {
 
 type SignalsTab = 'feed' | 'posts' | 'publisher'
 
+const SIGNALS_TAB_LABEL: Record<SignalsTab, string> = {
+  feed: '실시간',
+  publisher: '게시 큐',
+  posts: '생성 글',
+}
+
+const SIGNALS_SEARCH_PLACEHOLDER: Record<SignalsTab, string> = {
+  feed: '시그널 검색',
+  publisher: '초안, 게시물 검색',
+  posts: '생성 글 검색',
+}
+
 function buildSignalChatPrompt(item: SignalFeedItem) {
   const lines = [
     '다음 시그널을 바탕으로 핵심 내용과 바로 할 수 있는 다음 조치를 정리해줘.',
@@ -293,7 +305,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
         setSelectedDossierId(nextSelectedDossierId)
       } catch (nextError) {
         if (!silent) {
-          setActionMessage(nextError instanceof Error ? nextError.message : '아르테미스 와이어 상태를 불러오지 못했습니다.')
+          setActionMessage(nextError instanceof Error ? nextError.message : '게시 큐 상태를 불러오지 못했습니다.')
         }
       } finally {
         if (!silent) {
@@ -685,15 +697,15 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       })
       setActionMessage(
         response.createdCount > 0
-          ? `${response.createdCount}개의 아르테미스 와이어 초안을 큐에 추가했습니다.`
+          ? `${response.createdCount}개의 초안을 큐에 추가했습니다.`
           : response.skippedCount > 0
-            ? `${response.skippedCount}개의 후보가 guardrail에 걸려 건너뛰었습니다.`
+            ? `${response.skippedCount}개의 후보를 기준에 따라 제외했습니다.`
             : '새로 큐에 넣을 초안이 없었습니다.',
       )
       await loadXAutopost({ focusDraftId: response.items[0]?.id ?? selectedDraftId ?? null })
       setActiveTab('publisher')
     } catch (nextError) {
-      setActionMessage(nextError instanceof Error ? nextError.message : '게시 초안 생성에 실패했습니다.')
+      setActionMessage(nextError instanceof Error ? nextError.message : '초안 생성에 실패했습니다.')
     } finally {
       setPostActionLoading(false)
     }
@@ -720,9 +732,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
           response.publishers[0] ??
           defaultPublisherRuntimeStatus(),
       )
-      setActionMessage('아르테미스 와이어 설정을 저장했습니다.')
+      setActionMessage('게시 큐 설정을 저장했습니다.')
     } catch (nextError) {
-      setActionMessage(nextError instanceof Error ? nextError.message : '아르테미스 와이어 설정 저장에 실패했습니다.')
+      setActionMessage(nextError instanceof Error ? nextError.message : '게시 큐 설정 저장에 실패했습니다.')
     } finally {
       setPostActionLoading(false)
     }
@@ -773,8 +785,8 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
         response.item.status === 'scheduled' && response.detail
           ? response.detail
           : response.simulated
-          ? '실제 인증이 없어 dry-run으로 게시 시뮬레이션을 완료했습니다.'
-          : '아르테미스 와이어 게시를 완료했습니다.',
+          ? '실제 인증이 없어 시험 모드로 처리했습니다.'
+          : '게시를 완료했습니다.',
       )
       await loadXAutopost({
         focusDraftId: response.item.status === 'published' ? null : response.item.id,
@@ -791,7 +803,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
   return (
     <section className="page signals-page">
       <PageIntro
-        description="실시간 소스, 심층 리포트, 그리고 아르테미스 와이어 내부 게시 큐를 한 화면에서 운영합니다. 와이어 탭에서는 초안 생성, 승인, 예약, 즉시 게시, 최근 로그를 직접 관리할 수 있습니다."
+        description="실시간 시그널, 게시 큐, 생성 글을 한곳에서 확인합니다."
         icon="signals"
         title="시그널"
         trailing={
@@ -799,19 +811,19 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
             <span className="subtle-label">
               {activeTab === 'feed'
                 ? generatedAt
-                  ? `실시간 피드 갱신 ${formatDate(generatedAt)}`
-                  : '실시간 피드를 준비하고 있습니다.'
+                  ? `갱신 ${formatDate(generatedAt)}`
+                  : '피드 불러오는 중'
                 : activeTab === 'publisher'
                   ? xAutopostState.inProgress
-                    ? '아르테미스 와이어 수집기와 스케줄러가 실행 중입니다.'
+                    ? '게시 큐 실행 중'
                     : xAutopostState.lastPublishedAt
-                      ? `최근 와이어 게시 ${formatDate(xAutopostState.lastPublishedAt)}`
-                      : internalPublisherStatus.detail
+                      ? `최근 게시 ${formatDate(xAutopostState.lastPublishedAt)}`
+                      : '대기 중'
                 : schedulerState.inProgress
-                  ? '자동 게시글 생성이 실행 중입니다.'
+                  ? '생성 중'
                   : schedulerState.lastSuccessAt
-                    ? `마지막 성공 ${formatDate(schedulerState.lastSuccessAt)}`
-                    : '자동 게시글 상태를 불러오는 중입니다.'}
+                    ? `최근 생성 ${formatDate(schedulerState.lastSuccessAt)}`
+                    : '생성 상태 불러오는 중'}
             </span>
             <button
               className="ghost-button"
@@ -839,27 +851,27 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
             onClick={() => setActiveTab('feed')}
             type="button"
           >
-            실시간 시그널
+            {SIGNALS_TAB_LABEL.feed}
           </button>
           <button
             className={`chip ${activeTab === 'publisher' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('publisher')}
             type="button"
           >
-            아르테미스 와이어
+            {SIGNALS_TAB_LABEL.publisher}
           </button>
           <button
             className={`chip ${activeTab === 'posts' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('posts')}
             type="button"
           >
-            심층 리포트
+            {SIGNALS_TAB_LABEL.posts}
           </button>
         </div>
         <div className="signals-toolbar__actions signals-toolbar__actions--search">
           <SearchField
             onChange={setQuery}
-            placeholder={activeTab === 'feed' ? '시그널 검색...' : activeTab === 'publisher' ? '와이어 검색...' : '리포트 검색...'}
+            placeholder={SIGNALS_SEARCH_PLACEHOLDER[activeTab]}
             value={query}
           />
         </div>
@@ -882,7 +894,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
             </div>
             <div className="signals-toolbar__actions">
               <button className="primary-button" onClick={() => void executeRunNow()} type="button">
-                지금 게시글 생성
+                글 생성
               </button>
             </div>
           </div>
@@ -895,9 +907,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                 </span>
               ))}
             </div>
-            <p>
-              실시간 탭은 원문 소스 목록입니다. 심층 리포트와 아르테미스 와이어 게시 흐름은 각각 별도 탭에서 이어서 관리합니다.
-            </p>
+            <p>원문 피드만 빠르게 확인하는 탭입니다.</p>
           </section>
 
           {feedError ? (
@@ -914,7 +924,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
               {filteredFeed.map((item) => {
                 const translationLabel =
                   item.translationSource === 'codex'
-                    ? 'Codex 번역'
+                    ? '기본 번역'
                     : item.translationSource === 'ollama'
                       ? '로컬 번역'
                       : item.translationSource === 'google-gtx'
@@ -954,14 +964,14 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                         }}
                         type="button"
                       >
-                        채팅으로 보내기
+                        채팅
                       </button>
                       <button
                         className="ghost-button"
                         onClick={() => setActiveTab('posts')}
                         type="button"
                       >
-                        게시글 탭 보기
+                        생성 글
                       </button>
                       <button
                         className="ghost-button"
@@ -969,14 +979,14 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                         onClick={() => void executeCreateDraftFromSignal(item)}
                         type="button"
                       >
-                        와이어 초안 생성
+                        큐에 추가
                       </button>
                       <button
                         className="primary-button"
                         onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
                         type="button"
                       >
-                        원문 열기
+                        원문
                       </button>
                     </div>
                   </article>
@@ -1090,7 +1100,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
 
             <section className="panel-card signals-panel signals-panel--settings">
               <div className="panel-card__header">
-                <h2>자동 생성 설정</h2>
+                <h2>생성 설정</h2>
                 <span className="chip chip--soft">{autoPostSettings.generationModel}</span>
               </div>
               <div className="auto-post-settings-grid">
@@ -1154,7 +1164,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                 </label>
 
                 <label className="field">
-                  <span>스크린샷 fallback</span>
+                  <span>스크린샷 보조</span>
                   <select
                     value={settingsDraft.screenshotFallback ? 'on' : 'off'}
                     onChange={(event) =>
@@ -1269,7 +1279,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
 
             <section className="panel-card signals-panel signals-panel--list">
               <div className="panel-card__header">
-                <h2>게시글 목록</h2>
+                <h2>목록</h2>
                 <span className="chip chip--soft">{filteredPosts.length}개</span>
               </div>
 
@@ -1292,7 +1302,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                       {item.thumbnail ? (
                         <img className="auto-post-card__thumb" src={item.thumbnail} alt="" />
                       ) : (
-                        <div className="auto-post-card__thumb auto-post-card__thumb--empty">No media</div>
+                          <div className="auto-post-card__thumb auto-post-card__thumb--empty">미디어 없음</div>
                       )}
                       <div className="auto-post-card__body">
                         <div className="card-topline">
@@ -1387,7 +1397,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
 
                 <section className="panel-card signals-post-body">
                   <div className="panel-card__header">
-                    <h2>기사 본문</h2>
+                    <h2>본문</h2>
                     <span className="chip chip--soft">
                       {selectedPostSummary ? formatDate(selectedPostSummary.updatedAt) : formatDate(selectedPost.updatedAt)}
                     </span>

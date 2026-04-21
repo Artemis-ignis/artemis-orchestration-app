@@ -1194,6 +1194,30 @@
   background: linear-gradient(180deg, rgba(81, 13, 18, 0.96), rgba(46, 8, 12, 0.98));
 }
 
+.page--chat-modern .message-card__content {
+  max-width: 58ch;
+}
+
+.page--chat-modern .message-card--master .message-card__content {
+  max-width: 42ch;
+}
+
+.page--chat-modern .message-card__content .ui-formatted {
+  gap: 0.72rem;
+}
+
+.page--chat-modern .message-card__content .ui-formatted p,
+.page--chat-modern .message-card__content .ui-formatted li {
+  color: inherit;
+}
+
+@media (max-width: 720px) {
+  .page--chat-modern .message-card__content,
+  .page--chat-modern .message-card--master .message-card__content {
+    max-width: none;
+  }
+}
+
 .page--chat-modern .primary-icon--send {
   box-shadow: 0 12px 28px rgba(112, 0, 8, 0.32);
 }

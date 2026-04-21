@@ -64,7 +64,7 @@ export function defaultPublisherRuntimeStatus(): PublisherRuntimeStatus {
     enabled: false,
     configured: false,
     ready: false,
-    detail: '아르테미스 와이어 게시기 상태를 아직 확인하지 못했습니다.',
+    detail: '퍼블리셔 상태를 아직 확인하지 못했습니다.',
   }
 }
 
@@ -92,11 +92,11 @@ export function draftStatusLabel(status: PublisherDraft['status']) {
     case 'published':
       return '게시됨'
     case 'disabled':
-      return '비활성'
+      return '중지됨'
     case 'failed':
       return '실패'
     case 'skipped':
-      return '건너뜀'
+      return '제외됨'
     default:
       return '초안'
   }
@@ -116,11 +116,11 @@ export function publisherModeLabel(mode: PublisherSettings['mode']) {
 export function summaryTypeLabel(summaryType: PublisherDraft['summaryType'] | PublishedPost['summaryType']) {
   switch (summaryType) {
     case 'paper-intro':
-      return '논문 소개형'
+      return '논문 소개'
     case 'brief-points':
-      return '핵심 포인트형'
+      return '핵심 포인트'
     default:
-      return '속보형'
+      return '속보 요약'
   }
 }
 
@@ -142,6 +142,6 @@ export function dossierStatusLabel(status: PublisherDossier['status']) {
     case 'tracking':
       return '추적 중'
     default:
-      return '새 이슈'
+      return '새 묶음'
   }
 }

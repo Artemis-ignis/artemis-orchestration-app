@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { PageId } from '../../crewData'
 import { EmptyState, DisclosureSection } from '../../crewPageShared'
 import { changeTypeLabel, executionProviderLabel, formatDate, formatFriendlyModelName } from '../../crewPageHelpers'
+import { FormattedText } from '../../components/ui/FormattedText'
 import { NoticeBanner, PanelCard, SectionHeader, SplitPane, StatusPill, Toolbar } from '../../components/ui/primitives'
 
 export function OrchestrationStage({
@@ -49,7 +50,7 @@ export function OrchestrationAlerts({
           key={alert.key}
           action={
             alert.actionLabel && alert.actionPage
-              ? { label: alert.actionLabel, onClick: () => onNavigate(alert.actionPage as PageId) }
+              ? { label: alert.actionLabel, onClick: () => onNavigate(alert.actionPage!) }
               : undefined
           }
           tone={alert.tone}
@@ -103,20 +104,9 @@ export function OrchestrationResultsPanel({
       <SectionHeader
         title="결과"
         description={sessionRunning ? hint : undefined}
-        actions={
-          <StatusPill tone={sessionRunning ? 'accent' : 'muted'}>
-            {sessionRunning ? '진행 중' : '최근 세션'}
-          </StatusPill>
-        }
+        actions={<StatusPill tone={sessionRunning ? 'accent' : 'muted'}>{sessionRunning ? '진행 중' : '최근 세션'}</StatusPill>}
       />
-      {sessionHasResults ? (
-        cards
-      ) : (
-        <EmptyState
-          title="첫 응답을 기다리는 중입니다"
-          description="실행이 시작되면 각 모델의 결과가 이 영역으로 바로 쌓입니다."
-        />
-      )}
+      {cards}
     </PanelCard>
   )
 }
@@ -140,6 +130,9 @@ export function OrchestrationResultCard({
   body: string
   logs?: Array<{ id: string; createdAt: string; message: string; level: 'info' | 'success' | 'error' }>
 }) {
+  const tone =
+    statusLabel === '실행 중' ? 'accent' : statusLabel === '응답 완료' ? 'success' : statusLabel === '실행 오류' ? 'warning' : 'muted'
+
   return (
     <article className="orchestration-run-card">
       <div className="orchestration-run-card__header">
@@ -147,16 +140,16 @@ export function OrchestrationResultCard({
           <strong>{title}</strong>
           <span>{provider}</span>
         </div>
-        <StatusPill tone={statusLabel === '실행 중' ? 'accent' : statusLabel === '응답 완료' ? 'success' : 'muted'}>
-          {statusLabel}
-        </StatusPill>
+        <StatusPill tone={tone}>{statusLabel}</StatusPill>
       </div>
       <div className="orchestration-run-card__meta">
         <StatusPill tone="muted">{formatFriendlyModelName(model)}</StatusPill>
         {startedAt ? <StatusPill tone="muted">{formatDate(startedAt)}</StatusPill> : null}
         {elapsedLabel ? <StatusPill tone="muted">{elapsedLabel}</StatusPill> : null}
       </div>
-      <div className="orchestration-run-card__body">{body}</div>
+      <div className="orchestration-run-card__body">
+        <FormattedText text={body} />
+      </div>
       {logs?.length ? (
         <div className="orchestration-run-card__logs">
           {logs.map((log) => (
@@ -201,10 +194,10 @@ export function OrchestrationDetails({
   statusTiles: ReactNode
 }) {
   return (
-    <DisclosureSection className="disclosure--soft" title="상세 보기">
+    <DisclosureSection className="disclosure--soft" title="자세히 보기">
       <div className="orchestration-detail-grid">
         <section className="orchestration-detail-block">
-          <SectionHeader title="선택 모델" actions={<StatusPill tone="muted">{selectedAgents.length}개</StatusPill>} />
+          <SectionHeader title="선택한 모델" actions={<StatusPill tone="muted">{selectedAgents.length}개</StatusPill>} />
           <div className="chip-wrap">
             {selectedAgents.length > 0 ? (
               selectedAgents.map((agent) => (
@@ -213,16 +206,16 @@ export function OrchestrationDetails({
                 </StatusPill>
               ))
             ) : (
-              <StatusPill tone="muted">선택한 모델 없음</StatusPill>
+              <StatusPill tone="muted">선택된 모델 없음</StatusPill>
             )}
           </div>
           <div className="stack-grid stack-grid--compact orchestration-detail-stats">
             <div className="summary-row">
-              <span>구독 신호</span>
+              <span>구독 중인 시그널</span>
               <strong>{signalCount}개</strong>
             </div>
             <div className="summary-row">
-              <span>활성 도구</span>
+              <span>활성 스킬</span>
               <strong>{activeToolCount}개</strong>
             </div>
           </div>
@@ -250,8 +243,7 @@ export function OrchestrationDetails({
               <div className="summary-row">
                 <span>최근 실제 실행</span>
                 <strong>
-                  {executionProviderLabel(latestAgentExecution.provider)} ·{' '}
-                  {formatFriendlyModelName(latestAgentExecution.model)}
+                  {executionProviderLabel(latestAgentExecution.provider)} · {formatFriendlyModelName(latestAgentExecution.model)}
                 </strong>
               </div>
               <div className="chip-wrap">
@@ -272,7 +264,7 @@ export function OrchestrationDetails({
           ) : (
             <EmptyState
               title="아직 실제 실행 기록이 없습니다"
-              description="병렬 실행을 한 번 돌리면 최근 실행 결과와 변경 파일이 여기에 모입니다."
+              description="병렬 실행을 시작하면 최근 결과와 변경 파일이 여기에 쌓입니다."
             />
           )}
 
@@ -285,7 +277,7 @@ export function OrchestrationDetails({
                     right={<small>{formatDate(run.startedAt)}</small>}
                     className="run-card__topline"
                   />
-                  <p>{run.output || '아직 결과가 기록되지 않았습니다.'}</p>
+                  <FormattedText text={run.output || '아직 결과가 기록되지 않았습니다.'} />
                   <div className="run-card__logs">
                     {run.logs.slice(-2).map((log) => (
                       <div key={log.id} className={`run-log run-log--${log.level}`}>

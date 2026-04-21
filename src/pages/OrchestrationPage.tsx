@@ -39,10 +39,10 @@ function formatElapsedSeconds(totalSeconds: number) {
 
 function runningHint(provider: string) {
   if (provider === 'codex' || provider === 'ollama') {
-    return '이 실행기는 토큰을 조금씩 흘리기보다 최종 결과를 한 번에 올립니다. 대신 아래 로그와 상태가 먼저 갱신됩니다.'
+    return '로컬 실행기는 토큰 스트리밍보다 최종 응답을 한 번에 보내는 경우가 많습니다. 아래 로그가 먼저 갱신됩니다.'
   }
 
-  return '스트리밍이 가능한 공급자는 생성 중 로그와 부분 응답을 순차적으로 갱신합니다.'
+  return '스트리밍이 가능한 공급자는 생성 로그와 부분 응답이 순차적으로 갱신됩니다.'
 }
 
 function canAgentUseApiKey(agent: AgentItem, apiKeyIds: Set<string>) {
@@ -132,24 +132,26 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     const loadProviders = async () => {
       try {
         const providers = await fetchAiProviders(state.settings.bridgeUrl)
-        if (!active) {
-          return
+        if (active) {
+          setAiProviders(providers)
         }
-        setAiProviders(providers)
       } catch {
-        if (!active) {
-          return
+        if (active) {
+          setAiProviders([])
         }
-        setAiProviders([])
       }
     }
 
     void loadProviders()
-
     return () => {
       active = false
     }
   }, [needsOfficialProviders, state.settings.bridgeUrl])
+
+  const officialProviderStates = useMemo(
+    () => (needsOfficialProviders ? aiProviders : []),
+    [needsOfficialProviders, aiProviders],
+  )
 
   const codexStatus = bridgeHealth?.providers.find((item) => item.provider === 'codex') ?? null
   const ollamaStatus = bridgeHealth?.providers.find((item) => item.provider === 'ollama') ?? null
@@ -171,18 +173,18 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       }
 
       if (agent.provider === 'ollama') {
-        map.set(agent.id, { runnable: ollamaReady, reason: ollamaReady ? null : 'Ollama 준비 필요' })
+        map.set(agent.id, { runnable: ollamaReady, reason: ollamaReady ? null : 'Ollama 확인 필요' })
         return
       }
 
       if (agent.provider === 'codex') {
-        map.set(agent.id, { runnable: codexReady, reason: codexReady ? null : 'Codex 준비 필요' })
+        map.set(agent.id, { runnable: codexReady, reason: codexReady ? null : 'Codex 확인 필요' })
         return
       }
 
       if (agent.provider === 'official-router') {
         const providerState =
-          aiProviders.find((item) => item.provider === resolveOfficialProviderId(agent.baseUrl)) ?? null
+          officialProviderStates.find((item) => item.provider === resolveOfficialProviderId(agent.baseUrl)) ?? null
         const ready = Boolean(providerState?.enabled && providerState?.configured && agent.model.trim())
         map.set(agent.id, {
           runnable: ready,
@@ -195,7 +197,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     })
 
     return map
-  }, [enabledAgents, apiKeyIds, ollamaReady, codexReady, aiProviders])
+  }, [enabledAgents, apiKeyIds, ollamaReady, codexReady, officialProviderStates])
 
   const selectedAgentStatusItems = useMemo(() => {
     return selectedAgents.map((agent) => {
@@ -229,7 +231,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
 
       if (agent.provider === 'official-router') {
         const officialStatus =
-          aiProviders.find((item) => item.provider === resolveOfficialProviderId(agent.baseUrl)) ?? null
+          officialProviderStates.find((item) => item.provider === resolveOfficialProviderId(agent.baseUrl)) ?? null
         const ready = Boolean(officialStatus?.enabled && officialStatus?.configured && agent.model.trim())
 
         return {
@@ -253,7 +255,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
         label: agent.name,
       }
     })
-  }, [selectedAgents, codexReady, codexStatus, ollamaReady, ollamaStatus, aiProviders])
+  }, [selectedAgents, codexReady, codexStatus, ollamaReady, ollamaStatus, officialProviderStates])
 
   const runnableSelectedAgents = useMemo(
     () => selectedAgents.filter((agent) => agentAvailability.get(agent.id)?.runnable),
@@ -282,19 +284,12 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     [state.orchestration.sessionAgentIds, state.agents.items],
   )
 
-  const sessionAgentIdSet = useMemo(
-    () => new Set(sessionSelectedAgentIds),
-    [sessionSelectedAgentIds],
-  )
+  const sessionAgentIdSet = useMemo(() => new Set(sessionSelectedAgentIds), [sessionSelectedAgentIds])
 
   const sessionRuns = useMemo(() => {
     return state.agents.runs
       .filter((run) => {
-        if (!sessionAgentIdSet.has(run.agentId)) {
-          return false
-        }
-
-        if (!sessionStartedAt) {
+        if (!sessionAgentIdSet.has(run.agentId) || !sessionStartedAt) {
           return false
         }
 
@@ -328,30 +323,15 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
         const latestLog = run?.logs[run.logs.length - 1]?.message
 
         if (run?.status === 'running') {
-          return {
-            ...item,
-            summary: '실행 중',
-            detail: latestLog || item.detail,
-            tone: 'info',
-          }
+          return { ...item, summary: '실행 중', detail: latestLog || item.detail, tone: 'info' }
         }
 
         if (run?.status === 'success') {
-          return {
-            ...item,
-            summary: '최근 완료',
-            detail: latestLog || item.detail,
-            tone: 'info',
-          }
+          return { ...item, summary: '최근 완료', detail: latestLog || item.detail, tone: 'success' }
         }
 
         if (run?.status === 'error') {
-          return {
-            ...item,
-            summary: '최근 실패',
-            detail: latestLog || run.output || item.detail,
-            tone: 'warning',
-          }
+          return { ...item, summary: '최근 실패', detail: latestLog || run.output || item.detail, tone: 'warning' }
         }
 
         return item
@@ -367,9 +347,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   const latestRunElapsedSeconds = sessionRuns[0]
     ? Math.max(
         0,
-        Math.floor(
-          ((sessionRunning ? runClock : latestRunEndTime) - Date.parse(sessionRuns[0].startedAt)) / 1000,
-        ),
+        Math.floor(((sessionRunning ? runClock : latestRunEndTime) - Date.parse(sessionRuns[0].startedAt)) / 1000),
       )
     : 0
   const latestRunElapsedLabel = sessionRuns[0] ? formatElapsedSeconds(latestRunElapsedSeconds) : ''
@@ -403,18 +381,9 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
 
   const taskTemplates = useMemo(
     () => [
-      {
-        label: '브리프 정리',
-        value: 'AI 관련 소식을 요약해서 짧은 브리프 문서로 정리해 줘.',
-      },
-      {
-        label: '다음 작업',
-        value: '최근 실행 결과를 바탕으로 다음 작업 순서를 정리해 줘.',
-      },
-      {
-        label: '자동화 설계',
-        value: '현재 선택한 모델을 병렬로 돌릴 자동화 흐름 초안을 제안해 줘.',
-      },
+      { label: '브리프 정리', value: 'AI 관련 소식을 요약해서 바로 공유할 수 있는 브리프 문서로 정리해 줘.' },
+      { label: '다음 작업', value: '최근 실행 결과를 바탕으로 다음 작업 순서를 정리해 줘.' },
+      { label: '자동화 설계', value: '지금 선택한 모델을 병렬로 돌릴 수 있는 자동화 흐름 초안을 제안해 줘.' },
     ],
     [],
   )
@@ -468,7 +437,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       alerts.push({
         key: 'skipped-agents',
         tone: 'warning',
-        text: `${skippedSelectedAgents.length}개 모델은 아직 연결 조건이 맞지 않아 이번 실행에서 제외됩니다.`,
+        text: `${skippedSelectedAgents.length}개 모델은 아직 실행 조건이 맞지 않아 이번 실행에서 제외됩니다.`,
       })
     }
 
@@ -591,7 +560,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                 <OrchestrationAlerts alerts={runnerAlerts} onNavigate={onNavigate} />
                 {task.trim().length === 0 ? (
                   <div className="orchestration-template-list orchestration-template-list--inline">
-                    {taskTemplates.slice(0, 1).map((template) => (
+                    {taskTemplates.slice(0, 2).map((template) => (
                       <button
                         key={template.label}
                         type="button"
@@ -610,7 +579,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                   onClick={runSelectedAgents}
                 >
                   {sessionRunning
-                    ? `병렬 실행 중 · ${latestRunElapsedLabel || ''}`.trim()
+                    ? `병렬 실행 중 · ${latestRunElapsedLabel || '계속 진행 중'}`
                     : `${Math.max(runnableSelectedAgents.length, 1)}개 모델 실행`}
                 </button>
               </>
@@ -623,7 +592,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
         hint={
           sessionRuns[0]
             ? runningHint(sessionRuns[0].provider)
-            : '실행을 시작하면 각 모델 결과가 이 영역에 바로 쌓입니다.'
+            : '실행을 시작하면 각 모델 결과가 아래 영역에 바로 쌓입니다.'
         }
         sessionHasResults={sessionHasResults}
         sessionRunning={sessionRunning}

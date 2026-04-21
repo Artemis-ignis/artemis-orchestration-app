@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { NoticeBanner, PanelCard, SectionHeader, StatCard, StatusPill } from '../components/ui/primitives'
+import { NoticeBanner, PanelCard, StatCard, StatusPill } from '../components/ui/primitives'
 import type { PageId } from '../crewData'
 import { formatDate, pageLabel } from '../crewPageHelpers'
 import { PageIntro, SearchField } from '../crewPageShared'
@@ -15,94 +15,42 @@ import type {
   PublishedPost,
 } from '../types/publisher'
 
-function publisherTargetLabel(target: 'internal' | 'x') {
-  return target === 'internal' ? '아르테미스 와이어' : 'X'
+type Tone = 'default' | 'accent' | 'success' | 'warning' | 'danger' | 'muted' | 'info'
+
+type StreamEntry = {
+  id: string
+  createdAt: string
+  tone: Tone
+  label: string
+  title: string
+  summary: string
+  meta: string
 }
 
-function publisherStatusTone(target: PublisherRuntimeStatus) {
-  if (target.ready) {
-    return 'success'
+function clipText(value: string | null | undefined, maxLength = 140) {
+  const normalized = String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!normalized) {
+    return '설명이 아직 없습니다.'
   }
 
-  if (!target.enabled) {
-    return 'muted'
+  if (normalized.length <= maxLength) {
+    return normalized
   }
 
-  return target.configured ? 'warning' : 'danger'
-}
-
-function publisherStatusLabel(target: PublisherRuntimeStatus) {
-  if (target.ready) {
-    return '준비됨'
-  }
-
-  if (!target.enabled) {
-    return '비활성'
-  }
-
-  return target.configured ? '점검 필요' : '구성 필요'
-}
-
-function dossierStatusTone(status: PublisherDossierStatus) {
-  if (status === 'published') {
-    return 'success'
-  }
-
-  if (status === 'tracking') {
-    return 'accent'
-  }
-
-  return 'warning'
-}
-
-function dossierStatusLabel(status: PublisherDossierStatus) {
-  if (status === 'published') {
-    return '게시 중'
-  }
-
-  if (status === 'tracking') {
-    return '추적 중'
-  }
-
-  return '이슈 형성'
-}
-
-function logTone(level: PublisherLog['level']) {
-  if (level === 'success') {
-    return 'success'
-  }
-
-  if (level === 'warning') {
-    return 'warning'
-  }
-
-  if (level === 'error') {
-    return 'danger'
-  }
-
-  return 'muted'
-}
-
-function summaryTypeLabel(summaryType: PublishedPost['summaryType']) {
-  if (summaryType === 'breaking') {
-    return '속보 요약'
-  }
-
-  if (summaryType === 'brief-points') {
-    return '포인트 브리프'
-  }
-
-  return '리포트 인트로'
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}…`
 }
 
 function activityTypeLabel(type: ActivityType) {
   switch (type) {
     case 'chat':
-      return '대화'
+      return '채팅'
     case 'file':
       return '파일'
     case 'tool':
-      return '도구'
+      return '스킬'
     case 'insight':
       return '인사이트'
     case 'settings':
@@ -110,10 +58,93 @@ function activityTypeLabel(type: ActivityType) {
     case 'signal':
       return '시그널'
     case 'agent':
-      return '에이전트'
+      return '오케스트레이션'
     default:
       return '기록'
   }
+}
+
+function dossierTone(status: PublisherDossierStatus): Tone {
+  switch (status) {
+    case 'published':
+      return 'success'
+    case 'tracking':
+      return 'accent'
+    default:
+      return 'warning'
+  }
+}
+
+function dossierLabel(status: PublisherDossierStatus) {
+  switch (status) {
+    case 'published':
+      return '발행 중'
+    case 'tracking':
+      return '추적 중'
+    default:
+      return '신규 묶음'
+  }
+}
+
+function logTone(level: PublisherLog['level']): Tone {
+  switch (level) {
+    case 'success':
+      return 'success'
+    case 'warning':
+      return 'warning'
+    case 'error':
+      return 'danger'
+    default:
+      return 'muted'
+  }
+}
+
+function summaryTypeLabel(summaryType: PublishedPost['summaryType']) {
+  switch (summaryType) {
+    case 'breaking':
+      return '속보 요약'
+    case 'brief-points':
+      return '핵심 포인트'
+    default:
+      return '리포트형'
+  }
+}
+
+function publisherRuntimeLabel(targets: PublisherRuntimeStatus[]) {
+  const internal = targets.find((target) => target.target === 'internal')
+  const x = targets.find((target) => target.target === 'x')
+
+  if (internal?.ready) {
+    return '내부 발행 정상'
+  }
+
+  if (internal && !internal.enabled) {
+    return '내부 발행 꺼짐'
+  }
+
+  if (x?.ready) {
+    return '외부 연동 정상'
+  }
+
+  return '발행 상태 확인 필요'
+}
+
+function publisherRuntimeTone(targets: PublisherRuntimeStatus[]): Tone {
+  const internal = targets.find((target) => target.target === 'internal')
+
+  if (internal?.ready) {
+    return 'success'
+  }
+
+  if (internal && !internal.enabled) {
+    return 'muted'
+  }
+
+  if (targets.some((target) => target.configured && !target.ready)) {
+    return 'warning'
+  }
+
+  return 'info'
 }
 
 export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
@@ -135,206 +166,243 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
         if (ignore) {
           return
         }
+
         setPublisherMetrics(response.metrics)
         setPublisherLogs(response.logs.slice(0, 8))
         setPublishedPosts(response.published.slice(0, 4))
-        setRecentDossiers(response.dossiers.slice(0, 3))
+        setRecentDossiers(response.dossiers.slice(0, 4))
         setPublisherError(null)
       } catch (error) {
-        if (ignore) {
-          return
+        if (!ignore) {
+          setPublisherError(error instanceof Error ? error.message : '활동 상태를 불러오지 못했습니다.')
         }
-        setPublisherError(error instanceof Error ? error.message : '아르테미스 와이어 상태를 불러오지 못했습니다.')
       }
     }
 
     void run()
-
     return () => {
       ignore = true
     }
   }, [state.settings.bridgeUrl])
 
-  const items = useMemo(() => {
-    const keyword = deferredQuery.trim().toLowerCase()
+  const keyword = deferredQuery.trim().toLowerCase()
+
+  const streamEntries = useMemo(() => {
+    const entries: StreamEntry[] = []
+
+    publisherMetrics?.recentFailures.slice(0, 3).forEach((failure) => {
+      entries.push({
+        id: `failure-${failure.id}`,
+        createdAt: failure.updatedAt,
+        tone: 'danger',
+        label: '오류',
+        title: failure.sourceTitle,
+        summary: clipText(failure.errorReason, 120),
+        meta: '최근 실패',
+      })
+    })
+
+    publishedPosts.forEach((post) => {
+      entries.push({
+        id: `post-${post.id}`,
+        createdAt: post.publishedAt,
+        tone: 'success',
+        label: '발행',
+        title: post.title,
+        summary: clipText(post.excerpt || post.body, 140),
+        meta: `${post.sourceLabel || post.provider} · ${summaryTypeLabel(post.summaryType)}`,
+      })
+    })
+
+    publisherLogs.forEach((log) => {
+      entries.push({
+        id: `log-${log.id}`,
+        createdAt: log.createdAt,
+        tone: logTone(log.level),
+        label: '로그',
+        title: log.action || '퍼블리셔 로그',
+        summary: clipText(log.message, 130),
+        meta: log.draftId ? `초안 ${log.draftId}` : '운영 로그',
+      })
+    })
+
+    state.activity.items.forEach((item) => {
+      entries.push({
+        id: `activity-${item.id}`,
+        createdAt: item.createdAt,
+        tone: 'info',
+        label: pageLabel(item.page),
+        title: item.title,
+        summary: clipText(item.detail, 130),
+        meta: activityTypeLabel(item.type),
+      })
+    })
+
+    const ordered = entries.sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+
     if (!keyword) {
-      return state.activity.items
+      return ordered
     }
 
-    return state.activity.items.filter((item) =>
-      `${item.title} ${item.detail} ${item.page}`.toLowerCase().includes(keyword),
+    return ordered.filter((entry) =>
+      [entry.label, entry.title, entry.summary, entry.meta].join(' ').toLowerCase().includes(keyword),
     )
-  }, [deferredQuery, state.activity.items])
+  }, [keyword, publishedPosts, publisherLogs, publisherMetrics?.recentFailures, state.activity.items])
 
-  const totalActivityCount = state.activity.items.length
-  const latestActivity = items[0] ?? state.activity.items[0] ?? null
-  const latestPublishedPost = publishedPosts[0] ?? null
-  const visibleFailures = publisherMetrics?.recentFailures.slice(0, 2) ?? []
-  const latestFailure = visibleFailures[0] ?? null
-  const visibleProviderCounts = publisherMetrics?.providerCounts24h.slice(0, 4) ?? []
-  const queuedCount = publisherMetrics ? publisherMetrics.draftCount + publisherMetrics.scheduledCount : null
-  const hasQuery = query.trim().length > 0
-  const activityFilterLabel = hasQuery ? `검색 결과 ${items.length}건` : `전체 기록 ${totalActivityCount}건`
-  const publisherHealthTone = publisherError
-    ? 'danger'
-    : publisherMetrics
-      ? publisherMetrics.failedCount > 0
-        ? 'warning'
-        : 'success'
-      : 'muted'
-  const publisherHealthLabel = publisherError
-    ? '와이어 연결 오류'
-    : publisherMetrics
-      ? publisherMetrics.failedCount > 0
-        ? `운영 주의 ${publisherMetrics.failedCount}건`
-        : '와이어 정상'
-      : '와이어 동기화 중'
+  const filteredDossiers = useMemo(() => {
+    const ordered = [...recentDossiers].sort((left, right) => {
+      const leftTime = left.lastUpdatedAt || left.lastPublishedAt || ''
+      const rightTime = right.lastUpdatedAt || right.lastPublishedAt || ''
+      return rightTime.localeCompare(leftTime)
+    })
+
+    if (!keyword) {
+      return ordered
+    }
+
+    return ordered.filter((dossier) =>
+      [
+        dossier.title,
+        dossier.summary,
+        dossier.lead,
+        dossier.providerLabels.join(' '),
+        dossier.keyPoints.join(' '),
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(keyword),
+    )
+  }, [keyword, recentDossiers])
+
+  const queuedCount = publisherMetrics ? publisherMetrics.draftCount + publisherMetrics.scheduledCount : 0
   const summaryCards = [
     {
-      label: '최근 24시간 게시',
-      value: publisherMetrics ? `${publisherMetrics.publishedCount24h}건` : publisherError ? '연결 오류' : '동기화 중',
-      meta: publisherMetrics
-        ? latestPublishedPost
-          ? `최근 1시간 ${publisherMetrics.publishedCount1h}건 · ${formatDate(latestPublishedPost.publishedAt)} 마지막 게시`
-          : `최근 1시간 ${publisherMetrics.publishedCount1h}건 · 아직 게시 기록이 없습니다.`
-        : publisherError ?? '아르테미스 와이어 상태를 확인하는 중입니다.',
+      label: '24시간 발행',
+      value: publisherMetrics ? `${publisherMetrics.publishedCount24h}건` : publisherError ? '연결 오류' : '확인 중',
+      meta: publisherMetrics ? `최근 1시간 ${publisherMetrics.publishedCount1h}건` : publisherError ?? '발행 통계를 불러오는 중입니다.',
       tone: publisherMetrics ? 'accent' : publisherError ? 'danger' : 'muted',
     },
     {
-      label: '대기 작업',
-      value: queuedCount !== null ? `${queuedCount}건` : '집계 대기',
-      meta:
-        publisherMetrics !== null
-          ? `초안 ${publisherMetrics.draftCount}건 · 예약 ${publisherMetrics.scheduledCount}건`
-          : '큐 상태를 불러오는 중입니다.',
-      tone: queuedCount && queuedCount > 0 ? 'info' : 'muted',
+      label: '대기 중 작업',
+      value: publisherMetrics ? `${queuedCount}건` : '확인 중',
+      meta: publisherMetrics ? `초안 ${publisherMetrics.draftCount}건 · 예약 ${publisherMetrics.scheduledCount}건` : '초안과 예약 상태를 읽는 중입니다.',
+      tone: queuedCount > 0 ? 'info' : 'muted',
     },
     {
-      label: '운영 이슈',
-      value:
-        publisherMetrics !== null
-          ? `${publisherMetrics.failedCount}건`
-          : publisherError
-            ? '연결 오류'
-            : '문제 없음',
+      label: '오류',
+      value: publisherMetrics ? `${publisherMetrics.failedCount}건` : publisherError ? '연결 오류' : '확인 중',
       meta:
-        latestFailure !== null
-          ? `${formatDate(latestFailure.updatedAt)} · ${latestFailure.sourceTitle}`
-          : publisherMetrics !== null
-            ? '최근 실패 없이 운영 중입니다.'
-            : publisherError ?? '최근 실패 집계를 기다리는 중입니다.',
-      tone:
-        publisherMetrics !== null
-          ? publisherMetrics.failedCount > 0
-            ? 'danger'
-            : 'success'
-          : publisherError
-            ? 'danger'
-            : 'muted',
+        publisherMetrics && publisherMetrics.recentFailures[0]
+          ? publisherMetrics.recentFailures[0].sourceTitle
+          : publisherError ?? '최근 오류 없음',
+      tone: publisherMetrics ? (publisherMetrics.failedCount > 0 ? 'danger' : 'success') : publisherError ? 'danger' : 'muted',
     },
     {
-      label: '활동 기록',
-      value: `${totalActivityCount}건`,
-      meta: latestActivity
-        ? `${pageLabel(latestActivity.page)} · ${formatDate(latestActivity.createdAt)}`
-        : '아직 쌓인 활동 기록이 없습니다.',
+      label: '추적 묶음',
+      value: publisherMetrics ? `${publisherMetrics.dossierCount}개` : '확인 중',
+      meta: recentDossiers[0] ? recentDossiers[0].title : '활성 묶음을 불러오는 중입니다.',
       tone: 'info',
     },
   ] as const
 
+  const runtimeTone = publisherError
+    ? 'danger'
+    : publisherMetrics
+      ? publisherRuntimeTone(publisherMetrics.publishers)
+      : 'muted'
+  const runtimeLabel = publisherError
+    ? '발행 연결 오류'
+    : publisherMetrics
+      ? publisherRuntimeLabel(publisherMetrics.publishers)
+      : '발행 상태 확인 중'
+
   return (
     <section className="page activity-page">
       <PageIntro
-        description="채팅, 파일, 오케스트레이션, 그리고 아르테미스 와이어 운영에서 실제로 일어난 실행 기록만 모아 봅니다."
         icon="insights"
         title="활동"
+        description="지금 봐야 할 실행 흐름과 운영 이슈만 남겼습니다. 긴 원문과 잡다한 카드 대신 최근 흐름과 추적 묶음 중심으로 정리했습니다."
       />
 
-      <div className="page-toolbar activity-toolbar signals-toolbar--primary">
-        <SearchField onChange={setQuery} placeholder="활동 검색..." value={query} />
+      <div className="page-toolbar activity-toolbar">
+        <SearchField onChange={setQuery} placeholder="활동, 발행, 오류 검색" value={query} />
         <div className="activity-toolbar__meta">
-          <StatusPill tone="muted">{activityFilterLabel}</StatusPill>
-          <StatusPill tone={publisherHealthTone}>{publisherHealthLabel}</StatusPill>
-          {publisherMetrics ? <StatusPill tone="info">추적 이슈 {publisherMetrics.dossierCount}개</StatusPill> : null}
+          <StatusPill tone="muted">표시 {streamEntries.length}</StatusPill>
+          <StatusPill tone={runtimeTone}>{runtimeLabel}</StatusPill>
+          <StatusPill tone="info">추적 묶음 {filteredDossiers.length}</StatusPill>
         </div>
       </div>
 
-      <section className="activity-summary-strip" aria-label="활동 요약">
+      {publisherError ? (
+        <NoticeBanner tone="error" title="퍼블리셔 상태를 읽지 못했습니다.">
+          {publisherError}
+        </NoticeBanner>
+      ) : null}
+
+      <section className="activity-summary-strip" aria-label="활동 핵심 요약">
         {summaryCards.map((card) => (
           <StatCard key={card.label} label={card.label} meta={card.meta} tone={card.tone} value={card.value} />
         ))}
       </section>
 
-      <PanelCard
-        actions={
-          <button className="ghost-button" onClick={() => onNavigate('signals')} type="button">
-            시그널에서 이어 보기
-          </button>
-        }
-        className="activity-cluster-panel signals-panel"
-        description="최근 내부 게시물과 현재 추적 중인 이슈 묶음을 같은 화면에서 비교합니다."
-        title="최근 게시 및 이슈 묶음"
-        tone="accent"
-      >
-        {publisherError ? (
-          <NoticeBanner tone="error" title="와이어 연결 상태를 확인하세요">
-            {publisherError}
-          </NoticeBanner>
-        ) : null}
-
-        <div className="activity-cluster-grid">
-          <section className="activity-cluster-lane">
-            <SectionHeader
-              description="최근 내부 게시를 빠르게 훑고 상세 검토는 시그널에서 이어갑니다."
-              title="최근 게시"
-            />
-            {publishedPosts.length > 0 ? (
-              <div className="activity-card-list">
-                {publishedPosts.map((post) => (
-                  <article key={post.id} className="activity-story-card">
-                    <div className="activity-card-topline">
-                      <StatusPill tone="info">{post.sourceLabel || post.provider}</StatusPill>
-                      <small>{formatDate(post.publishedAt)}</small>
+      <div className="activity-journal-grid activity-journal-grid--clean">
+        <PanelCard
+          className="activity-log-panel signals-panel"
+          title="최근 실행과 이벤트"
+          description="최근 실행, 발행, 운영 로그를 시간순으로 묶었습니다."
+          actions={
+            <button className="ghost-button" onClick={() => onNavigate('signals')} type="button">
+              시그널로 이동
+            </button>
+          }
+          tone="accent"
+        >
+          {streamEntries.length > 0 ? (
+            <div className="activity-sequence">
+              {streamEntries.map((entry) => (
+                <article key={entry.id} className={`activity-sequence__item activity-sequence__item--${entry.tone}`}>
+                  <div className="activity-sequence__rail" aria-hidden="true">
+                    <span className="activity-sequence__dot" />
+                  </div>
+                  <div className="activity-sequence__body">
+                    <div className="activity-sequence__meta">
+                      <div className="activity-sequence__metaGroup">
+                        <StatusPill tone={entry.tone}>{entry.label}</StatusPill>
+                        <StatusPill tone="muted">{entry.meta}</StatusPill>
+                      </div>
+                      <small>{formatDate(entry.createdAt)}</small>
                     </div>
-                    <h3>{post.title}</h3>
-                    <p>{post.excerpt}</p>
-                    <div className="activity-card-footer">
-                      {post.category ? <StatusPill tone="muted">{post.category}</StatusPill> : null}
-                      <StatusPill tone="muted">{summaryTypeLabel(post.summaryType)}</StatusPill>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="activity-inline-empty">최근 내부 게시물이 아직 없습니다.</div>
-            )}
-          </section>
+                    <strong>{entry.title}</strong>
+                    <p>{entry.summary}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="activity-inline-empty">표시할 최근 실행이나 이벤트가 없습니다.</div>
+          )}
+        </PanelCard>
 
-          <section className="activity-cluster-lane">
-            <SectionHeader
-              description="아르테미스 와이어가 지금 추적 중인 주제 묶음을 우선순위 중심으로 봅니다."
-              title="라이브 이슈 묶음"
-            />
-            {recentDossiers.length > 0 ? (
+        <div className="activity-side-stack">
+          <PanelCard
+            className="activity-cluster-panel signals-panel"
+            title="라이브 이슈 묶음"
+            description="현재 추적 중인 주제 묶음만 간단히 봅니다."
+            tone="muted"
+          >
+            {filteredDossiers.length > 0 ? (
               <div className="activity-card-list">
-                {recentDossiers.map((dossier) => (
+                {filteredDossiers.map((dossier) => (
                   <article key={dossier.id} className="activity-dossier-card">
                     <div className="activity-card-topline">
-                      <StatusPill tone={dossierStatusTone(dossier.status)}>{dossierStatusLabel(dossier.status)}</StatusPill>
-                      <small>{formatDate(dossier.lastUpdatedAt || dossier.lastPublishedAt || '')}</small>
+                      <StatusPill tone={dossierTone(dossier.status)}>{dossierLabel(dossier.status)}</StatusPill>
+                      <small>{formatDate(dossier.lastUpdatedAt || dossier.lastPublishedAt || dossier.sourceItems[0]?.publishedAt || '')}</small>
                     </div>
                     <h3>{dossier.title}</h3>
-                    <p>{dossier.summary || dossier.lead}</p>
-                    {dossier.keyPoints.length > 0 ? (
-                      <ul className="activity-dossier-points">
-                        {dossier.keyPoints.slice(0, 2).map((point) => (
-                          <li key={point}>{point}</li>
-                        ))}
-                      </ul>
-                    ) : null}
+                    <p>{clipText(dossier.summary || dossier.lead, 150)}</p>
                     <div className="activity-card-footer activity-card-footer--text">
                       <span>소스 {dossier.sourceCount}</span>
-                      <span>게시 {dossier.publishedCount}</span>
+                      <span>발행 {dossier.publishedCount}</span>
                       <span>{dossier.providerLabels.slice(0, 2).join(' · ') || dossier.sourceType}</span>
                     </div>
                   </article>
@@ -343,137 +411,34 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
             ) : (
               <div className="activity-inline-empty">현재 추적 중인 이슈 묶음이 없습니다.</div>
             )}
-          </section>
+          </PanelCard>
+
+          <PanelCard className="activity-meta-panel" title="발행 상태" description="퍼블리셔 런타임과 최근 대기열 상태입니다.">
+            <div className="activity-status-list">
+              <article className="activity-status-item">
+                <div>
+                  <strong>런타임</strong>
+                  <p>{runtimeLabel}</p>
+                </div>
+                <StatusPill tone={runtimeTone}>{runtimeLabel}</StatusPill>
+              </article>
+              <article className="activity-status-item">
+                <div>
+                  <strong>대기열</strong>
+                  <p>초안과 예약 대기 수량입니다.</p>
+                </div>
+                <StatusPill tone={queuedCount > 0 ? 'info' : 'muted'}>{queuedCount}건</StatusPill>
+              </article>
+              <article className="activity-status-item">
+                <div>
+                  <strong>최근 발행</strong>
+                  <p>{publishedPosts[0] ? publishedPosts[0].title : '최근 발행 기록이 없습니다.'}</p>
+                </div>
+                <StatusPill tone="muted">{publishedPosts[0] ? formatDate(publishedPosts[0].publishedAt) : '없음'}</StatusPill>
+              </article>
+            </div>
+          </PanelCard>
         </div>
-
-        <div className="activity-ops-meta-grid">
-          <section className="activity-meta-panel">
-            <SectionHeader description="현재 게시 대상별 준비 상태" title="게시 대상 상태" />
-            {publisherMetrics ? (
-              <div className="activity-status-list">
-                {publisherMetrics.publishers.map((target) => (
-                  <article key={target.target} className="activity-status-item">
-                    <div>
-                      <strong>{publisherTargetLabel(target.target)}</strong>
-                      <p>{target.detail}</p>
-                    </div>
-                    <StatusPill tone={publisherStatusTone(target)}>{publisherStatusLabel(target)}</StatusPill>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="activity-inline-empty">게시 대상 상태를 불러오는 중입니다.</div>
-            )}
-          </section>
-
-          <section className="activity-meta-panel">
-            <SectionHeader description="최근 24시간 공급원별 수집과 게시량" title="공급원 처리량" />
-            {visibleProviderCounts.length > 0 ? (
-              <div className="activity-status-list">
-                {visibleProviderCounts.map((provider) => (
-                  <article key={provider.provider} className="activity-status-item">
-                    <div>
-                      <strong>{provider.label || provider.provider}</strong>
-                      <p>
-                        수집 {provider.fetchedCount24h} · 게시 {provider.publishedCount24h}
-                        {provider.lastError ? ` · ${provider.lastError}` : ''}
-                      </p>
-                    </div>
-                    <StatusPill tone={provider.lastError ? 'warning' : provider.enabled === false ? 'muted' : 'info'}>
-                      {provider.enabled === false ? '중지됨' : '활성'}
-                    </StatusPill>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="activity-inline-empty">최근 집계된 공급원 처리량이 없습니다.</div>
-            )}
-          </section>
-        </div>
-      </PanelCard>
-
-      <div className="activity-journal-grid">
-        <PanelCard
-          actions={<StatusPill tone="muted">운영 로그 {publisherLogs.length}건</StatusPill>}
-          className="activity-log-panel signals-panel"
-          description="와이어 운영 로그와 최근 실패 신호를 시간순으로 확인합니다."
-          title="작업 로그"
-          tone="muted"
-        >
-          {visibleFailures.length > 0 ? (
-            <div className="activity-failure-list">
-              {visibleFailures.map((failure) => (
-                <article key={failure.id} className="activity-failure-card">
-                  <div className="activity-card-topline">
-                    <StatusPill tone="danger">실패</StatusPill>
-                    <small>{formatDate(failure.updatedAt)}</small>
-                  </div>
-                  <h3>{failure.sourceTitle}</h3>
-                  <p>{failure.errorReason || '실패 원인이 기록되지 않았습니다.'}</p>
-                </article>
-              ))}
-            </div>
-          ) : null}
-
-          {publisherLogs.length > 0 ? (
-            <div className="activity-sequence">
-              {publisherLogs.map((log) => {
-                const tone = logTone(log.level)
-
-                return (
-                  <article key={log.id} className={`activity-sequence__item activity-sequence__item--${tone}`}>
-                    <div className="activity-sequence__rail" aria-hidden="true">
-                      <span className="activity-sequence__dot" />
-                    </div>
-                    <div className="activity-sequence__body">
-                      <div className="activity-sequence__meta">
-                        <StatusPill tone={tone}>{log.action || '운영 로그'}</StatusPill>
-                        <small>{formatDate(log.createdAt)}</small>
-                      </div>
-                      <p>{log.message}</p>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="activity-inline-empty">아직 표시할 운영 로그가 없습니다.</div>
-          )}
-        </PanelCard>
-
-        <PanelCard
-          actions={<StatusPill tone="muted">{activityFilterLabel}</StatusPill>}
-          className="activity-history-panel signals-panel"
-          description="채팅, 파일, 오케스트레이션 등 실제 실행 기록을 시간순으로 정리합니다."
-          title="활동 기록"
-        >
-          {items.length > 0 ? (
-            <div className="activity-sequence">
-              {items.map((item) => (
-                <article key={item.id} className="activity-sequence__item activity-sequence__item--info">
-                  <div className="activity-sequence__rail" aria-hidden="true">
-                    <span className="activity-sequence__dot" />
-                  </div>
-                  <div className="activity-sequence__body">
-                    <div className="activity-sequence__meta">
-                      <div className="activity-sequence__metaGroup">
-                        <StatusPill tone="info">{pageLabel(item.page)}</StatusPill>
-                        <StatusPill tone="muted">{activityTypeLabel(item.type)}</StatusPill>
-                      </div>
-                      <small>{formatDate(item.createdAt)}</small>
-                    </div>
-                    <strong>{item.detail}</strong>
-                    <p>{item.title}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="activity-inline-empty">
-              채팅, 파일, 오케스트레이션을 실행하면 실제 활동 기록이 여기에 쌓입니다.
-            </div>
-          )}
-        </PanelCard>
       </div>
     </section>
   )

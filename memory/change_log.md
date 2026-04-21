@@ -1,5 +1,18 @@
 # Change Log
 
+## 2026-04-21
+
+### Activity inbox-style cleanup
+
+- Reworked `src/pages/ActivityPage.tsx` into a flatter operator view:
+  - top summary now focuses on 핵심 수치,
+  - recent execution, publish, log, and activity items now share one recent stream,
+  - live issue dossiers are grouped into one separate lane,
+  - long English text in stream cards is clipped on the default view,
+  - copy is shortened to read in Korean first.
+- Verified the page file with a standalone TypeScript check:
+  - `npx tsc --ignoreConfig --noEmit --pretty false --jsx react-jsx --moduleResolution bundler --module ESNext --target ES2022 src/pages/ActivityPage.tsx`
+
 ## 2026-04-17
 
 ### Deep report Korean article polish
@@ -1059,3 +1072,44 @@
   - `npm run lint`
   - `npm run build`
   - headless capture under `output/playwright/orchestration-mobile-pass3/orchestration-mobile-pass3.png`
+
+## 2026-04-21 Workspace Overhaul Final
+
+- Reworked the workspace around the user's direct complaints instead of continuing the earlier theme-only pass.
+- Added `src/components/ui/FormattedText.tsx` and switched chat/orchestration rich text surfaces to it so raw markdown markers no longer leak into visible output.
+- Rewrote `src/pages/SkillsPage.tsx` into a simpler store-like list:
+  - icon,
+  - title,
+  - one-line purpose summary,
+  - source label,
+  - toggle,
+  - hidden detail disclosure for examples and paths.
+- Rewrote `src/pages/ActivityPage.tsx` into a smaller operations view with summary stats, recent execution flow, and live tracked issue bundles.
+- Rebuilt `src/features/publisher/PublisherOperationsPanel.tsx` into a much simpler operator rail:
+  - overview,
+  - pending review queue,
+  - dossier list,
+  - published history,
+  - collapsed settings and source status.
+- Simplified `src/pages/SignalsPage.tsx` top-level copy and labels:
+  - `실시간`,
+  - `게시 큐`,
+  - `생성 글`,
+  - shorter search placeholders and action labels,
+  - removed the earlier `아르테미스 와이어` / `심층 리포트` naming from the visible surface.
+- Fixed workspace bootstrap fallback:
+  - `src/state/AppState.tsx` now retries with default workspace root when a persisted root/path is stale,
+  - `local-bridge/workspace.mjs` now resolves back to `DEFAULT_WORKSPACE_ROOT` when a requested root no longer exists.
+- Cleaned follow-up build blockers introduced during the rewrite pass:
+  - removed an unused import in `src/pages/ActivityPage.tsx`,
+  - memoized `officialProviderStates` in `src/pages/OrchestrationPage.tsx`,
+  - tightened the orchestration alert action typing in `src/features/orchestration/OrchestrationSections.tsx`,
+  - repaired corrupted routing helper strings in `src/state/AppState.tsx`.
+- Re-verified with:
+  - `npm run lint`
+  - `npm run build`
+  - headless Playwright captures under `output/playwright/workspace-overhaul-final/`
+    - `skills-final.png`
+    - `activity-final.png`
+    - `signals-publisher-final.png`
+    - `orchestration-final.png`
