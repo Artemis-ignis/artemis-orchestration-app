@@ -1151,3 +1151,30 @@
     - `orchestration-mobile.png`
     - `skills-mobile.png`
     - `activity-mobile.png`
+## 2026-04-22 Workspace UX Reset - Pass 2
+
+- Rebuilt the orchestration route again around a top command rail instead of the previous right-side dock.
+- Rewrote `src/pages/OrchestrationPage.tsx` with clean Korean operator copy and safer alert/status wording.
+- Rebuilt `src/features/orchestration/OrchestrationSections.tsx` so the orchestration surface now renders:
+  - command rail
+  - results panel
+  - compact details disclosure
+  with simpler visual hierarchy.
+- Tightened the flow board in `src/OrchestrationCanvas.tsx`:
+  - smaller board dimensions
+  - tighter `fitView`
+  - hidden default flow controls.
+- Reworked `src/pages/SkillsPage.tsx` into grouped catalog sections using path-family grouping instead of flat list sorting.
+- Removed the default per-item disclosure block from the skills list and compressed the row structure in `src/styles/pages/skills.css`.
+- Added/updated verification captures under:
+  - `output/playwright/workspace-ux-reset-pass2/`
+    - `orchestration-desktop.png`
+    - `skills-desktop.png`
+    - `activity-desktop.png`
+    - `orchestration-mobile.png`
+    - `skills-mobile.png`
+- Verification:
+  - `npm run lint`
+  - `npm run build`
+  - preview `http://127.0.0.1:4173/` = 200
+  - bridge `http://127.0.0.1:4174/api/health` = 200

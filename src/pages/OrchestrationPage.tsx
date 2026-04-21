@@ -39,10 +39,54 @@ function formatElapsedSeconds(totalSeconds: number) {
 
 function runningHint(provider: string) {
   if (provider === 'codex' || provider === 'ollama') {
-    return '로컬 실행기는 토큰 스트리밍보다 최종 응답을 한 번에 보내는 경우가 많습니다. 아래 로그가 먼저 갱신됩니다.'
+    return '로컬 실행기는 최종 응답을 한 번에 보내는 경우가 많습니다. 아래 로그가 먼저 갱신될 수 있습니다.'
   }
 
-  return '스트리밍이 가능한 공급자는 생성 로그와 부분 응답이 순차적으로 갱신됩니다.'
+  return '스트리밍 가능한 공급자는 부분 응답과 로그가 순차적으로 갱신됩니다.'
+}
+
+function sanitizeOperatorMessage(value: string | null | undefined, fallback: string) {
+  const text = String(value ?? '').trim()
+
+  if (!text) {
+    return fallback
+  }
+
+  try {
+    const parsed = JSON.parse(text) as { ok?: boolean; error?: string; message?: string }
+    if (parsed && typeof parsed === 'object' && parsed.ok === false) {
+      return sanitizeOperatorMessage(parsed.error || parsed.message, fallback)
+    }
+  } catch {
+    // plain text
+  }
+
+  const normalized = text.toLowerCase()
+
+  if (normalized.includes('workspace') || normalized.includes('folder') || normalized.includes('enoent')) {
+    return '작업 폴더를 다시 연결해야 합니다.'
+  }
+
+  if (
+    normalized.includes('api key') ||
+    normalized.includes('unauthorized') ||
+    normalized.includes('forbidden') ||
+    normalized.includes('401') ||
+    normalized.includes('403')
+  ) {
+    return '연결 정보 또는 권한을 다시 확인해야 합니다.'
+  }
+
+  if (
+    normalized.includes('timeout') ||
+    normalized.includes('timed out') ||
+    normalized.includes('econnrefused') ||
+    normalized.includes('network')
+  ) {
+    return '연결 상태가 불안정합니다. 잠시 뒤 다시 시도해 주세요.'
+  }
+
+  return text.length > 140 ? `${text.slice(0, 140).trimEnd()}…` : text
 }
 
 function canAgentUseApiKey(agent: AgentItem, apiKeyIds: Set<string>) {
@@ -76,7 +120,21 @@ function conciseAgentLabel(agent: AgentItem) {
     return 'gemma4'
   }
 
-  return agent.name.length > 18 ? agent.name.slice(0, 18).trimEnd() : agent.name
+  return agent.name.length > 18 ? `${agent.name.slice(0, 18).trimEnd()}…` : agent.name
+}
+
+function latestRunMap(sessionRuns: AgentRun[]) {
+  const sorted = sessionRuns
+    .slice()
+    .sort((left, right) => Date.parse(right.finishedAt ?? right.startedAt) - Date.parse(left.finishedAt ?? left.startedAt))
+
+  const map = new Map<string, AgentRun>()
+  for (const run of sorted) {
+    if (!map.has(run.agentId)) {
+      map.set(run.agentId, run)
+    }
+  }
+  return map
 }
 
 export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
@@ -99,14 +157,9 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
 
   const task = state.orchestration.draftTask
   const selectedAgentIds = state.orchestration.selectedAgentIds
-  const sessionStartedAt = state.orchestration.sessionStartedAt
-    ? Date.parse(state.orchestration.sessionStartedAt)
-    : null
+  const sessionStartedAt = state.orchestration.sessionStartedAt ? Date.parse(state.orchestration.sessionStartedAt) : null
 
-  const enabledAgents = useMemo(
-    () => state.agents.items.filter((item) => item.enabled),
-    [state.agents.items],
-  )
+  const enabledAgents = useMemo(() => state.agents.items.filter((item) => item.enabled), [state.agents.items])
   const enabledAgentIds = useMemo(() => new Set(enabledAgents.map((agent) => agent.id)), [enabledAgents])
   const apiKeyIds = useMemo(() => new Set(state.apiKeys.map((item) => item.id)), [state.apiKeys])
   const activeTools = state.tools.items.filter((item) => item.enabled)
@@ -134,9 +187,12 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     return []
   }, [selectedAgentIds, enabledAgentIds, enabledAgents, activeAgent])
 
-  const needsOfficialProviders = enabledAgents.some(
-    (agent) => effectiveSelectedAgentIds.includes(agent.id) && agent.provider === 'official-router',
+  const selectedAgents = useMemo(
+    () => enabledAgents.filter((agent) => effectiveSelectedAgentIds.includes(agent.id)),
+    [enabledAgents, effectiveSelectedAgentIds],
   )
+
+  const needsOfficialProviders = selectedAgents.some((agent) => agent.provider === 'official-router')
 
   useEffect(() => {
     let active = true
@@ -166,37 +222,28 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
     }
   }, [needsOfficialProviders, state.settings.bridgeUrl])
 
-  const officialProviderStates = useMemo(
-    () => (needsOfficialProviders ? aiProviders : []),
-    [needsOfficialProviders, aiProviders],
-  )
-
+  const officialProviderStates = useMemo(() => (needsOfficialProviders ? aiProviders : []), [needsOfficialProviders, aiProviders])
   const codexStatus = bridgeHealth?.providers.find((item) => item.provider === 'codex') ?? null
   const ollamaStatus = bridgeHealth?.providers.find((item) => item.provider === 'ollama') ?? null
   const codexReady = codexStatus?.ready ?? false
   const ollamaReady = ollamaStatus?.ready ?? false
-
-  const selectedAgents = useMemo(
-    () => enabledAgents.filter((agent) => effectiveSelectedAgentIds.includes(agent.id)),
-    [enabledAgents, effectiveSelectedAgentIds],
-  )
 
   const agentAvailability = useMemo(() => {
     const map = new Map<string, { runnable: boolean; reason: string | null }>()
 
     enabledAgents.forEach((agent) => {
       if (!canAgentUseApiKey(agent, apiKeyIds)) {
-        map.set(agent.id, { runnable: false, reason: 'API 키 필요' })
+        map.set(agent.id, { runnable: false, reason: 'API 키 확인 필요' })
         return
       }
 
       if (agent.provider === 'ollama') {
-        map.set(agent.id, { runnable: ollamaReady, reason: ollamaReady ? null : 'Ollama 확인 필요' })
+        map.set(agent.id, { runnable: ollamaReady, reason: ollamaReady ? null : 'Ollama 연결 확인 필요' })
         return
       }
 
       if (agent.provider === 'codex') {
-        map.set(agent.id, { runnable: codexReady, reason: codexReady ? null : 'Codex 확인 필요' })
+        map.set(agent.id, { runnable: codexReady, reason: codexReady ? null : 'Codex 연결 확인 필요' })
         return
       }
 
@@ -204,10 +251,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
         const providerState =
           officialProviderStates.find((item) => item.provider === resolveOfficialProviderId(agent.baseUrl)) ?? null
         const ready = Boolean(providerState?.enabled && providerState?.configured && agent.model.trim())
-        map.set(agent.id, {
-          runnable: ready,
-          reason: ready ? null : '공식 API 설정 확인 필요',
-        })
+        map.set(agent.id, { runnable: ready, reason: ready ? null : '공식 API 설정 확인 필요' })
         return
       }
 
@@ -224,11 +268,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
           id: agent.id,
           tone: codexReady ? 'info' : 'warning',
           summary: codexReady ? '연결됨' : '확인 필요',
-          detail:
-            codexStatus?.warning ||
-            codexStatus?.lastError ||
-            codexStatus?.detail ||
-            'Codex CLI 상태를 아직 확인하지 못했습니다.',
+          detail: sanitizeOperatorMessage(codexStatus?.warning || codexStatus?.lastError || codexStatus?.detail, 'Codex 연결 상태를 아직 확인하지 못했습니다.'),
           label: agent.name,
         }
       }
@@ -238,11 +278,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
           id: agent.id,
           tone: ollamaReady ? 'info' : 'warning',
           summary: ollamaReady ? '연결됨' : '확인 필요',
-          detail:
-            ollamaStatus?.warning ||
-            ollamaStatus?.lastError ||
-            ollamaStatus?.detail ||
-            'Ollama 상태를 아직 확인하지 못했습니다.',
+          detail: sanitizeOperatorMessage(ollamaStatus?.warning || ollamaStatus?.lastError || ollamaStatus?.detail, 'Ollama 연결 상태를 아직 확인하지 못했습니다.'),
           label: agent.name,
         }
       }
@@ -256,11 +292,9 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
           id: agent.id,
           tone: ready ? 'info' : officialStatus ? 'warning' : 'error',
           summary: ready ? '준비됨' : officialStatus ? '설정 필요' : '미설정',
-          detail:
-            (ready && officialStatus ? `${officialStatus.label} · ${agent.model}` : null) ||
-            officialStatus?.last_test_message ||
-            officialStatus?.detail ||
-            '공식 API 공급자를 아직 확인하지 못했습니다.',
+          detail: ready
+            ? `${officialStatus?.label ?? '공식 API'} · ${agent.model}`
+            : sanitizeOperatorMessage(officialStatus?.last_test_message || officialStatus?.detail, '공식 API 공급자를 아직 확인하지 못했습니다.'),
           label: agent.name,
         }
       }
@@ -286,22 +320,14 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   )
 
   const canvasAgentStates = useMemo(
-    () =>
-      selectedAgents.map((agent) => ({
-        id: agent.id,
-        ready: Boolean(agentAvailability.get(agent.id)?.runnable),
-      })),
+    () => selectedAgents.map((agent) => ({ id: agent.id, ready: Boolean(agentAvailability.get(agent.id)?.runnable) })),
     [selectedAgents, agentAvailability],
   )
 
   const sessionSelectedAgentIds = useMemo(
-    () =>
-      state.orchestration.sessionAgentIds.filter((id) =>
-        state.agents.items.some((agent) => agent.id === id),
-      ),
+    () => state.orchestration.sessionAgentIds.filter((id) => state.agents.items.some((agent) => agent.id === id)),
     [state.orchestration.sessionAgentIds, state.agents.items],
   )
-
   const sessionAgentIdSet = useMemo(() => new Set(sessionSelectedAgentIds), [sessionSelectedAgentIds])
 
   const sessionRuns = useMemo(() => {
@@ -310,46 +336,35 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
         if (!sessionAgentIdSet.has(run.agentId) || !sessionStartedAt) {
           return false
         }
-
         return Date.parse(run.startedAt) >= sessionStartedAt - 1000
       })
-      .sort(
-        (left, right) =>
-          Date.parse(right.finishedAt ?? right.startedAt) - Date.parse(left.finishedAt ?? left.startedAt),
-      )
+      .sort((left, right) => Date.parse(right.finishedAt ?? right.startedAt) - Date.parse(left.finishedAt ?? left.startedAt))
   }, [state.agents.runs, sessionAgentIdSet, sessionStartedAt])
 
-  const sessionAgents = useMemo(
-    () => state.agents.items.filter((agent) => sessionAgentIdSet.has(agent.id)),
-    [state.agents.items, sessionAgentIdSet],
-  )
-
-  const latestRunsByAgent = useMemo(() => {
-    const map = new Map<string, AgentRun>()
-    for (const run of sessionRuns) {
-      if (!map.has(run.agentId)) {
-        map.set(run.agentId, run)
-      }
-    }
-    return map
-  }, [sessionRuns])
+  const sessionAgents = useMemo(() => state.agents.items.filter((agent) => sessionAgentIdSet.has(agent.id)), [state.agents.items, sessionAgentIdSet])
+  const latestRunsByAgent = useMemo(() => latestRunMap(sessionRuns), [sessionRuns])
 
   const visibleAgentStatusItems = useMemo(
     () =>
       selectedAgentStatusItems.map((item) => {
         const run = latestRunsByAgent.get(item.id)
-        const latestLog = run?.logs[run.logs.length - 1]?.message
+        const latestLog = run?.logs.at(-1)?.message
 
         if (run?.status === 'running') {
-          return { ...item, summary: '실행 중', detail: latestLog || item.detail, tone: 'info' }
+          return { ...item, summary: '실행 중', detail: sanitizeOperatorMessage(latestLog, item.detail), tone: 'info' }
         }
 
         if (run?.status === 'success') {
-          return { ...item, summary: '최근 완료', detail: latestLog || item.detail, tone: 'success' }
+          return { ...item, summary: '최근 완료', detail: sanitizeOperatorMessage(latestLog, item.detail), tone: 'success' }
         }
 
         if (run?.status === 'error') {
-          return { ...item, summary: '최근 실패', detail: latestLog || run.output || item.detail, tone: 'warning' }
+          return {
+            ...item,
+            summary: '최근 실패',
+            detail: sanitizeOperatorMessage(latestLog || run.output, item.detail),
+            tone: 'warning',
+          }
         }
 
         return item
@@ -359,14 +374,9 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
 
   const sessionRunning = sessionRuns.some((run) => run.status === 'running')
   const sessionHasResults = sessionRuns.length > 0
-  const latestRunEndTime = sessionRuns[0]
-    ? Date.parse(sessionRuns[0].finishedAt ?? sessionRuns[0].startedAt)
-    : runClock
+  const latestRunEndTime = sessionRuns[0] ? Date.parse(sessionRuns[0].finishedAt ?? sessionRuns[0].startedAt) : runClock
   const latestRunElapsedSeconds = sessionRuns[0]
-    ? Math.max(
-        0,
-        Math.floor(((sessionRunning ? runClock : latestRunEndTime) - Date.parse(sessionRuns[0].startedAt)) / 1000),
-      )
+    ? Math.max(0, Math.floor(((sessionRunning ? runClock : latestRunEndTime) - Date.parse(sessionRuns[0].startedAt)) / 1000))
     : 0
   const latestRunElapsedLabel = sessionRuns[0] ? formatElapsedSeconds(latestRunElapsedSeconds) : ''
   const sessionDisplayAgents = sessionHasResults ? sessionAgents : runnableSelectedAgents
@@ -390,18 +400,13 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   }, [sessionRunning])
 
   const hasWorkspaceConnection = Boolean(workspaceAbsolutePath)
-  const canRunTask =
-    Boolean(task.trim()) &&
-    runnableSelectedAgents.length > 0 &&
-    !sessionRunning &&
-    !workspaceError &&
-    hasWorkspaceConnection
+  const canRunTask = Boolean(task.trim()) && runnableSelectedAgents.length > 0 && !sessionRunning && !workspaceError && hasWorkspaceConnection
 
   const taskTemplates = useMemo(
     () => [
       { label: '브리프 정리', value: 'AI 관련 소식을 요약해서 바로 공유할 수 있는 브리프 문서로 정리해 줘.' },
       { label: '다음 작업', value: '최근 실행 결과를 바탕으로 다음 작업 순서를 정리해 줘.' },
-      { label: '자동화 설계', value: '지금 선택한 모델을 병렬로 돌릴 수 있는 자동화 흐름 초안을 제안해 줘.' },
+      { label: '자동화 제안', value: '지금 선택한 모델로 병렬 실행했을 때 유용한 자동화 흐름을 제안해 줘.' },
     ],
     [],
   )
@@ -419,7 +424,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       alerts.push({
         key: 'session-summary',
         tone: sessionErrorCount > 0 ? 'warning' : 'info',
-        text: `최근 실행 · 성공 ${sessionSuccessCount} · 실패 ${sessionErrorCount} · 진행 중 ${sessionRunningCount}${sessionSkippedCount > 0 ? ` · 제외 ${sessionSkippedCount}` : ''}`,
+        text: `최근 실행 · 완료 ${sessionSuccessCount} · 실패 ${sessionErrorCount} · 진행 중 ${sessionRunningCount}${sessionSkippedCount > 0 ? ` · 제외 ${sessionSkippedCount}` : ''}`,
       })
     }
 
@@ -427,7 +432,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       alerts.push({
         key: 'bridge-error',
         tone: 'error',
-        text: bridgeError,
+        text: sanitizeOperatorMessage(bridgeError, '브리지 연결을 다시 확인해야 합니다.'),
         actionLabel: '설정 열기',
         actionPage: 'settings',
       })
@@ -437,16 +442,16 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       alerts.push({
         key: 'workspace-error',
         tone: 'warning',
-        text: workspaceError,
-        actionLabel: '내 파일 열기',
+        text: sanitizeOperatorMessage(workspaceError, '작업 폴더를 다시 연결해야 합니다.'),
+        actionLabel: '파일 열기',
         actionPage: 'files',
       })
     } else if (!hasWorkspaceConnection) {
       alerts.push({
         key: 'workspace-missing',
         tone: 'warning',
-        text: '작업 폴더가 연결되지 않아 실제 실행을 시작할 수 없습니다.',
-        actionLabel: '내 파일 열기',
+        text: '작업 폴더가 연결되지 않아 실행을 시작할 수 없습니다.',
+        actionLabel: '파일 열기',
         actionPage: 'files',
       })
     }
@@ -455,7 +460,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       alerts.push({
         key: 'skipped-agents',
         tone: 'warning',
-        text: `${skippedSelectedAgents.length}개 모델은 아직 실행 조건이 맞지 않아 이번 실행에서 제외됩니다.`,
+        text: `${skippedSelectedAgents.length}개 모델은 아직 실행 조건을 만족하지 않아 이번 실행에서 제외됩니다.`,
       })
     }
 
@@ -531,7 +536,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                 recentPrompt={latestMasterMessage?.text ?? ''}
                 bridgeError={bridgeError}
                 workspaceError={workspaceError}
-                requiresApiKey={skippedSelectedAgents.some((agent) => agentAvailability.get(agent.id)?.reason === 'API 키 필요')}
+                requiresApiKey={skippedSelectedAgents.some((agent) => agentAvailability.get(agent.id)?.reason === 'API 키 확인 필요')}
                 onNavigate={onNavigate}
               />
             </div>
@@ -550,9 +555,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                       key={agent.id}
                       type="button"
                       aria-pressed={selected}
-                      className={`chip orchestration-agent-chip ${
-                        selected ? 'is-active' : 'chip--soft'
-                      } ${availability?.runnable ? '' : 'is-blocked'}`.trim()}
+                      className={`chip orchestration-agent-chip ${selected ? 'is-active' : 'chip--soft'} ${availability?.runnable ? '' : 'is-blocked'}`.trim()}
                       onClick={() => toggleSelectedAgent(agent.id)}
                     >
                       <span className={`orchestration-agent-chip__dot ${availability?.runnable ? 'is-ready' : 'is-blocked'}`} />
@@ -590,15 +593,8 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                     ))}
                   </div>
                 ) : null}
-                <button
-                  type="button"
-                  className="primary-button orchestration-dock__submit"
-                  disabled={!canRunTask}
-                  onClick={runSelectedAgents}
-                >
-                  {sessionRunning
-                    ? `병렬 실행 중 · ${latestRunElapsedLabel || '계속 진행 중'}`
-                    : `${Math.max(runnableSelectedAgents.length, 1)}개 모델 실행`}
+                <button type="button" className="primary-button orchestration-dock__submit" disabled={!canRunTask} onClick={runSelectedAgents}>
+                  {sessionRunning ? `병렬 실행 중 · ${latestRunElapsedLabel || '계속 진행 중'}` : `${Math.max(runnableSelectedAgents.length, 1)}개 모델 실행`}
                 </button>
               </>
             }
@@ -607,18 +603,14 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
       />
 
       <OrchestrationResultsPanel
-        hint={
-          sessionRuns[0]
-            ? runningHint(sessionRuns[0].provider)
-            : '실행을 시작하면 각 모델 결과가 아래 영역에 바로 쌓입니다.'
-        }
+        hint={sessionRuns[0] ? runningHint(sessionRuns[0].provider) : '실행을 시작하면 각 모델 결과가 아래 영역에 바로 들어옵니다.'}
         sessionHasResults={sessionHasResults}
         sessionRunning={sessionRunning}
         cards={
           <div className="orchestration-live-panel__cards">
             {sessionDisplayAgents.map((agent) => {
               const run = latestRunsByAgent.get(agent.id)
-              const latestLog = run?.logs[run.logs.length - 1]
+              const latestLog = run?.logs.at(-1)
               const elapsedLabel =
                 run && run.status === 'running'
                   ? formatElapsedSeconds(Math.max(0, Math.floor((runClock - Date.parse(run.startedAt)) / 1000)))
@@ -629,13 +621,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                   key={agent.id}
                   title={agent.name}
                   provider={executionProviderLabel(agent.provider)}
-                  statusLabel={
-                    run
-                      ? displayRunStatusLabel(run.status)
-                      : agentAvailability.get(agent.id)?.reason
-                        ? '제외됨'
-                        : '대기'
-                  }
+                  statusLabel={run ? displayRunStatusLabel(run.status) : agentAvailability.get(agent.id)?.reason ? '제외됨' : '대기'}
                   model={agent.model}
                   startedAt={run?.startedAt}
                   elapsedLabel={elapsedLabel}

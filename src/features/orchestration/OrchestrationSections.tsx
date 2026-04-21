@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { PageId } from '../../crewData'
 import { FormattedText } from '../../components/ui/FormattedText'
-import { NoticeBanner, PanelCard, SectionHeader, SplitPane, StatusPill, Toolbar } from '../../components/ui/primitives'
+import { NoticeBanner, PanelCard, SectionHeader, StatusPill, Toolbar } from '../../components/ui/primitives'
 import { changeTypeLabel, executionProviderLabel, formatDate, formatFriendlyModelName } from '../../crewPageHelpers'
 import { DisclosureSection, EmptyState } from '../../crewPageShared'
 
@@ -32,12 +32,9 @@ export function OrchestrationStage({
   controls: ReactNode
 }) {
   return (
-    <section className="orchestration-stage">
-      <SplitPane
-        className="orchestration-stage__split orchestration-stage__split--workspace"
-        primary={<div className="orchestration-stage__canvasPane">{canvas}</div>}
-        secondary={<div className="orchestration-stage__controlPane">{controls}</div>}
-      />
+    <section className="orchestration-stage orchestration-stage--workspace">
+      <div className="orchestration-stage__commandPane">{controls}</div>
+      <div className="orchestration-stage__canvasPane">{canvas}</div>
     </section>
   )
 }
@@ -90,22 +87,27 @@ export function OrchestrationControls({
   actions: ReactNode
 }) {
   return (
-    <PanelCard
-      className="orchestration-inline-dock orchestration-dock"
-      title="실행 준비"
-      description="모델을 고르고 작업 지시를 적으면 바로 실행합니다."
-      tone="muted"
-    >
-      <div className="orchestration-inline-dock__selectionHeader">
-        <strong>이번 실행에 포함할 모델</strong>
-        <span>필요한 모델만 남겨서 바로 돌립니다.</span>
+    <section className="orchestration-command-rail">
+      <div className="orchestration-command-block orchestration-command-block--agents">
+        <div className="orchestration-inline-dock__selectionHeader">
+          <strong>실행 대상 모델</strong>
+          <span>필요한 모델만 남겨서 바로 돌립니다.</span>
+        </div>
+        <div className="orchestration-inline-dock__selection">{enabledAgentToggles}</div>
       </div>
-      <div className="orchestration-inline-dock__selection">{enabledAgentToggles}</div>
-      <div className="orchestration-controlForm">
+
+      <div className="orchestration-command-block orchestration-command-block--task">
+        <div className="orchestration-inline-dock__selectionHeader">
+          <strong>작업 지시</strong>
+          <span>짧고 직접적인 문장 하나면 충분합니다.</span>
+        </div>
         {taskField}
-        {actions}
       </div>
-    </PanelCard>
+
+      <PanelCard className="orchestration-inline-dock orchestration-command-block orchestration-command-block--action" tone="muted">
+        <div className="orchestration-controlForm">{actions}</div>
+      </PanelCard>
+    </section>
   )
 }
 
@@ -128,7 +130,7 @@ export function OrchestrationResultsPanel({
     <PanelCard
       className="orchestration-live-panel orchestration-live-panel--stream"
       title="결과"
-      description={sessionRunning ? hint : '최근 실행 결과를 모델별로 나눠 보여줍니다.'}
+      description={sessionRunning ? hint : '최근 실행 결과를 모델별로 바로 확인합니다.'}
       actions={<StatusPill tone={sessionRunning ? 'accent' : 'muted'}>{sessionRunning ? '실행 중' : '최근 실행'}</StatusPill>}
     >
       {cards}
@@ -156,7 +158,13 @@ export function OrchestrationResultCard({
   logs?: Array<{ id: string; createdAt: string; message: string; level: 'info' | 'success' | 'error' }>
 }) {
   const tone =
-    statusLabel === '실행 중' ? 'accent' : statusLabel === '응답 완료' ? 'success' : statusLabel === '실행 오류' ? 'warning' : 'muted'
+    statusLabel === '실행 중'
+      ? 'accent'
+      : statusLabel === '응답 완료'
+        ? 'success'
+        : statusLabel === '실행 오류'
+          ? 'warning'
+          : 'muted'
 
   return (
     <article className="orchestration-run-card">
@@ -219,7 +227,7 @@ export function OrchestrationDetails({
   statusTiles: ReactNode
 }) {
   return (
-    <DisclosureSection className="disclosure--soft orchestration-detail-disclosure" title="자세히 보기" summary="모델 상태와 최근 변경">
+    <DisclosureSection className="disclosure--soft orchestration-detail-disclosure" title="상세 상태" summary="모델 상태와 최근 변경">
       <div className="orchestration-detail-grid">
         <section className="orchestration-detail-block">
           <SectionHeader title="이번 실행 구성" actions={<StatusPill tone="muted">{selectedAgents.length}개</StatusPill>} />
@@ -240,7 +248,7 @@ export function OrchestrationDetails({
               <strong>{signalCount}개</strong>
             </div>
             <div className="summary-row">
-              <span>활성 스킬</span>
+              <span>사용 중 스킬</span>
               <strong>{activeToolCount}개</strong>
             </div>
           </div>
@@ -253,7 +261,7 @@ export function OrchestrationDetails({
           ) : (
             <EmptyState
               title="아직 선택한 모델이 없습니다"
-              description="오른쪽 실행 레일에서 모델을 고르면 여기에서 상태를 바로 볼 수 있습니다."
+              description="위 실행 레일에서 모델을 고르면 여기서 바로 상태를 확인할 수 있습니다."
             />
           )}
         </section>
@@ -289,7 +297,7 @@ export function OrchestrationDetails({
           ) : (
             <EmptyState
               title="아직 실행 기록이 없습니다"
-              description="모델을 실행하면 최근 결과와 변경 파일이 여기에 남습니다."
+              description="모델을 실행하면 여기서 최근 결과와 변경 파일을 바로 확인할 수 있습니다."
             />
           )}
 

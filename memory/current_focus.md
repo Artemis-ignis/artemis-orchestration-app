@@ -617,3 +617,28 @@
   - `orchestration-mobile.png`
   - `skills-mobile.png`
   - `activity-mobile.png`
+## 2026-04-22 Workspace UX Reset Branch - Pass 2
+
+- Orchestration now opens as one workspace instead of `canvas + side dock`:
+  - the run controls moved into a top command rail,
+  - the rail is split into models, task, and action only,
+  - the canvas zoom was tightened so the graph fills more of the visible area,
+  - React Flow controls were removed from the default surface.
+- Orchestration strings were rewritten in Korean again after the page-level corruption cleanup:
+  - run state labels,
+  - task templates,
+  - alerts,
+  - button labels,
+  - result hints.
+- Skills now use stable path-family grouping instead of the duplicate `section/originLabel` values from the bridge:
+  - 기본 도구
+  - 문서·콘텐츠
+  - 디자인·프론트엔드
+  - 앱·게임
+  - 개발·운영
+  - ML·데이터
+- Skills rows were compressed again:
+  - the default row now shows icon, title, one-line summary, source, state, and toggle only,
+  - the old per-item disclosure block was removed from the default list.
+- Updated browser verification for this pass lives under:
+  - `output/playwright/workspace-ux-reset-pass2/`

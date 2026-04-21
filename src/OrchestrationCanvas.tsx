@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Background,
-  Controls,
   Handle,
   MarkerType,
   Position,
@@ -50,8 +49,8 @@ type FlowNodeData = {
   page?: PageId
 }
 
-const BOARD_WIDTH = 1320
-const BOARD_HEIGHT = 760
+const BOARD_WIDTH = 1160
+const BOARD_HEIGHT = 620
 
 function normalizeModelLabel(value: string) {
   return value.trim().replace(/:latest$/i, '')
@@ -581,12 +580,7 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
     }
 
     const frame = window.requestAnimationFrame(() => {
-      flowInstance.fitView({
-        padding: 0.18,
-        minZoom: 0.54,
-        maxZoom: 1.08,
-        duration: 220,
-      })
+      flowInstance.fitView({ padding: 0.1, minZoom: 0.7, maxZoom: 1.22, duration: 220 })
     })
 
     return () => window.cancelAnimationFrame(frame)
@@ -599,9 +593,9 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
         edges={graph.edges}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.18, minZoom: 0.54, maxZoom: 1.08 }}
-        minZoom={0.48}
-        maxZoom={1.36}
+        fitViewOptions={{ padding: 0.1, minZoom: 0.7, maxZoom: 1.22 }}
+        minZoom={0.62}
+        maxZoom={1.4}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
@@ -634,7 +628,6 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
           gap={30}
           size={1}
         />
-        <Controls className="orchestration-flow__controls" position="bottom-right" showInteractive={false} />
       </ReactFlow>
     </div>
   )
