@@ -671,9 +671,34 @@
   - bridge `http://127.0.0.1:4174/api/health` = 200
   - headless Playwright captures under `output/playwright/workspace-ux-reset-pass3/`
     - `orchestration-desktop.png`
-    - `signals-desktop.png`
-    - `skills-desktop.png`
-    - `activity-desktop.png`
-    - `orchestration-mobile.png`
-    - `skills-mobile.png`
-    - `activity-mobile.png`
+  - `signals-desktop.png`
+  - `skills-desktop.png`
+  - `activity-desktop.png`
+  - `orchestration-mobile.png`
+  - `skills-mobile.png`
+  - `activity-mobile.png`
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 4
+
+- 마스터 피드백 기준으로 `생성 글`과 `오케스트레이션 결과`를 다시 재현해서 확인했다.
+- `생성 글`은 `고정 레일 + 넓은 작업면` 구조로 다시 배치했다.
+  - 좌측은 스케줄러 상태, 접힌 생성 설정, 목록만 남긴다.
+  - 우측은 글 본문과 보조 정보가 더 넓게 보이도록 정리했다.
+  - 핵심 클래스:
+    - `signals-ops-shell--posts`
+    - `signals-posts-rail`
+    - `signals-posts-workspace`
+    - `signals-posts-settings-disclosure`
+    - `signals-post-hero__facts`
+- `오케스트레이션 결과`는 카드 그리드를 버리고 세로 스택 리스트로 재구성했다.
+  - 좌측 rail: 모델명, 공급자, 상태, 메타
+  - 우측 content: 결과 본문, 최근 로그
+  - 긴 모델명은 `conciseAgentLabel`로 줄여서 제목 폭을 정리했다.
+- 이번 패스는 실제 문제 화면을 다시 열어 확인했다.
+  - `#/signals` -> 생성 글 탭 -> 첫 게시물 선택
+  - `#/agents` -> 시드된 실행 결과 주입 후 결과 패널 확인
+- 새 검증 캡처:
+  - `output/playwright/workspace-ux-reset-pass4/signals-posts-desktop.png`
+  - `output/playwright/workspace-ux-reset-pass4/signals-posts-mobile.png`
+  - `output/playwright/workspace-ux-reset-pass4/orchestration-results-desktop.png`
+  - `output/playwright/workspace-ux-reset-pass4/orchestration-results-mobile.png`

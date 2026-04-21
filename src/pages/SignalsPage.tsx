@@ -1077,8 +1077,8 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
           xCrossPostStatus={xCrossPostStatus}
         />
       ) : (
-        <div className="auto-posts-shell signals-ops-shell">
-          <div className="auto-posts-side signals-ops-side">
+        <div className="auto-posts-shell signals-ops-shell signals-ops-shell--posts">
+          <div className="auto-posts-side signals-ops-side signals-posts-rail">
             <section className="panel-card signals-panel signals-panel--overview">
               <div className="panel-card__header">
                 <h2>스케줄러 상태</h2>
@@ -1086,7 +1086,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                   {schedulerState.inProgress ? '실행 중' : autoPostSettings.enabled ? '활성' : '비활성'}
                 </span>
               </div>
-              <div className="stack-grid stack-grid--compact">
+              <div className="stack-grid stack-grid--compact signals-posts-summary">
                 <div className="summary-row">
                   <span>마지막 실행</span>
                   <strong>{schedulerState.lastRunAt ? formatDate(schedulerState.lastRunAt) : '없음'}</strong>
@@ -1126,184 +1126,186 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
               </div>
             </section>
 
-            <section className="panel-card signals-panel signals-panel--settings">
-              <div className="panel-card__header">
-                <h2>생성 설정</h2>
-                <span className="chip chip--soft">{autoPostSettings.generationModel}</span>
-              </div>
-              <div className="auto-post-settings-grid">
-                <label className="field">
-                  <span>활성화</span>
-                  <select
-                    value={settingsDraft.enabled ? 'enabled' : 'disabled'}
-                    onChange={(event) =>
-                      setSettingsDraft((current) => ({
-                        ...current,
-                        enabled: event.target.value === 'enabled',
-                      }))
-                    }
+            <DisclosureSection
+              className="disclosure--soft signals-posts-settings-disclosure"
+              summary={`${autoPostSettings.generationModel} · 최대 ${settingsDraft.topK}개`}
+              title="생성 설정"
+            >
+              <section className="panel-card signals-panel signals-panel--settingsCompact">
+                <div className="auto-post-settings-grid">
+                  <label className="field">
+                    <span>활성화</span>
+                    <select
+                      value={settingsDraft.enabled ? 'enabled' : 'disabled'}
+                      onChange={(event) =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          enabled: event.target.value === 'enabled',
+                        }))
+                      }
+                    >
+                      <option value="enabled">활성</option>
+                      <option value="disabled">비활성</option>
+                    </select>
+                  </label>
+
+                  <label className="field">
+                    <span>주기(ms)</span>
+                    <input
+                      type="number"
+                      value={settingsDraft.intervalMs}
+                      onChange={(event) =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          intervalMs: Number(event.target.value || current.intervalMs),
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="field">
+                    <span>최대 생성 수</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={3}
+                      value={settingsDraft.topK}
+                      onChange={(event) =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          topK: Number(event.target.value || current.topK),
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="field">
+                    <span>생성 모델</span>
+                    <input
+                      value={settingsDraft.generationModel}
+                      onChange={(event) =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          generationModel: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="field">
+                    <span>스크린샷 보조</span>
+                    <select
+                      value={settingsDraft.screenshotFallback ? 'on' : 'off'}
+                      onChange={(event) =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          screenshotFallback: event.target.value === 'on',
+                        }))
+                      }
+                    >
+                      <option value="on">사용</option>
+                      <option value="off">사용 안 함</option>
+                    </select>
+                  </label>
+
+                  <label className="field field--full">
+                    <span>저장 경로</span>
+                    <input
+                      value={settingsDraft.outputDir}
+                      onChange={(event) =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          outputDir: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="field">
+                    <span>AI 및 기술 가중치</span>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={settingsDraft.categoryWeights.ai ?? 1}
+                      onChange={(event) =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          categoryWeights: {
+                            ...current.categoryWeights,
+                            ai: Number(event.target.value || current.categoryWeights.ai || 1),
+                          },
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="field">
+                    <span>연구 가중치</span>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={settingsDraft.categoryWeights.research ?? 1.05}
+                      onChange={(event) =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          categoryWeights: {
+                            ...current.categoryWeights,
+                            research: Number(event.target.value || current.categoryWeights.research || 1.05),
+                          },
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="field">
+                    <span>오픈소스 가중치</span>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={settingsDraft.categoryWeights.opensource ?? 0.98}
+                      onChange={(event) =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          categoryWeights: {
+                            ...current.categoryWeights,
+                            opensource: Number(event.target.value || current.categoryWeights.opensource || 0.98),
+                          },
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="field">
+                    <span>비즈니스 가중치</span>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={settingsDraft.categoryWeights.business ?? 0.9}
+                      onChange={(event) =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          categoryWeights: {
+                            ...current.categoryWeights,
+                            business: Number(event.target.value || current.categoryWeights.business || 0.9),
+                          },
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+
+                <div className="badge-row">
+                  <button
+                    className="primary-button"
+                    disabled={postActionLoading}
+                    onClick={() => void executeSaveSettings()}
+                    type="button"
                   >
-                    <option value="enabled">활성</option>
-                    <option value="disabled">비활성</option>
-                  </select>
-                </label>
-
-                <label className="field">
-                  <span>주기(ms)</span>
-                  <input
-                    type="number"
-                    value={settingsDraft.intervalMs}
-                    onChange={(event) =>
-                      setSettingsDraft((current) => ({
-                        ...current,
-                        intervalMs: Number(event.target.value || current.intervalMs),
-                      }))
-                    }
-                  />
-                </label>
-
-                <label className="field">
-                  <span>최대 생성 수</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={3}
-                    value={settingsDraft.topK}
-                    onChange={(event) =>
-                      setSettingsDraft((current) => ({
-                        ...current,
-                        topK: Number(event.target.value || current.topK),
-                      }))
-                    }
-                  />
-                </label>
-
-                <label className="field">
-                  <span>생성 모델</span>
-                  <input
-                    value={settingsDraft.generationModel}
-                    onChange={(event) =>
-                      setSettingsDraft((current) => ({
-                        ...current,
-                        generationModel: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-
-                <label className="field">
-                  <span>스크린샷 보조</span>
-                  <select
-                    value={settingsDraft.screenshotFallback ? 'on' : 'off'}
-                    onChange={(event) =>
-                      setSettingsDraft((current) => ({
-                        ...current,
-                        screenshotFallback: event.target.value === 'on',
-                      }))
-                    }
-                  >
-                    <option value="on">사용</option>
-                    <option value="off">사용 안 함</option>
-                  </select>
-                </label>
-
-                <label className="field field--full">
-                  <span>저장 경로</span>
-                  <input
-                    value={settingsDraft.outputDir}
-                    onChange={(event) =>
-                      setSettingsDraft((current) => ({
-                        ...current,
-                        outputDir: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-
-                <label className="field">
-                  <span>AI 및 기술 가중치</span>
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={settingsDraft.categoryWeights.ai ?? 1}
-                    onChange={(event) =>
-                      setSettingsDraft((current) => ({
-                        ...current,
-                        categoryWeights: {
-                          ...current.categoryWeights,
-                          ai: Number(event.target.value || current.categoryWeights.ai || 1),
-                        },
-                      }))
-                    }
-                  />
-                </label>
-
-                <label className="field">
-                  <span>연구 가중치</span>
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={settingsDraft.categoryWeights.research ?? 1.05}
-                    onChange={(event) =>
-                      setSettingsDraft((current) => ({
-                        ...current,
-                        categoryWeights: {
-                          ...current.categoryWeights,
-                          research: Number(event.target.value || current.categoryWeights.research || 1.05),
-                        },
-                      }))
-                    }
-                  />
-                </label>
-
-                <label className="field">
-                  <span>오픈소스 가중치</span>
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={settingsDraft.categoryWeights.opensource ?? 0.98}
-                    onChange={(event) =>
-                      setSettingsDraft((current) => ({
-                        ...current,
-                        categoryWeights: {
-                          ...current.categoryWeights,
-                          opensource: Number(event.target.value || current.categoryWeights.opensource || 0.98),
-                        },
-                      }))
-                    }
-                  />
-                </label>
-
-                <label className="field">
-                  <span>비즈니스 가중치</span>
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={settingsDraft.categoryWeights.business ?? 0.9}
-                    onChange={(event) =>
-                      setSettingsDraft((current) => ({
-                        ...current,
-                        categoryWeights: {
-                          ...current.categoryWeights,
-                          business: Number(event.target.value || current.categoryWeights.business || 0.9),
-                        },
-                      }))
-                    }
-                  />
-                </label>
-              </div>
-
-              <div className="badge-row">
-                <button
-                  className="primary-button"
-                  disabled={postActionLoading}
-                  onClick={() => void executeSaveSettings()}
-                  type="button"
-                >
-                  설정 저장
-                </button>
-              </div>
-            </section>
+                    설정 저장
+                  </button>
+                </div>
+              </section>
+            </DisclosureSection>
 
             <section className="panel-card signals-panel signals-panel--list">
               <div className="panel-card__header">
@@ -1360,7 +1362,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
             </section>
           </div>
 
-          <div className="auto-posts-detail signals-ops-detail">
+          <div className="auto-posts-detail signals-ops-detail signals-posts-workspace">
             {actionMessage ? (
               <div className="status-banner status-banner--info">
                 <Icon name="spark" size={16} />
@@ -1377,7 +1379,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                         {selectedPost.subtitleLines.join(' / ') || selectedPost.lead}
                       </p>
                     </div>
-                    <div className="badge-row">
+                    <div className="badge-row signals-post-hero__badges">
                       <span className="chip chip--soft">{selectedPost.category}</span>
                       <span className="chip chip--soft">점수 {Math.round(selectedPost.topicScore)}</span>
                       <span className={`chip ${selectedPost.status === 'ready' ? 'is-active' : 'chip--soft'}`}>
@@ -1386,7 +1388,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                     </div>
                   </div>
 
-                  <div className="badge-row">
+                  <div className="badge-row signals-post-hero__actions">
                     <button
                       className="primary-button"
                       disabled={postActionLoading}
@@ -1413,13 +1415,15 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                     </button>
                   </div>
 
-                  <div className="summary-row summary-row--soft">
-                    <span>저장 위치</span>
-                    <strong>{selectedPost.workspacePath}</strong>
-                  </div>
-                  <div className="summary-row summary-row--soft">
-                    <span>생성 모델</span>
-                    <strong>{selectedPost.generationModel}</strong>
+                  <div className="signals-post-hero__facts">
+                    <div className="summary-row summary-row--soft">
+                      <span>저장 위치</span>
+                      <strong>{selectedPost.workspacePath}</strong>
+                    </div>
+                    <div className="summary-row summary-row--soft">
+                      <span>생성 모델</span>
+                      <strong>{selectedPost.generationModel}</strong>
+                    </div>
                   </div>
                 </section>
 
@@ -1484,7 +1488,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                       <span className="chip chip--soft">{selectedPost.sourceItems.length}개 출처</span>
                     </div>
 
-                    <div className="stack-grid stack-grid--compact">
+                    <div className="stack-grid stack-grid--compact signals-post-sources">
                       {selectedPost.sourceItems.map((item) => (
                         <article key={item.id} className="panel-card panel-card--muted">
                           <div className="card-topline">

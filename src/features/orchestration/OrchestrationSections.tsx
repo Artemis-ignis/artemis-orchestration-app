@@ -168,31 +168,35 @@ export function OrchestrationResultCard({
 
   return (
     <article className="orchestration-run-card">
-      <div className="orchestration-run-card__header">
-        <div>
-          <strong>{title}</strong>
-          <span>{provider}</span>
+      <div className="orchestration-run-card__rail">
+        <div className="orchestration-run-card__header">
+          <div>
+            <strong>{title}</strong>
+            <span>{provider}</span>
+          </div>
+          <StatusPill tone={tone}>{statusLabel}</StatusPill>
         </div>
-        <StatusPill tone={tone}>{statusLabel}</StatusPill>
-      </div>
-      <div className="orchestration-run-card__meta">
-        <StatusPill tone="muted">{formatFriendlyModelName(model)}</StatusPill>
-        {startedAt ? <StatusPill tone="muted">{formatDate(startedAt)}</StatusPill> : null}
-        {elapsedLabel ? <StatusPill tone="muted">{elapsedLabel}</StatusPill> : null}
-      </div>
-      <div className="orchestration-run-card__body">
-        <FormattedText text={prettifyRunBody(body)} />
-      </div>
-      {logs?.length ? (
-        <div className="orchestration-run-card__logs">
-          {logs.map((log) => (
-            <div key={log.id} className={`run-log run-log--${log.level}`}>
-              <span>{formatDate(log.createdAt)}</span>
-              <p>{prettifyRunBody(log.message)}</p>
-            </div>
-          ))}
+        <div className="orchestration-run-card__meta">
+          <StatusPill tone="muted">{formatFriendlyModelName(model)}</StatusPill>
+          {startedAt ? <StatusPill tone="muted">{formatDate(startedAt)}</StatusPill> : null}
+          {elapsedLabel ? <StatusPill tone="muted">{elapsedLabel}</StatusPill> : null}
         </div>
-      ) : null}
+      </div>
+      <div className="orchestration-run-card__content">
+        <div className="orchestration-run-card__body">
+          <FormattedText text={prettifyRunBody(body)} />
+        </div>
+        {logs?.length ? (
+          <div className="orchestration-run-card__logs">
+            {logs.map((log) => (
+              <div key={log.id} className={`run-log run-log--${log.level}`}>
+                <span>{formatDate(log.createdAt)}</span>
+                <p>{prettifyRunBody(log.message)}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
     </article>
   )
 }

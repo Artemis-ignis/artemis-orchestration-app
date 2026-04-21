@@ -619,7 +619,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
               return (
                 <OrchestrationResultCard
                   key={agent.id}
-                  title={agent.name}
+                  title={conciseAgentLabel(agent)}
                   provider={executionProviderLabel(agent.provider)}
                   statusLabel={run ? displayRunStatusLabel(run.status) : agentAvailability.get(agent.id)?.reason ? '제외됨' : '대기'}
                   model={agent.model}

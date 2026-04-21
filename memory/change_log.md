@@ -1199,3 +1199,28 @@
   - preview `http://127.0.0.1:4173/` = 200
   - bridge `http://127.0.0.1:4174/api/health` = 200
   - headless Playwright captures under `output/playwright/workspace-ux-reset-pass3/`
+
+## 2026-04-22 Workspace UX Reset - Pass 4
+
+- Reworked the generated-posts screen in `src/pages/SignalsPage.tsx` and `src/styles/pages/support.css` around a narrower left rail plus a wider reading workspace.
+- Moved generated-post settings behind a soft disclosure and added dedicated layout hooks:
+  - `signals-ops-shell--posts`
+  - `signals-posts-rail`
+  - `signals-posts-workspace`
+  - `signals-posts-settings-disclosure`
+  - `signals-post-hero__facts`
+- Rebuilt `OrchestrationResultCard` in `src/features/orchestration/OrchestrationSections.tsx` into a split layout:
+  - left rail for title/provider/status/meta
+  - right content area for formatted body + recent logs
+- Updated `src/pages/OrchestrationPage.tsx` to use `conciseAgentLabel(agent)` in the result cards so long model titles no longer dominate the row.
+- Added final result-panel overrides in `src/styles/pages/orchestration.css` so orchestration results render as a vertical list instead of equal-width cards.
+- Verification:
+  - `npm run lint`
+  - `npm run build`
+  - preview `http://127.0.0.1:4173/` = 200
+  - bridge `http://127.0.0.1:4174/api/health` = 200
+  - headless Playwright captures under `output/playwright/workspace-ux-reset-pass4/`
+    - `signals-posts-desktop.png`
+    - `signals-posts-mobile.png`
+    - `orchestration-results-desktop.png`
+    - `orchestration-results-mobile.png`
