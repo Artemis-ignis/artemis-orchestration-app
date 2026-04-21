@@ -58,10 +58,14 @@
     - prefer the real file's Windows short path such as `C:/Users/.../CODEXW~1/.../CHAT-D~1.PNG`,
     - if a usable short path is unavailable, copy the image to a no-space cache path and send that cache path instead,
     - keep the original source as a normal file link/card alongside the inline image when needed,
-  - `scripts/build-inline-image-preview.ps1` now emits:
-    - a no-space markdown image line,
-    - the matching original file-link line,
-    - the chosen delivery mode (`short-path` or `staged-copy`).
+- `scripts/build-inline-image-preview.ps1` now emits:
+  - a no-space markdown image line,
+  - the matching original file-link line,
+  - the chosen delivery mode (`short-path` or `staged-copy`).
+- Repository branch state was simplified after the workspace polish push:
+  - active working branch is `feat/source-agnostic-publisher`,
+  - `main` remains the only long-lived base branch,
+  - older already-contained branches were deleted locally and on GitHub so future sessions do not switch across stale UI/publisher branches.
 
 - `feat/source-agnostic-publisher` now generalizes the older X autopost branch into a content-ingest and internal-publishing pipeline instead of an X-first pipeline.
 - The bridge now exposes source-agnostic publisher APIs:

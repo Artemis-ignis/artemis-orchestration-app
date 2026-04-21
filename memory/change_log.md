@@ -939,3 +939,22 @@
 - Reconfirmed live local runtime health after the pass:
   - preview `http://127.0.0.1:4173/` returned `200`
   - bridge `http://127.0.0.1:4174/api/health` returned `200`
+
+## 2026-04-21 Branch And GitHub Cleanup
+
+- Removed the stray untracked `decoded.txt` temp file before staging.
+- Staged the current Artemis workspace changes as one intentional publish set instead of leaving them split across old branch history.
+- Re-ran:
+  - `npm run lint`
+  - `npm run build`
+- Committed the full workspace/publisher/UI cleanup on `feat/source-agnostic-publisher` as:
+  - `7c63e99` `feat: consolidate Artemis workspace polish`
+- Pushed the updated branch to GitHub.
+- Deleted already-contained stale branches both locally and on GitHub:
+  - `codex/artemis-routing-ui-polish`
+  - `codex/ollama-health-stability`
+  - `feat/premium-ui-shell`
+  - `feat/x-autopost-pipeline`
+- The repo branch surface is now intentionally reduced to:
+  - `main`
+  - `feat/source-agnostic-publisher`
