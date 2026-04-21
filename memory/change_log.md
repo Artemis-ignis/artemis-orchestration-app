@@ -958,3 +958,104 @@
 - The repo branch surface is now intentionally reduced to:
   - `main`
   - `feat/source-agnostic-publisher`
+
+## 2026-04-21 Orchestration Layout-First Pass
+
+- Re-applied the orchestration route using the actual `frontend-skill` rules instead of only changing colors:
+  - one primary workspace,
+  - one slim execution dock,
+  - no intro banner ahead of the task surface,
+  - hidden results until the operator actually runs something.
+- Updated `src/features/orchestration/OrchestrationSections.tsx`:
+  - removed the stage `PanelCard` wrapper,
+  - turned the right side into a simpler dock wrapper,
+  - made the results panel return `null` until there is a running or completed session,
+  - flattened the disclosure internals into simpler detail blocks instead of nested cards.
+- Updated `src/pages/OrchestrationPage.tsx`:
+  - removed `PageIntro` from the route,
+  - let the orchestration stage become the first viewport immediately.
+- Updated `src/styles/pages/orchestration.css`:
+  - replaced the card-heavy first viewport with a layout-first composition,
+  - widened the canvas and visually demoted the dock,
+  - turned template actions and notices into lighter list-like treatments,
+  - simplified result cards and detail blocks into divided sections.
+- Re-verified with:
+  - `npm run lint`
+  - `npm run build`
+  - headless screenshot under `output/playwright/orchestration-layout-pass/orchestration-desktop-layout.png`
+
+## 2026-04-21 Orchestration Dock Compression Pass
+
+- Rebuilt `src/features/orchestration/OrchestrationSections.tsx` cleanly after the accidental delete and kept the route in the same workspace-first direction.
+- Simplified the orchestration structure again:
+  - the stage header no longer competes with the canvas,
+  - the execution dock keeps only one active alert,
+  - templates are trimmed to the first two quick starts,
+  - quick starts disappear once the operator types into the task field,
+  - results still stay hidden until a run is active or has completed,
+  - details remain pushed below the fold inside one disclosure block.
+- Tightened the dock surface in `src/styles/pages/orchestration.css`:
+  - smaller chip height,
+  - shorter textarea,
+  - subtler placeholder,
+  - less spacing around the dock and detail blocks.
+- Re-verified with:
+  - `npm run lint`
+  - `npm run build`
+  - preview `http://127.0.0.1:4173/` returned `200`
+  - bridge `http://127.0.0.1:4174/api/health` returned `200`
+  - headless captures under `output/playwright/orchestration-dock-pass/`
+    - `orchestration-desktop-dock.png`
+    - `orchestration-desktop-dock-final.png`
+
+## 2026-04-21 Orchestration Node Density Pass
+
+- Tightened the orchestration graph without changing the underlying flow structure:
+  - worker nodes now use concise titles through `conciseAgentLabel()` in `src/OrchestrationCanvas.tsx`,
+  - official router nodes now read `공식 API`,
+  - the gemma worker now reads `gemma4`,
+  - worker and output nodes no longer render their subtitle rows.
+- Added late flow-specific overrides in `src/styles/legacy.css` so the React Flow node sizes match the new quieter orchestration surface:
+  - narrower worker/output node widths,
+  - slightly smaller node titles,
+  - smaller badges.
+- Re-verified with:
+  - `npm run lint`
+  - `npm run build`
+  - headless capture under `output/playwright/orchestration-node-pass/orchestration-desktop-node-clean.png`
+
+## 2026-04-21 Orchestration Minimal Surface Pass
+
+- Flattened the orchestration route further without changing the flow model:
+  - removed the canvas help chip from `src/OrchestrationCanvas.tsx`,
+  - removed the stage and dock section headers from `src/features/orchestration/OrchestrationSections.tsx`,
+  - stopped rendering info-only orchestration alerts,
+  - hid the results panel until there is actual output instead of showing an empty running placeholder,
+  - shortened the disclosure label to one `상세 보기` row.
+- Tightened the first viewport again in `src/styles/pages/orchestration.css`:
+  - wider canvas / narrower dock split,
+  - cardless dock section treatment,
+  - hidden flow controls until the canvas is hovered,
+  - worker/output node badges hidden,
+  - orchestration disclosure reduced to a thin divider row.
+- Re-verified with:
+  - `npm run lint`
+  - `npm run build`
+  - preview `http://127.0.0.1:4173/` returned `200`
+  - bridge `http://127.0.0.1:4174/api/health` returned `200`
+  - headless captures under `output/playwright/orchestration-minimal-pass/`
+    - `orchestration-desktop-minimal-final.png`
+    - `orchestration-mobile-minimal-final.png`
+
+## 2026-04-21 Orchestration Mobile Ordering Pass
+
+- Continued the orchestration cleanup specifically for narrow layouts:
+  - mobile now places the execution rail before the canvas by reordering the split-pane grid items,
+  - the inline starter template row is hidden on narrow widths to reduce clutter,
+  - the mobile canvas height is reduced so the first scroll covers more of the actionable UI,
+  - flow zoom controls are hidden on mobile,
+  - the agent chip label in `src/pages/OrchestrationPage.tsx` now renders through a dedicated label span so long model names truncate cleanly.
+- Re-verified with:
+  - `npm run lint`
+  - `npm run build`
+  - headless capture under `output/playwright/orchestration-mobile-pass3/orchestration-mobile-pass3.png`

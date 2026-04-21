@@ -520,10 +520,57 @@
 - The last major mismatch was the flow canvas legacy override layer:
   - `src/styles/legacy.css` now force-overrides the late orchestration flow styles so hub, nodes, badges, controls, and edges no longer fall back to the old blue/cold treatment,
   - the hub now reads red-dark, worker nodes are matte black, and the flow edges use neutral or red states instead of icy blue.
+- The orchestration route is now being treated as a workspace-first product surface rather than a dashboard:
+  - `PageIntro` was removed from the route so the first viewport starts directly with the canvas workspace,
+  - the main stage is now a plain composition instead of a nested premium card shell,
+  - the right rail is treated as a slim execution dock,
+  - result history stays hidden until there is an active or recent run,
+  - detailed status and file information remain inside the disclosure instead of competing in the first viewport.
 - Verification for this final theme pass lives under `output/playwright/netflix-final-pass/`:
   - `orchestration-desktop-final.png`
   - `settings-desktop-final.png`
   - `chat-desktop-final.png`
+- A follow-up workspace-first screenshot after the layout pass now lives under `output/playwright/orchestration-layout-pass/`:
+  - `orchestration-desktop-layout.png`
+- The orchestration dock was compressed again after the layout-first pass:
+  - the deleted `OrchestrationSections.tsx` file was rebuilt cleanly,
+  - the stage header was removed so the first viewport starts on the canvas immediately,
+  - the right dock now shows only one alert at a time and keeps templates to two quick starters,
+  - starter templates disappear once the operator begins typing,
+  - the detail area remains collapsed into one `자세히 보기` disclosure below the workspace,
+  - updated browser verification now lives under `output/playwright/orchestration-dock-pass/`
+    - `orchestration-desktop-dock.png`
+    - `orchestration-desktop-dock-final.png`
+- The orchestration canvas itself is now denser and cleaner without changing the flow model:
+  - worker nodes use shorter titles such as `GPT-5.4`, `공식 API`, and `gemma4`,
+  - worker and output nodes no longer spend a second line on subtitles,
+  - node badge and title sizing was tightened in the late legacy override layer so the graph reads as one flow instead of a cluster of mini cards,
+  - updated verification now lives under `output/playwright/orchestration-node-pass/`
+    - `orchestration-desktop-node-clean.png`
 - Keep the screenshot rule unchanged while reviewing these captures:
   - do not send or inspect long paths with spaces,
   - if a screenshot must be shown, generate and use the script-emitted short no-space path only.
+
+## 2026-04-21 Orchestration Minimal Surface Pass
+
+- The orchestration first viewport now behaves more like one working surface:
+  - the canvas help chip was removed,
+  - the right dock no longer carries its own title block,
+  - info-only notices no longer render in the dock,
+  - worker and output node badges are hidden so labels and edges lead the scan,
+  - the results panel stays hidden until there is actual output,
+  - the collapsed details area now reads as a thin disclosure row instead of a heavy panel.
+- Browser verification for this pass now lives under `output/playwright/orchestration-minimal-pass/`:
+  - `orchestration-desktop-minimal-final.png`
+  - `orchestration-mobile-minimal-final.png`
+
+## 2026-04-21 Orchestration Mobile Ordering Pass
+
+- The orchestration mobile route now prioritizes action before the board:
+  - the execution rail moves above the canvas on narrow widths,
+  - mobile hides the inline starter template row,
+  - the canvas height is reduced on mobile,
+  - flow zoom controls stay hidden on touch layouts,
+  - long agent chip labels now truncate instead of stretching the rail.
+- Browser verification for this pass now lives under `output/playwright/orchestration-mobile-pass3/`:
+  - `orchestration-mobile-pass3.png`

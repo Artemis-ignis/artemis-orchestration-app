@@ -115,6 +115,24 @@ function providerLabel(value: string) {
   }
 }
 
+function conciseAgentLabel(agent: AgentItem) {
+  const model = normalizeModelLabel(agent.model || agent.name)
+
+  if (agent.provider === 'official-router') {
+    return '공식 API'
+  }
+
+  if (agent.provider === 'codex' && /gpt-5\.4/i.test(model)) {
+    return 'GPT-5.4'
+  }
+
+  if (agent.provider === 'ollama' && /gemma4-e4b/i.test(model)) {
+    return 'gemma4'
+  }
+
+  return compactModelLabel(model || agent.name)
+}
+
 function latestRunMap(sessionRuns: AgentRun[]) {
   const sorted = sessionRuns
     .slice()
@@ -367,10 +385,10 @@ function createFlowModel({
   const workerAgents = selectedAgents.slice(0, 6)
   const workerPositions = createParallelWorkerPositions(workerAgents.length)
 
-  nodes.push({
-    id: 'result',
-    type: 'orchestration',
-    position: { x: 1016, y: 302 },
+    nodes.push({
+      id: 'result',
+      type: 'orchestration',
+      position: { x: 1016, y: 302 },
     data: {
       title: '결과',
       subtitle: resultSubtitle,
@@ -399,7 +417,7 @@ function createFlowModel({
       type: 'orchestration',
       position: workerPositions[index],
       data: {
-        title: compactModelLabel(agent.model || agent.name),
+        title: conciseAgentLabel(agent),
         fullTitle: agent.name,
         subtitle: providerLabel(agent.provider),
         badge: workerState.badge,
@@ -445,6 +463,7 @@ function createFlowModel({
 function OrchestrationFlowNode({ data }: NodeProps<Node<FlowNodeData>>) {
   const isHub = data.kind === 'hub'
   const isCompact = data.kind === 'trigger' || data.kind === 'standby'
+  const showSubtitle = !isCompact && data.kind === 'hub' && Boolean(data.subtitle)
 
   const nodeClasses = [
     'orchestration-flow-node',
@@ -476,7 +495,7 @@ function OrchestrationFlowNode({ data }: NodeProps<Node<FlowNodeData>>) {
             <i className={`orchestration-flow-node__dot is-${data.status}`} />
             <span>{data.badge}</span>
           </div>
-          {data.subtitle ? <p className="orchestration-flow-node__subtitle">{data.subtitle}</p> : null}
+          {showSubtitle ? <p className="orchestration-flow-node__subtitle">{data.subtitle}</p> : null}
         </>
       ) : (
         <>
@@ -490,7 +509,7 @@ function OrchestrationFlowNode({ data }: NodeProps<Node<FlowNodeData>>) {
               {data.badge}
             </span>
           </div>
-          {data.subtitle ? <p className="orchestration-flow-node__subtitle">{data.subtitle}</p> : null}
+          {showSubtitle ? <p className="orchestration-flow-node__subtitle">{data.subtitle}</p> : null}
         </>
       )}
 
@@ -575,9 +594,6 @@ export function OrchestrationCanvas(props: OrchestrationCanvasProps) {
 
   return (
     <div className="orchestration-canvas orchestration-canvas--flow">
-      <div className="orchestration-canvas__hud">
-        <span>드래그로 이동 · 휠로 확대</span>
-      </div>
       <ReactFlow
         nodes={graph.nodes}
         edges={graph.edges}

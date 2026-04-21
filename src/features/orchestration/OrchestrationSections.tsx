@@ -12,11 +12,7 @@ export function OrchestrationStage({
   controls: ReactNode
 }) {
   return (
-    <PanelCard className="orchestration-stage orchestration-stage--premium">
-      <SectionHeader
-        title="실행 흐름"
-        description="왼쪽에서 흐름을 보고, 오른쪽에서 선택과 지시만 바로 조정합니다."
-      />
+    <PanelCard className="orchestration-stage orchestration-stage--poster">
       <SplitPane
         className="orchestration-stage__split"
         primary={<div className="orchestration-stage__canvasPane">{canvas}</div>}
@@ -39,13 +35,16 @@ export function OrchestrationAlerts({
   }>
   onNavigate: (page: PageId) => void
 }) {
-  if (alerts.length === 0) {
+  const priorityAlerts = alerts.filter((alert) => alert.tone !== 'info')
+  const visibleAlerts = priorityAlerts.slice(0, 1)
+
+  if (visibleAlerts.length === 0) {
     return null
   }
 
   return (
     <div className="orchestration-alertStack">
-      {alerts.map((alert) => (
+      {visibleAlerts.map((alert) => (
         <NoticeBanner
           key={alert.key}
           action={
@@ -72,12 +71,8 @@ export function OrchestrationControls({
   actions: ReactNode
 }) {
   return (
-    <div className="orchestration-controlStack">
-      <PanelCard className="orchestration-inline-dock" tone="muted">
-        <SectionHeader
-          title="지금 실행"
-          description="모델을 고르고 지시를 넣으면 바로 병렬 실행합니다."
-        />
+    <div className="orchestration-controlStack orchestration-dock">
+      <PanelCard className="orchestration-inline-dock orchestration-dock__section" tone="muted">
         <div className="orchestration-inline-dock__selection">{enabledAgentToggles}</div>
         <div className="orchestration-controlForm">
           {taskField}
@@ -99,14 +94,18 @@ export function OrchestrationResultsPanel({
   hint: string
   cards: ReactNode
 }) {
+  if (!sessionHasResults) {
+    return null
+  }
+
   return (
-    <PanelCard className="orchestration-live-panel">
+    <PanelCard className="orchestration-live-panel orchestration-live-panel--stream">
       <SectionHeader
-        title="실행 결과"
-        description={hint}
+        title="결과"
+        description={sessionRunning ? hint : undefined}
         actions={
           <StatusPill tone={sessionRunning ? 'accent' : 'muted'}>
-            {sessionRunning ? '진행 중' : sessionHasResults ? '최근 세션' : '대기 중'}
+            {sessionRunning ? '진행 중' : '최근 세션'}
           </StatusPill>
         }
       />
@@ -114,8 +113,8 @@ export function OrchestrationResultsPanel({
         cards
       ) : (
         <EmptyState
-          title="결과는 여기로 모입니다"
-          description="모델을 실행하면 각 결과와 최근 로그가 이 영역에 바로 쌓입니다."
+          title="첫 응답을 기다리는 중입니다"
+          description="실행이 시작되면 각 모델의 결과가 이 영역으로 바로 쌓입니다."
         />
       )}
     </PanelCard>
@@ -202,9 +201,9 @@ export function OrchestrationDetails({
   statusTiles: ReactNode
 }) {
   return (
-    <DisclosureSection className="disclosure--soft" summary="모델 상태, 최근 결과, 변경 파일" title="자세히 보기">
+    <DisclosureSection className="disclosure--soft" title="상세 보기">
       <div className="orchestration-detail-grid">
-        <PanelCard>
+        <section className="orchestration-detail-block">
           <SectionHeader title="선택 모델" actions={<StatusPill tone="muted">{selectedAgents.length}개</StatusPill>} />
           <div className="chip-wrap">
             {selectedAgents.length > 0 ? (
@@ -227,23 +226,23 @@ export function OrchestrationDetails({
               <strong>{activeToolCount}개</strong>
             </div>
           </div>
-        </PanelCard>
+        </section>
 
-        <PanelCard>
-          <SectionHeader title="모델 상태" description="첫 화면에서 뺀 상태 정보는 여기서 한 번에 확인합니다." />
+        <section className="orchestration-detail-block">
+          <SectionHeader title="모델 상태" />
           {selectedAgents.length > 0 ? (
             <div className="orchestration-statusGrid orchestration-statusGrid--detail">{statusTiles}</div>
           ) : (
             <EmptyState
               title="상태를 볼 모델이 없습니다"
-              description="오른쪽 실행 도크에서 모델을 고르면 연결 상태와 최근 실행 상태가 여기로 모입니다."
+              description="오른쪽에서 모델을 고르면 연결 상태와 최근 실행 상태가 여기에 표시됩니다."
             />
           )}
-        </PanelCard>
+        </section>
 
-        <PanelCard>
+        <section className="orchestration-detail-block orchestration-detail-block--wide">
           <SectionHeader
-            title="최근 결과와 로그"
+            title="최근 실행"
             actions={sessionStatus ? <StatusPill tone="muted">{sessionStatus}</StatusPill> : undefined}
           />
           {latestAgentExecution ? (
@@ -251,12 +250,13 @@ export function OrchestrationDetails({
               <div className="summary-row">
                 <span>최근 실제 실행</span>
                 <strong>
-                  {executionProviderLabel(latestAgentExecution.provider)} · {formatFriendlyModelName(latestAgentExecution.model)}
+                  {executionProviderLabel(latestAgentExecution.provider)} ·{' '}
+                  {formatFriendlyModelName(latestAgentExecution.model)}
                 </strong>
               </div>
               <div className="chip-wrap">
                 {latestChangedFiles.length > 0 ? (
-                  latestChangedFiles.slice(0, 6).map((item) => (
+                  latestChangedFiles.slice(0, 5).map((item) => (
                     <StatusPill key={`${item.changeType}:${item.relativePath}`} tone="muted">
                       {changeTypeLabel(item.changeType)} · {item.relativePath}
                     </StatusPill>
@@ -272,7 +272,7 @@ export function OrchestrationDetails({
           ) : (
             <EmptyState
               title="아직 실제 실행 기록이 없습니다"
-              description="병렬 실행을 한 번 돌리면 최근 실행 결과와 변경 파일이 여기로 모입니다."
+              description="병렬 실행을 한 번 돌리면 최근 실행 결과와 변경 파일이 여기에 모입니다."
             />
           )}
 
@@ -297,13 +297,8 @@ export function OrchestrationDetails({
                 </article>
               ))}
             </div>
-          ) : (
-            <EmptyState
-              title="아직 실행 로그가 없습니다"
-              description="모델을 병렬 실행하면 최근 로그가 이 영역에 간단히 쌓입니다."
-            />
-          )}
-        </PanelCard>
+          ) : null}
+        </section>
       </div>
     </DisclosureSection>
   )

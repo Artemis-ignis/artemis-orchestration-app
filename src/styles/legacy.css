@@ -14187,6 +14187,24 @@ select:focus-visible {
   stroke: rgba(255, 107, 115, 0.42) !important;
 }
 
+.orchestration-flow-node--worker,
+.orchestration-flow-node--output {
+  min-width: 164px !important;
+  max-width: 164px !important;
+}
+
+.orchestration-flow-node--worker .orchestration-flow-node__title,
+.orchestration-flow-node--output .orchestration-flow-node__title {
+  font-size: 0.88rem !important;
+}
+
+.orchestration-flow-node--worker .orchestration-flow-node__badge,
+.orchestration-flow-node--output .orchestration-flow-node__badge {
+  min-height: 18px !important;
+  padding: 0 6px !important;
+  font-size: 0.62rem !important;
+}
+
 /* Workspace simplification pass */
 .crew-shell {
   grid-template-columns: 232px minmax(0, 1fr);

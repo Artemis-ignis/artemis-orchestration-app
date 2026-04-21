@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { PageId } from '../crewData'
-import { PageIntro } from '../crewPageShared'
 import { executionProviderLabel } from '../crewPageHelpers'
 import {
   OrchestrationAlerts,
@@ -531,13 +530,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
   )
 
   return (
-    <section className="page">
-      <PageIntro
-        description="여러 실행기를 한 번에 돌리고 결과만 빠르게 비교합니다."
-        icon="agent"
-        title="오케스트레이션"
-      />
-
+    <section className="page page--orchestration-focus">
       <OrchestrationStage
         canvas={
           <div className="orchestration-stage__canvasShell">
@@ -576,7 +569,7 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
                       onClick={() => toggleSelectedAgent(agent.id)}
                     >
                       <span className={`orchestration-agent-chip__dot ${availability?.runnable ? 'is-ready' : 'is-blocked'}`} />
-                      {agent.name}
+                      <span className="orchestration-agent-chip__label">{agent.name}</span>
                     </button>
                   )
                 })}
@@ -596,18 +589,20 @@ export function OrchestrationPage({ onNavigate }: { onNavigate: (page: PageId) =
             actions={
               <>
                 <OrchestrationAlerts alerts={runnerAlerts} onNavigate={onNavigate} />
-                <div className="orchestration-template-list orchestration-template-list--inline">
-                  {taskTemplates.map((template) => (
-                    <button
-                      key={template.label}
-                      type="button"
-                      className="chip orchestration-template"
-                      onClick={() => setOrchestrationDraft(template.value)}
-                    >
-                      {template.label}
-                    </button>
-                  ))}
-                </div>
+                {task.trim().length === 0 ? (
+                  <div className="orchestration-template-list orchestration-template-list--inline">
+                    {taskTemplates.slice(0, 1).map((template) => (
+                      <button
+                        key={template.label}
+                        type="button"
+                        className="chip orchestration-template"
+                        onClick={() => setOrchestrationDraft(template.value)}
+                      >
+                        {template.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   className="primary-button orchestration-dock__submit"
