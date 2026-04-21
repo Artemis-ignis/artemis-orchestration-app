@@ -1178,3 +1178,24 @@
   - `npm run build`
   - preview `http://127.0.0.1:4173/` = 200
   - bridge `http://127.0.0.1:4174/api/health` = 200
+
+## 2026-04-22 Workspace UX Reset - Pass 3
+
+- Added shared UI sanitation helpers in `src/crewPageHelpers.ts` for clipped text, provider display names, routing failure labels, and raw error cleanup.
+- Rewrote `src/state/runtimeReducer.ts` to stop appending raw backend errors directly into chat/activity surfaces.
+- Updated `src/state/AppState.tsx` so bridge/workspace/chat/orchestration failures now pass through Korean operator-facing fallback messages.
+- Cleaned `src/features/chat/ChatPage.tsx` routing meta text so provider names and retry reasons render as readable Korean labels.
+- Updated `src/features/publisher/PublisherOperationsPanel.tsx` and `src/features/publisher/publisherUi.ts` to remove provider slug leakage and sanitize draft/source/runtime errors.
+- Repaired the remaining corrupted Korean strings in `src/pages/SignalsPage.tsx`, including:
+  - real-time feed actions
+  - scheduler state
+  - generation settings
+  - generated posts list/detail
+  - media/source/log sections
+- Normalized the remaining mixed-language CTA in `src/pages/ActivityPage.tsx`.
+- Verification:
+  - `npm run lint`
+  - `npm run build`
+  - preview `http://127.0.0.1:4173/` = 200
+  - bridge `http://127.0.0.1:4174/api/health` = 200
+  - headless Playwright captures under `output/playwright/workspace-ux-reset-pass3/`

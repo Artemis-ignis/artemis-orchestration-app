@@ -1,7 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { NoticeBanner, PageHeader, PanelCard, StatCard, StatusPill } from '../components/ui/primitives'
 import type { PageId } from '../crewData'
-import { formatDate } from '../crewPageHelpers'
+import { clipUiText, formatDate, pageLabel, providerLabel, routingFailureLabel } from '../crewPageHelpers'
 import { EmptyState, SearchField } from '../crewPageShared'
 import { fetchPublisherState } from '../lib/modelClient'
 import { useArtemisApp } from '../state/context'
@@ -27,24 +27,16 @@ type ActivityDigestItem = {
   meta: string
 }
 
-function normalizeText(value: string | null | undefined) {
-  return String(value ?? '')
-    .replace(/\s+/g, ' ')
-    .trim()
+function clipText(value: string | null | undefined, maxLength = 132) {
+  return clipUiText(value, maxLength) || '내용이 없습니다.'
 }
 
-function clipText(value: string | null | undefined, maxLength = 132) {
-  const normalized = normalizeText(value)
-
-  if (!normalized) {
-    return '설명은 아직 없습니다.'
+function friendlyErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    return routingFailureLabel(undefined, fallback, error.message)
   }
 
-  if (normalized.length <= maxLength) {
-    return normalized
-  }
-
-  return `${normalized.slice(0, maxLength - 1).trimEnd()}…`
+  return fallback
 }
 
 function activityTypeLabel(type: ActivityType) {
@@ -54,15 +46,15 @@ function activityTypeLabel(type: ActivityType) {
     case 'file':
       return '파일'
     case 'tool':
-      return '스킬'
+      return '도구'
     case 'insight':
       return '인사이트'
     case 'settings':
       return '설정'
     case 'signal':
-      return '시그널'
+      return '신호'
     case 'agent':
-      return '오케스트레이션'
+      return '에이전트'
     default:
       return '기록'
   }
@@ -82,11 +74,11 @@ function dossierTone(status: PublisherDossierStatus): Tone {
 function dossierLabel(status: PublisherDossierStatus) {
   switch (status) {
     case 'published':
-      return '발행됨'
+      return '발행 완료'
     case 'tracking':
       return '추적 중'
     default:
-      return '검토 중'
+      return '진행 중'
   }
 }
 
@@ -123,14 +115,14 @@ function publisherRuntimeLabel(targets: PublisherRuntimeStatus[]) {
   }
 
   if (internal && !internal.enabled) {
-    return '내부 발행 꺼짐'
+    return '내부 발행 비활성'
   }
 
   if (x?.ready) {
     return '외부 연동 정상'
   }
 
-  return '상태 확인 필요'
+  return '상태 확인 중'
 }
 
 function publisherRuntimeTone(targets: PublisherRuntimeStatus[]): Tone {
@@ -178,7 +170,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
         setPublisherError(null)
       } catch (error) {
         if (!ignore) {
-          setPublisherError(error instanceof Error ? error.message : '활동 상태를 불러오지 못했습니다.')
+          setPublisherError(friendlyErrorMessage(error, '활동 상태를 불러오지 못했습니다.'))
         }
       }
     }
@@ -214,7 +206,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
         lane: '발행',
         title: post.title,
         summary: clipText(post.excerpt || post.body, 118),
-        meta: `${post.sourceLabel || post.provider} · ${summaryTypeLabel(post.summaryType)}`,
+        meta: `${post.sourceLabel || providerLabel(post.provider)} · ${summaryTypeLabel(post.summaryType)}`,
       })
     })
 
@@ -226,7 +218,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
         lane: '로그',
         title: log.action || '운영 로그',
         summary: clipText(log.message, 110),
-        meta: log.draftId ? `초안 ${log.draftId}` : '운영 이벤트',
+        meta: log.draftId ? `초안 ${log.draftId}` : '시스템 이벤트',
       })
     })
 
@@ -238,7 +230,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
         lane: activityTypeLabel(item.type),
         title: item.title,
         summary: clipText(item.detail, 110),
-        meta: item.page,
+        meta: pageLabel(item.page),
       })
     })
 
@@ -264,13 +256,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
     }
 
     return ordered.filter((item) =>
-      [
-        item.title,
-        item.summary,
-        item.lead,
-        item.providerLabels.join(' '),
-        item.keyPoints.join(' '),
-      ]
+      [item.title, item.summary, item.lead, item.providerLabels.join(' '), item.keyPoints.join(' ')]
         .join(' ')
         .toLowerCase()
         .includes(keyword),
@@ -291,9 +277,9 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
 
   const summaryCards = [
     {
-      label: '지금 처리 중',
+      label: '진행 중 작업',
       value: publisherMetrics ? `${queuedCount}건` : '확인 중',
-      meta: publisherMetrics ? `초안 ${publisherMetrics.draftCount} · 예약 ${publisherMetrics.scheduledCount}` : '대기열을 읽는 중입니다.',
+      meta: publisherMetrics ? `초안 ${publisherMetrics.draftCount}건 · 예약 ${publisherMetrics.scheduledCount}건` : '대기열을 불러오는 중입니다.',
       tone: queuedCount > 0 ? 'accent' : 'muted',
     },
     {
@@ -301,7 +287,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
       value: publisherMetrics ? `${publisherMetrics.publishedCount24h}건` : publisherError ? '연결 오류' : '확인 중',
       meta:
         publishedPosts[0]?.title ??
-        (publisherError ? publisherError : '최근 발행 기록을 불러오는 중입니다.'),
+        (publisherError ? friendlyErrorMessage(publisherError, '최근 발행 기록을 불러오는 중입니다.') : '최근 발행 기록이 아직 없습니다.'),
       tone: publisherMetrics ? 'success' : publisherError ? 'danger' : 'muted',
     },
     {
@@ -309,13 +295,13 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
       value: publisherMetrics ? `${publisherMetrics.failedCount}건` : publisherError ? '연결 오류' : '확인 중',
       meta:
         publisherMetrics?.recentFailures[0]?.sourceTitle ??
-        (publisherError ? publisherError : '즉시 확인할 오류는 없습니다.'),
+        (publisherError ? friendlyErrorMessage(publisherError, '최근 오류를 확인하는 중입니다.') : '최근 오류가 없습니다.'),
       tone: publisherMetrics ? (publisherMetrics.failedCount > 0 ? 'danger' : 'muted') : 'danger',
     },
     {
       label: '추적 묶음',
       value: publisherMetrics ? `${publisherMetrics.dossierCount}개` : '확인 중',
-      meta: dossiers[0]?.title ?? '현재 추적 중인 묶음을 불러오는 중입니다.',
+      meta: dossiers[0]?.title ?? '현재 추적 중인 이슈 묶음을 불러오는 중입니다.',
       tone: 'info',
     },
   ] as const
@@ -325,13 +311,13 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
       <PageHeader
         icon="insights"
         title="활동"
-        description="지금 확인할 흐름과 이슈만 남기고, 긴 원문과 중복 메타는 첫 화면에서 걷어냈습니다."
+        description="지금 확인할 수치, 최근 실행, 진행 중 이슈만 한 화면에 모았습니다."
         actions={
           <div className="activity-header__actions">
             <StatusPill tone="muted">표시 {digestItems.length}</StatusPill>
             <StatusPill tone={runtimeTone}>{runtimeLabel}</StatusPill>
             <button className="ghost-button" onClick={() => onNavigate('signals')} type="button">
-              시그널 열기
+              시그널 보기
             </button>
           </div>
         }
@@ -342,12 +328,12 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
       </div>
 
       {publisherError ? (
-        <NoticeBanner tone="error" title="퍼블리셔 상태를 읽지 못했습니다.">
-          {publisherError}
+        <NoticeBanner tone="error" title="발행 상태를 불러오는 중 문제가 발생했습니다.">
+          {friendlyErrorMessage(publisherError, '활동 상태를 불러오지 못했습니다.')}
         </NoticeBanner>
       ) : null}
 
-      <section className="activity-summary-strip" aria-label="활동 핵심 요약">
+      <section className="activity-summary-strip" aria-label="활동 핵심 수치">
         {summaryCards.map((card) => (
           <StatCard key={card.label} label={card.label} meta={card.meta} tone={card.tone} value={card.value} />
         ))}
@@ -357,7 +343,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
         <PanelCard
           className="activity-feed-panel"
           title="최근 실행 흐름"
-          description="무슨 일이 일어났는지 시간순으로 바로 읽을 수 있게 정리했습니다."
+          description="무슨 일이 있었는지 시간순으로 바로 읽히게 정리했습니다."
           tone="accent"
         >
           {digestItems.length > 0 ? (
@@ -384,7 +370,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
           ) : (
             <EmptyState
               title="최근 실행 흐름이 없습니다"
-              description="검색 조건을 바꾸거나 새 실행을 시작하면 여기에 최근 흐름이 쌓입니다."
+              description="조건을 바꾸거나 작업이 다시 시작되면 여기에 최근 흐름이 쌓입니다."
             />
           )}
         </PanelCard>
@@ -392,8 +378,8 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
         <div className="activity-side">
           <PanelCard
             className="activity-focus-panel"
-            title="지금 봐야 할 묶음"
-            description="현재 추적 중인 주제 묶음만 간단히 봅니다."
+            title="라이브 이슈 묶음"
+            description="현재 추적 중인 주제 묶음만 간단히 보여줍니다."
           >
             {dossiers.length > 0 ? (
               <div className="activity-focus-list">
@@ -419,21 +405,21 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
               </div>
             ) : (
               <EmptyState
-                title="추적 중인 묶음이 없습니다"
-                description="지금 중요한 주제가 생기면 여기에 우선순위 순서대로 보입니다."
+                title="추적 중인 이슈 묶음이 없습니다"
+                description="진행 중인 주제가 생기면 이 영역에서 바로 확인할 수 있습니다."
               />
             )}
           </PanelCard>
 
           <PanelCard
             className="activity-runtime-panel"
-            title="운영 상태"
-            description="지금 눌러볼 가치가 있는 상태만 모았습니다."
+            title="발행 상태"
+            description="지금 바로 읽어야 할 상태만 모았습니다."
           >
             <div className="activity-runtime-list">
               <article className="activity-runtime-item">
                 <div>
-                  <strong>런타임</strong>
+                  <strong>현재 상태</strong>
                   <p>{runtimeLabel}</p>
                 </div>
                 <StatusPill tone={runtimeTone}>{runtimeLabel}</StatusPill>
@@ -448,7 +434,7 @@ export function ActivityPage({ onNavigate }: { onNavigate: (page: PageId) => voi
               <article className="activity-runtime-item">
                 <div>
                   <strong>최근 발행</strong>
-                  <p>{publishedPosts[0] ? clipText(publishedPosts[0].title, 52) : '최근 발행 기록이 없습니다.'}</p>
+                  <p>{publishedPosts[0] ? clipText(publishedPosts[0].title, 52) : '최근 발행 기록이 아직 없습니다.'}</p>
                 </div>
                 <StatusPill tone="muted">{publishedPosts[0] ? formatDate(publishedPosts[0].publishedAt) : '없음'}</StatusPill>
               </article>

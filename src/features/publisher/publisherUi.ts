@@ -118,7 +118,7 @@ export function summaryTypeLabel(summaryType: PublisherDraft['summaryType'] | Pu
     case 'paper-intro':
       return '논문 소개'
     case 'brief-points':
-      return '핵심 포인트'
+      return '핵심 정리'
     default:
       return '속보 요약'
   }
@@ -142,6 +142,6 @@ export function dossierStatusLabel(status: PublisherDossier['status']) {
     case 'tracking':
       return '추적 중'
     default:
-      return '새 묶음'
+      return '검토 중'
   }
 }

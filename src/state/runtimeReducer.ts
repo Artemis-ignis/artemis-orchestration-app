@@ -16,6 +16,7 @@ import type {
   ToolItem,
 } from './types'
 import { resetRuntimeState } from './storage'
+import { providerLabel, sanitizeOperatorMessage } from '../crewPageHelpers'
 
 function createId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`
@@ -175,7 +176,7 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
         activity: {
           items: pushActivity(state.activity.items, {
             type: 'chat',
-            title: '새 채팅 생성',
+            title: '새 채팅 시작',
             detail: thread.title,
             page: 'chat',
           }),
@@ -222,11 +223,8 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
         return state
       }
 
-      const { nextThread } = appendChatMessage(
-        state,
-        prompt,
-        `요청 처리에 실패했습니다.\n\n${action.error}`,
-      )
+      const errorText = sanitizeOperatorMessage(action.error, '채팅 요청을 처리하지 못했습니다.')
+      const { nextThread } = appendChatMessage(state, prompt, `요청을 처리하지 못했습니다.\n\n${errorText}`)
 
       return {
         ...state,
@@ -238,8 +236,8 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
         activity: {
           items: pushActivity(state.activity.items, {
             type: 'chat',
-            title: '채팅 실행 실패',
-            detail: action.error,
+            title: '채팅 요청 실패',
+            detail: errorText,
             page: 'chat',
           }),
         },
@@ -389,7 +387,7 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
           items: pushActivity(state.activity.items, {
             type: 'agent',
             title: '채팅 모델 전환',
-            detail: `${action.provider} / ${action.model}`,
+            detail: `${providerLabel(action.provider)} / ${action.model}`,
             page: 'chat',
           }),
         },
@@ -463,8 +461,8 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
         activity: {
           items: pushActivity(state.activity.items, {
             type: 'settings',
-            title: 'API 키 삭제',
-            detail: '저장된 API 키를 제거했습니다.',
+            title: 'API 키 제거',
+            detail: '선택한 API 키를 삭제했습니다.',
             page: 'settings',
           }),
         },
@@ -475,7 +473,7 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
         id: createId('signal'),
         title: action.title.trim() || '새 시그널',
         category: action.category.trim() || 'AI 및 기술',
-        description: action.description.trim() || '직접 추가한 관심 시그널입니다.',
+        description: action.description.trim() || '직접 추가한 시그널입니다.',
         subscribed: true,
         createdAt: nowIso(),
       }
@@ -529,7 +527,7 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
         activity: {
           items: pushActivity(state.activity.items, {
             type: 'agent',
-            title: '에이전트 생성',
+            title: '실행기 추가',
             detail: nextAgent.name,
             page: 'settings',
           }),
@@ -575,7 +573,7 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
         activity: {
           items: pushActivity(state.activity.items, {
             type: 'agent',
-            title: '에이전트 삭제',
+            title: '실행기 제거',
             detail: action.agentId,
             page: 'settings',
           }),
@@ -688,7 +686,7 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
                       id: createId('log'),
                       createdAt,
                       level: 'success',
-                      message: `${action.provider} 응답을 정상적으로 수신했습니다.`,
+                      message: `${providerLabel(action.provider)} 응답을 정상적으로 수신했습니다.`,
                     },
                   ],
                 }
@@ -700,6 +698,7 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
 
     case 'FAIL_AGENT_RUN': {
       const createdAt = nowIso()
+      const errorText = sanitizeOperatorMessage(action.error, '작업 실행을 완료하지 못했습니다.')
       return {
         ...state,
         agents: {
@@ -715,14 +714,14 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
                   ...run,
                   status: 'error',
                   finishedAt: createdAt,
-                  output: run.output || action.error,
+                  output: run.output || errorText,
                   logs: [
                     ...run.logs,
                     {
                       id: createId('log'),
                       createdAt,
                       level: 'error',
-                      message: action.error,
+                      message: errorText,
                     },
                   ],
                 }
@@ -733,7 +732,7 @@ export function runtimeReducer(state: RuntimeState, action: Action): RuntimeStat
           items: pushActivity(state.activity.items, {
             type: 'agent',
             title: '오케스트레이션 실행 실패',
-            detail: action.error,
+            detail: errorText,
             page: 'agents',
           }),
         },

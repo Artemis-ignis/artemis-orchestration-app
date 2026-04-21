@@ -642,3 +642,38 @@
   - the old per-item disclosure block was removed from the default list.
 - Updated browser verification for this pass lives under:
   - `output/playwright/workspace-ux-reset-pass2/`
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 3
+
+- 사용자 노출 텍스트 정리 범위를 `시그널 / 채팅 / 활동 / 발행 패널 / 런타임 에러`까지 확장했다.
+- `src/crewPageHelpers.ts`에 공용 UI 보정 함수를 추가했다:
+  - `normalizeUiText`
+  - `clipUiText`
+  - `routingModeLabel`
+  - `routingFailureLabel`
+  - `sanitizeOperatorMessage`
+- 이제 다음 문제가 공용 함수 기준으로 정리된다:
+  - raw markdown `**`
+  - JSON 문자열 그대로 노출되는 오류
+  - 공급자 슬러그/영문 provider id 직노출
+  - workspace missing / API key missing / bridge fetch 실패 같은 저수준 오류 문구
+- `src/state/runtimeReducer.ts`는 활동 로그와 채팅 에러가 공용 정리 함수를 통과하도록 다시 정리했다.
+- `src/state/AppState.tsx`는 브리지/워크스페이스/채팅/오케스트레이션 경로의 fallback 에러를 한국어 운영 문구로 보정한다.
+- `src/pages/SignalsPage.tsx`에 남아 있던 깨진 한글 문자열을 복구했다:
+  - 실시간 탭 액션
+  - 생성 글 스케줄러/설정/목록
+  - 게시글 상세의 본문/미디어/원문/로그
+- `src/pages/ActivityPage.tsx`의 `Signals 보기`를 `시그널 보기`로 통일했다.
+- 최종 검증은 다음으로 확인했다:
+  - `npm run lint`
+  - `npm run build`
+  - preview `http://127.0.0.1:4173/` = 200
+  - bridge `http://127.0.0.1:4174/api/health` = 200
+  - headless Playwright captures under `output/playwright/workspace-ux-reset-pass3/`
+    - `orchestration-desktop.png`
+    - `signals-desktop.png`
+    - `skills-desktop.png`
+    - `activity-desktop.png`
+    - `orchestration-mobile.png`
+    - `skills-mobile.png`
+    - `activity-mobile.png`

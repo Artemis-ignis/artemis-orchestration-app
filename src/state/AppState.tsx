@@ -32,6 +32,12 @@ import { ArtemisContext, type ArtemisContextValue } from './context'
 import { loadRuntimeState, saveRuntimeState } from './storage'
 import { getActiveThread, runtimeReducer } from './runtimeReducer'
 import type { AgentRun } from './types'
+import {
+  providerLabel,
+  routingFailureLabel,
+  routingModeLabel,
+  sanitizeOperatorMessage,
+} from '../crewPageHelpers'
 
 const WORKSPACE_STORAGE_KEY = 'artemis-workspace/v1'
 function createId(prefix: string) {
@@ -94,27 +100,8 @@ function buildPromptHistory(
     })
 }
 
-const RUN_PROGRESS_LOG_STEPS = [
-  { delayMs: 2_000, message: '???덈뺄?リ옇?? ??븐슙????筌먦끉逾??濡ル츎 繞벿살탳????덈펲.' },
-  { delayMs: 6_000, message: '??얜Ŧ堉??貫?녽뇡??繞벿뮻???들뇡??繞벿살탳????덈펲.' },
-  { delayMs: 14_000, message: '嶺뚣끉裕뉏펺???얜Ŧ堉??嶺뚮ㅄ維???繞벿살탳????덈펲. ?브퀗??臾뺤춹??リ옇?????낅슣?섋땻??' },
-  { delayMs: 30_000, message: '嶺뚯솘???⑥щ턄 ?ル梨룟젆源띿???????곕????덈펲. ?熬곣뫁???????긺춯?뼿 ??ｌ뫒????⑤객臾???띠룄????紐껊퉵??' },
-  { delayMs: 60_000, message: '??얜Ŧ堉?????됯퉵彛??????곕????덈펲. ???熬곣뫖????熬곥룊?긺춯?뼿 ???リ옇?ч뜮????덈펲.' },
-]
-
 function shouldAttachSignalsContext(task: string) {
   return /(\\uC18C\\uC2DD|\\uB274\\uC2A4|\\uB3D9\\uD5A5|\\uBE0C\\uB9AC\\uD551|\\uD2B8\\uB80C\\uB4DC|\\uC5C5\\uB370\\uC774\\uD2B8|\\uC2E0\\uD638)/.test(task)
-}
-
-function buildSignalsContext(
-  items: Array<{
-    title: string
-    summary: string
-  }>,
-) {
-  return items
-    .map((item, index) => `${index + 1}. ${item.title}\n- ??븐슜?? ${item.summary}`)
-    .join('\n')
 }
 
 function buildOfficialRouterSystemPrompt({
@@ -143,24 +130,42 @@ function resolveOfficialProviderId(baseUrl: string) {
   return 'openrouter'
 }
 
-function describeRoutingMeta(meta: AiStreamMetaEvent) {
+const RUN_PROGRESS_LOG_STEPS_UI = [
+  { delayMs: 2_000, message: '요청을 준비하고 있습니다.' },
+  { delayMs: 6_000, message: '선택한 실행기에서 응답을 기다리는 중입니다.' },
+  { delayMs: 14_000, message: '처리가 길어지고 있습니다. 완료될 때까지 상태를 계속 갱신합니다.' },
+  { delayMs: 30_000, message: '응답이 늦어지고 있습니다. 타임아웃 전까지 대기합니다.' },
+  { delayMs: 60_000, message: '아직 처리 중입니다. 연결 상태를 점검하면서 계속 대기합니다.' },
+]
+
+function buildSignalsContextForUi(
+  items: Array<{
+    title: string
+    summary: string
+  }>,
+) {
+  return items.map((item, index) => `${index + 1}. ${item.title}\n- 요약: ${item.summary}`).join('\n')
+}
+
+function describeRoutingMetaForUi(meta: AiStreamMetaEvent) {
   if (meta.routing_mode === 'manual' && meta.top_candidate) {
-    return '직접 호출 · ' + meta.top_candidate.provider_label + ' · ' + meta.top_candidate.display_name
+    return `직접 호출 · ${providerLabel(meta.top_candidate.provider)} · ${meta.top_candidate.display_name}`
   }
 
-  return meta.routing_mode + ' · 후보 ' + meta.candidate_count + '개'
+  return `${routingModeLabel(meta.routing_mode)} · 후보 ${meta.candidate_count}개`
 }
 
-function describeRoutingAttempt(attempt: AiStreamAttemptEvent) {
+function describeRoutingAttemptForUi(attempt: AiStreamAttemptEvent) {
   const label = attempt.display_name || attempt.model
-  return `${attempt.attempt_index}차 시도 · ${attempt.provider} · ${label}`
+  return `${attempt.attempt_index}차 시도 · ${providerLabel(attempt.provider)} · ${label}`
 }
 
-function describeRoutingAttemptFailure(attempt: AiStreamAttemptEvent) {
+function describeRoutingAttemptFailureForUi(attempt: AiStreamAttemptEvent) {
   const label = attempt.display_name || attempt.model
-  const reason = attempt.fallback_reason || attempt.error_message || '다음 후보로 전환'
-  return `${attempt.attempt_index}차 실패 · ${attempt.provider} · ${label} · ${reason}`
+  const reason = routingFailureLabel(attempt.error_type, attempt.fallback_reason, attempt.error_message)
+  return `${attempt.attempt_index}차 실패 · ${providerLabel(attempt.provider)} · ${label} · ${reason}`
 }
+
 function loadWorkspacePrefs() {
   if (typeof window === 'undefined') {
     return { rootPath: '', currentPath: '', showSystemEntries: false }
@@ -244,7 +249,9 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
   }
 
   const applyBridgeHealthFailure = (error: unknown, fallbackMessage: string) => {
-    setBridgeError(error instanceof Error ? error.message : fallbackMessage)
+    setBridgeError(
+      sanitizeOperatorMessage(error instanceof Error ? error.message : '', fallbackMessage),
+    )
   }
 
   useEffect(() => {
@@ -315,7 +322,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : '???????????얜봾????됰씭????? 癲ル슢履뉑쾮?彛??????'
-      setWorkspaceError(message)
+      setWorkspaceError(sanitizeOperatorMessage(message, '작업 폴더 목록을 불러오지 못했습니다.'))
     } finally {
       setWorkspaceLoading(false)
     }
@@ -333,7 +340,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : '??????????????ㅼ뒦???????됰꽡???怨?????덊렡.'
-      setWorkspaceError(message)
+      setWorkspaceError(sanitizeOperatorMessage(message, '작업 폴더를 연결하지 못했습니다.'))
       throw error
     } finally {
       setWorkspaceLoading(false)
@@ -359,7 +366,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : '?????????????筌?六????????袁⑸즵????? 癲ル슢履뉑쾮?彛??????'
-      setWorkspaceError(message)
+      setWorkspaceError(sanitizeOperatorMessage(message, '시스템 항목 표시 설정을 바꾸지 못했습니다.'))
     } finally {
       setWorkspaceLoading(false)
     }
@@ -656,7 +663,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           const officialModel = selectedAgent.model.trim()
 
           if (!officialModel) {
-            throw new Error('Official API model ID is empty. Check provider and model settings.')
+            throw new Error('공식 API 모델이 비어 있습니다. 설정에서 모델을 다시 선택해 주세요.')
           }
 
           let finalEvent: AiStreamFinalEvent | null = null
@@ -745,14 +752,14 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           selectedAgent?.provider === 'openai-compatible' &&
           !state.apiKeys.find((item) => item.id === selectedAgent.apiKeyId)
         ) {
-          throw new Error('????????ш낄援θキ??API ??? ??ш끽維???筌뤾퍓??? ???源놁젳??????沃섅굥?? ???ㅼ뒦?????낆뒩??뗫빝??')
+          throw new Error('OpenAI 호환 API 키를 연결해 주세요.')
         }
 
         if (
           selectedAgent?.provider === 'anthropic' &&
           !state.apiKeys.find((item) => item.id === selectedAgent.apiKeyId)
         ) {
-          throw new Error('Claude ??????ш낄援θキ??API ??? ??ш끽維???筌뤾퍓??? ???源놁젳??????沃섅굥?? ???ㅼ뒦?????낆뒩??뗫빝??')
+          throw new Error('Claude API 키를 연결해 주세요.')
         }
 
         const response = await executeModelPrompt({
@@ -787,7 +794,11 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       } catch (error) {
         const message =
           error instanceof Error ? error.message : '癲ル슢?꾤땟???????덈틖 濚?????곸씔??좊읈? ?袁⑸즵獒뺣뎾????怨?????덊렡.'
-        dispatch({ type: 'APPEND_CHAT_ERROR', prompt: nextPrompt, error: message })
+        dispatch({
+          type: 'APPEND_CHAT_ERROR',
+          prompt: nextPrompt,
+          error: sanitizeOperatorMessage(message, '채팅 요청을 처리하지 못했습니다.'),
+        })
       } finally {
         setIsGenerating(false)
       }
@@ -833,7 +844,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         agent.provider === 'openai-compatible' &&
         !state.apiKeys.find((item) => item.id === agent.apiKeyId)
       ) {
-        setBridgeError('????????ш낄援θキ??API ??? ??ш끽維???筌뤾퍓??? ???源놁젳??????沃섅굥?? ???ㅼ뒦?????낆뒩??뗫빝??')
+        setBridgeError('OpenAI 호환 API 키를 연결해 주세요.')
         return
       }
 
@@ -841,7 +852,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         agent.provider === 'anthropic' &&
         !state.apiKeys.find((item) => item.id === agent.apiKeyId)
       ) {
-        setBridgeError('Claude ??????ш낄援θキ??API ??? ??ш끽維???筌뤾퍓??? ???源놁젳??????沃섅굥?? ???ㅼ뒦?????낆뒩??뗫빝??')
+        setBridgeError('Claude API 키를 연결해 주세요.')
         return
       }
 
@@ -904,7 +915,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
                 nextTask,
                 '',
                 '[嶺뚣볝늾????ル쪇源?',
-                buildSignalsContext(contextItems),
+                buildSignalsContextForUi(contextItems),
                 '',
                 '????ル쪇源??嶺뚣볝늾???嶺뚣끉裕?????堉딁춯?嶺뚯쉧猷????ル봿援???우벟 ?筌먲퐘遊???낅슣?섋땻??',
               ].join('\n')
@@ -942,14 +953,14 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
             },
             {
               onMeta: (meta) => {
-                pushRunLog('info', describeRoutingMeta(meta))
+                pushRunLog('info', describeRoutingMetaForUi(meta))
               },
               onAttempt: (attempt) => {
                 updateRunRoute(attempt.provider, attempt.model)
-                pushRunLog('info', describeRoutingAttempt(attempt))
+                pushRunLog('info', describeRoutingAttemptForUi(attempt))
               },
               onAttemptFailed: (attempt) => {
-                pushRunLog('error', describeRoutingAttemptFailure(attempt))
+                pushRunLog('error', describeRoutingAttemptFailureForUi(attempt))
               },
               onToken: (token) => {
                 streamedText += token
@@ -1006,7 +1017,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           )
         }
 
-        const progressTimers = RUN_PROGRESS_LOG_STEPS.map(({ delayMs, message }) =>
+        const progressTimers = RUN_PROGRESS_LOG_STEPS_UI.map(({ delayMs, message }) =>
           window.setTimeout(() => {
             pushRunLog('info', message)
           }, delayMs),
@@ -1051,7 +1062,12 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       } catch (error) {
         const message =
           error instanceof Error ? error.message : '??????ш낄援θキ?????덈틖 濚?????곸씔??좊읈? ?袁⑸즵獒뺣뎾????怨?????덊렡.'
-        dispatch({ type: 'FAIL_AGENT_RUN', runId, agentId, error: message })
+        dispatch({
+          type: 'FAIL_AGENT_RUN',
+          runId,
+          agentId,
+          error: sanitizeOperatorMessage(message, '작업 실행을 완료하지 못했습니다.'),
+        })
       }
     },
     addSignal: (title, category, description) =>

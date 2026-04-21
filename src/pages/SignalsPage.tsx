@@ -9,7 +9,9 @@ import {
 import {
   formatDate,
   formatRelative,
+  providerLabel,
   signalSourceLabel,
+  sanitizeOperatorMessage,
 } from '../crewPageHelpers'
 import { AutoPostArticle } from '../features/autoPosts/AutoPostArticle'
 import { PublisherOperationsPanel } from '../features/publisher/PublisherOperationsPanel'
@@ -196,9 +198,10 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       } catch (nextError) {
         if (!silent) {
           setFeedError(
-            nextError instanceof Error
-              ? nextError.message
-              : '시그널을 불러오지 못했습니다.',
+            sanitizeOperatorMessage(
+              nextError instanceof Error ? nextError.message : '',
+              '시그널을 불러오지 못했습니다.',
+            ),
           )
         }
       } finally {
@@ -245,9 +248,10 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       } catch (nextError) {
         if (!silent) {
           setPostError(
-            nextError instanceof Error
-              ? nextError.message
-              : '자동 생성 게시글을 불러오지 못했습니다.',
+            sanitizeOperatorMessage(
+              nextError instanceof Error ? nextError.message : '',
+              '자동 생성 게시글을 불러오지 못했습니다.',
+            ),
           )
         }
       } finally {
@@ -305,7 +309,12 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
         setSelectedDossierId(nextSelectedDossierId)
       } catch (nextError) {
         if (!silent) {
-          setActionMessage(nextError instanceof Error ? nextError.message : '게시 큐 상태를 불러오지 못했습니다.')
+          setActionMessage(
+            sanitizeOperatorMessage(
+              nextError instanceof Error ? nextError.message : '',
+              '게시 큐 상태를 불러오지 못했습니다.',
+            ),
+          )
         }
       } finally {
         if (!silent) {
@@ -326,7 +335,10 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
         setSelectedPost(detail)
       } catch (nextError) {
         setActionMessage(
-          nextError instanceof Error ? nextError.message : '게시글 상세를 불러오지 못했습니다.',
+          sanitizeOperatorMessage(
+            nextError instanceof Error ? nextError.message : '',
+            '게시글 상세를 불러오지 못했습니다.',
+          ),
         )
       } finally {
         setPostActionLoading(false)
@@ -474,18 +486,18 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     const next = new Map<string, string>()
 
     for (const stat of xAutopostState.providerStats) {
-      next.set(stat.provider, stat.label || stat.provider)
+      next.set(stat.provider, stat.label || providerLabel(stat.provider))
     }
 
     for (const item of xQueue) {
       if (!next.has(item.provider)) {
-        next.set(item.provider, item.sourceLabel || item.provider)
+        next.set(item.provider, item.sourceLabel || providerLabel(item.provider))
       }
     }
 
     for (const item of publishedItems) {
       if (!next.has(item.provider)) {
-        next.set(item.provider, item.sourceLabel || item.provider)
+        next.set(item.provider, item.sourceLabel || providerLabel(item.provider))
       }
     }
 
@@ -583,7 +595,10 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       setActiveTab('posts')
     } catch (nextError) {
       setActionMessage(
-        nextError instanceof Error ? nextError.message : '수동 실행에 실패했습니다.',
+        sanitizeOperatorMessage(
+          nextError instanceof Error ? nextError.message : '',
+          '수동 실행에 실패했습니다.',
+        ),
       )
     } finally {
       setPostActionLoading(false)
@@ -608,7 +623,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       await loadPosts({ focusPostId: selectedPostId })
     } catch (nextError) {
       setActionMessage(
-        nextError instanceof Error ? nextError.message : '재생성에 실패했습니다.',
+        sanitizeOperatorMessage(nextError instanceof Error ? nextError.message : '', '재생성에 실패했습니다.'),
       )
     } finally {
       setPostActionLoading(false)
@@ -631,7 +646,10 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       setActionMessage(`HTML 내보내기를 완료했습니다: ${result.relativePath}`)
     } catch (nextError) {
       setActionMessage(
-        nextError instanceof Error ? nextError.message : 'HTML 내보내기에 실패했습니다.',
+        sanitizeOperatorMessage(
+          nextError instanceof Error ? nextError.message : '',
+          'HTML 내보내기에 실패했습니다.',
+        ),
       )
     } finally {
       setPostActionLoading(false)
@@ -653,7 +671,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       setActionMessage('게시글 저장 폴더를 열었습니다.')
     } catch (nextError) {
       setActionMessage(
-        nextError instanceof Error ? nextError.message : '폴더 열기에 실패했습니다.',
+        sanitizeOperatorMessage(nextError instanceof Error ? nextError.message : '', '폴더 열기에 실패했습니다.'),
       )
     } finally {
       setPostActionLoading(false)
@@ -675,7 +693,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       setActionMessage('자동 게시글 설정을 저장했습니다.')
     } catch (nextError) {
       setActionMessage(
-        nextError instanceof Error ? nextError.message : '설정 저장에 실패했습니다.',
+        sanitizeOperatorMessage(nextError instanceof Error ? nextError.message : '', '설정 저장에 실패했습니다.'),
       )
     } finally {
       setPostActionLoading(false)
@@ -705,7 +723,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       await loadXAutopost({ focusDraftId: response.items[0]?.id ?? selectedDraftId ?? null })
       setActiveTab('publisher')
     } catch (nextError) {
-      setActionMessage(nextError instanceof Error ? nextError.message : '초안 생성에 실패했습니다.')
+      setActionMessage(
+        sanitizeOperatorMessage(nextError instanceof Error ? nextError.message : '', '초안 생성에 실패했습니다.'),
+      )
     } finally {
       setPostActionLoading(false)
     }
@@ -734,7 +754,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       )
       setActionMessage('게시 큐 설정을 저장했습니다.')
     } catch (nextError) {
-      setActionMessage(nextError instanceof Error ? nextError.message : '게시 큐 설정 저장에 실패했습니다.')
+      setActionMessage(
+        sanitizeOperatorMessage(nextError instanceof Error ? nextError.message : '', '게시 큐 설정 저장에 실패했습니다.'),
+      )
     } finally {
       setPostActionLoading(false)
     }
@@ -752,7 +774,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       )
       await loadXAutopost({ focusDraftId: response.item.id })
     } catch (nextError) {
-      setActionMessage(nextError instanceof Error ? nextError.message : '초안 승인에 실패했습니다.')
+      setActionMessage(
+        sanitizeOperatorMessage(nextError instanceof Error ? nextError.message : '', '초안 승인에 실패했습니다.'),
+      )
     } finally {
       setPostActionLoading(false)
     }
@@ -766,7 +790,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
       setActionMessage(`초안을 큐에서 제외했습니다: ${response.item.sourceTitle}`)
       await loadXAutopost({ focusDraftId: response.item.id })
     } catch (nextError) {
-      setActionMessage(nextError instanceof Error ? nextError.message : '초안 거절에 실패했습니다.')
+      setActionMessage(
+        sanitizeOperatorMessage(nextError instanceof Error ? nextError.message : '', '초안 거절에 실패했습니다.'),
+      )
     } finally {
       setPostActionLoading(false)
     }
@@ -794,7 +820,9 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
           response.item.status === 'published' ? response.item.internalPostId ?? null : null,
       })
     } catch (nextError) {
-      setActionMessage(nextError instanceof Error ? nextError.message : '즉시 게시에 실패했습니다.')
+      setActionMessage(
+        sanitizeOperatorMessage(nextError instanceof Error ? nextError.message : '', '즉시 게시에 실패했습니다.'),
+      )
     } finally {
       setPostActionLoading(false)
     }
@@ -892,23 +920,23 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                 </button>
               ))}
             </div>
-            <div className="signals-toolbar__actions">
-              <button className="primary-button" onClick={() => void executeRunNow()} type="button">
-                글 생성
-              </button>
+              <div className="signals-toolbar__actions">
+                <button className="primary-button" onClick={() => void executeRunNow()} type="button">
+                  글 생성
+                </button>
+              </div>
             </div>
-          </div>
 
           <section className="panel-card panel-card--muted signals-source-strip signals-source-strip--overview">
-            <div className="badge-row">
-              {sourceSummary.map(([label, count]) => (
-                <span key={label} className="chip chip--soft">
-                  {label} {count}건
-                </span>
-              ))}
-            </div>
-            <p>원문 피드만 빠르게 확인하는 탭입니다.</p>
-          </section>
+              <div className="badge-row">
+                {sourceSummary.map(([label, count]) => (
+                  <span key={label} className="chip chip--soft">
+                    {label} {count}건
+                  </span>
+                ))}
+              </div>
+              <p>원문 피드만 빠르게 확인하는 탭입니다.</p>
+            </section>
 
           {feedError ? (
             <div className="status-banner status-banner--error">
@@ -1075,7 +1103,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
               {schedulerState.lastError ? (
                 <div className="status-banner status-banner--warning">
                   <Icon name="warning" size={16} />
-                  <span>{schedulerState.lastError}</span>
+                  <span>{sanitizeOperatorMessage(schedulerState.lastError, '스케줄러 상태를 확인할 수 없습니다.')}</span>
                 </div>
               ) : null}
               <div className="badge-row">
@@ -1323,7 +1351,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                 <div className="panel-card panel-card--muted signals-loadingCard">자동 생성 게시글을 불러오는 중입니다...</div>
               ) : (
                 <EmptyState
-                  description="아직 저장된 자동 생성 게시글이 없습니다. 지금 실행을 눌러 첫 배치를 생성하세요."
+                  description="아직 저장된 자동 생성 게시글이 없습니다. 지금 실행을 눌러 첫 배치를 생성해 주세요."
                   action="지금 실행"
                   onAction={() => void executeRunNow()}
                   title="빈 게시글 저장소"
@@ -1423,10 +1451,10 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                               )
                             ) : null}
                             <strong>{item.title}</strong>
-                            <p>{item.description || item.provider || item.kind}</p>
+                            <p>{item.description || providerLabel(item.provider) || item.kind}</p>
                             <div className="badge-row">
                               <span className="chip chip--soft">{item.kind}</span>
-                              <span className="chip chip--soft">{item.provider || 'media'}</span>
+                              <span className="chip chip--soft">{providerLabel(item.provider || 'media')}</span>
                               {(item.url || item.thumbnailUrl) ? (
                                 <button
                                   className="ghost-button ghost-button--compact"
@@ -1512,3 +1540,4 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
 }
 
 export default SignalsPage
+

@@ -9,7 +9,13 @@ import {
   type AiStreamAttemptEvent,
   type AiStreamMetaEvent,
 } from '../../lib/aiRoutingClient'
-import { formatDate, formatFriendlyModelName, providerLabel } from '../../crewPageHelpers'
+import {
+  formatDate,
+  formatFriendlyModelName,
+  providerLabel,
+  routingFailureLabel,
+  sanitizeOperatorMessage,
+} from '../../crewPageHelpers'
 import { FormattedText } from '../../components/ui/FormattedText'
 import { Icon } from '../../icons'
 import { useArtemisApp } from '../../state/context'
@@ -17,6 +23,65 @@ import type { AgentItem } from '../../state/types'
 import { ChatIdlePanel } from './ChatSections'
 
 type LiveAttemptItem = AiRoutingAttemptLog | AiStreamAttemptEvent
+
+function friendlyProviderLabel(provider?: string | null, model?: string | null) {
+  if (provider) {
+    const resolved = providerLabel(provider)
+    if (resolved !== provider) {
+      return resolved
+    }
+  }
+
+  if (model && /^gpt-/i.test(model)) {
+    return 'OpenAI GPT'
+  }
+
+  if (model && /^gemini-/i.test(model)) {
+    return 'Gemini API'
+  }
+
+  if (model && /^claude-/i.test(model)) {
+    return 'Claude API'
+  }
+
+  if (model && /^openrouter\//i.test(model)) {
+    return 'OpenRouter'
+  }
+
+  if (model && /(coding-glm|minimax)/i.test(model)) {
+    return 'AIHubMix'
+  }
+
+  if (model && /^nvidia\//i.test(model)) {
+    return 'NVIDIA NIM'
+  }
+
+  return '공급자 미상'
+}
+
+function describeRoutingAttempt(attempt: AiRoutingAttemptLog | AiStreamAttemptEvent) {
+  const displayName = 'display_name' in attempt ? attempt.display_name : undefined
+  const label = formatFriendlyModelName(displayName || attempt.model)
+  return `${attempt.attempt_index}회 시도 · ${friendlyProviderLabel(attempt.provider, attempt.model)} · ${label}`
+}
+
+function describeRoutingFailure(attempt: AiRoutingAttemptLog | AiStreamAttemptEvent) {
+  const displayName = 'display_name' in attempt ? attempt.display_name : undefined
+  const label = formatFriendlyModelName(displayName || attempt.model)
+  const reason = routingFailureLabel(attempt.error_type, attempt.fallback_reason, attempt.error_message)
+  return `${attempt.attempt_index}회 실패 · ${friendlyProviderLabel(attempt.provider, attempt.model)} · ${label} · ${reason}`
+}
+
+function describeStreamCandidate(provider?: string | null, displayName?: string | null) {
+  const providerText = friendlyProviderLabel(provider)
+  const modelText = formatFriendlyModelName(displayName || '')
+
+  if (providerText === '공급자 미상') {
+    return modelText || providerText
+  }
+
+  return modelText ? `${providerText} · ${modelText}` : providerText
+}
 
 function MessageCard({
   role,
@@ -43,46 +108,7 @@ function MessageCard({
         (attempt) => !attempt.success || Boolean(attempt.fallback_reason) || Boolean(attempt.error_type),
       ),
     )
-  const label =
-    provider === 'codex'
-      ? 'Codex CLI'
-      : provider === 'ollama'
-        ? 'Ollama'
-        : provider === 'openrouter'
-          ? 'OpenRouter'
-          : provider === 'nvidia-build'
-            ? 'NVIDIA Build'
-            : provider === 'gemini'
-              ? 'Gemini Developer API'
-              : provider === 'anthropic'
-                ? 'Claude API'
-                : model && /^gpt-/i.test(model)
-                  ? 'OpenAI GPT'
-                  : model && /^gemini-/i.test(model)
-                    ? 'Gemini API'
-                    : model && /^claude-/i.test(model)
-                      ? 'Claude API'
-                      : model && /^openrouter\//i.test(model)
-                        ? 'OpenRouter'
-                        : model && /(coding-glm|minimax)/i.test(model)
-                          ? 'AIHubMix'
-                          : model && /^nvidia\//i.test(model)
-                            ? 'NVIDIA NIM'
-                            : provider === 'openai-direct'
-                              ? 'OpenAI GPT'
-                              : provider === 'gemini-openai'
-                                ? 'Gemini API'
-                                : provider === 'claude-anthropic'
-                                  ? 'Claude API'
-                                  : provider === 'openrouter-free'
-                                    ? 'OpenRouter'
-                                    : provider === 'aihubmix-free'
-                                      ? 'AIHubMix'
-                                      : provider === 'nvidia-trial'
-                                        ? 'NVIDIA NIM'
-                                        : provider === 'openai-compatible'
-                                          ? 'OpenAI 호환 API'
-                                          : provider
+  const label = friendlyProviderLabel(provider, model)
 
   return (
     <article className={`message-card message-card--${role}`}>
@@ -131,13 +157,11 @@ function MessageCard({
                         attempt.success ? 'is-success' : 'is-failed'
                       }`}
                     >
-                      <strong>
-                        {attempt.attempt_index}. {attempt.provider} · {formatFriendlyModelName(attempt.model)}
-                      </strong>
+                      <strong>{describeRoutingAttempt(attempt)}</strong>
                       <small>
                         {attempt.success
                           ? `성공 · ${attempt.latency_ms ?? '-'}ms`
-                          : `${attempt.error_type ?? 'error'} · ${attempt.fallback_reason ?? '다음 후보로 이동'}`}
+                          : describeRoutingFailure(attempt)}
                       </small>
                     </article>
                   ))}
@@ -294,7 +318,12 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
         if (!active) {
           return
         }
-        setAiProviderError(error instanceof Error ? error.message : '공식 API 공급자 정보를 불러오지 못했습니다.')
+        setAiProviderError(
+          sanitizeOperatorMessage(
+            error instanceof Error ? error.message : null,
+            '공식 API 공급자 정보를 불러오지 못했습니다.',
+          ),
+        )
       }
     }
 
@@ -375,11 +404,11 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
     !selectedAgentUnavailable &&
     composerText.trim().length > 0
   const composerHint = bridgeError
-    ? bridgeError
+    ? sanitizeOperatorMessage(bridgeError, '연결 상태를 확인해 주세요.')
     : selectedAgentNeedsKey
       ? 'API 키 연결 필요'
       : selectedAgent?.provider === 'official-router' && selectedAgentUnavailable
-        ? aiProviderError ?? '공식 API 설정 확인'
+        ? sanitizeOperatorMessage(aiProviderError, '공식 API 설정을 확인해 주세요.')
         : selectedAgentUnavailable
           ? '실행기 준비 안 됨'
           : isGenerating
@@ -621,8 +650,11 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
                         <strong>{state.settings.agentName}</strong>
                         <span className="message-card__badge">
                           {streamMeta?.top_candidate
-                            ? `${streamMeta.top_candidate.provider_label} 쨌 ${streamMeta.top_candidate.display_name}`
-                            : `${selectedOfficialProviderStatus?.label ?? '공식 API'} 쨌 ${selectedModel || '모델 확인 중'}`}
+                            ? describeStreamCandidate(
+                                streamMeta.top_candidate.provider,
+                                streamMeta.top_candidate.display_name,
+                              )
+                            : `${selectedOfficialProviderStatus?.label ?? '공식 API'} · ${selectedModel || '모델 확인 중'}`}
                         </span>
                       </div>
                       <span>실시간 스트리밍</span>
@@ -632,8 +664,11 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
                       <div className="message-streamMeta">
                         {streamMeta?.top_candidate ? (
                           <span>
-                            현재 후보 쨌 {streamMeta.top_candidate.provider_label} 쨌{' '}
-                            {streamMeta.top_candidate.display_name}
+                            현재 후보 ·{' '}
+                            {describeStreamCandidate(
+                              streamMeta.top_candidate.provider,
+                              streamMeta.top_candidate.display_name,
+                            )}
                           </span>
                         ) : null}
                         {hasStreamFallback ? <span>재시도 발생</span> : null}

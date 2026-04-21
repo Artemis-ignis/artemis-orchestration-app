@@ -1,6 +1,6 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { DisclosureSection, EmptyState } from '../../crewPageShared'
-import { formatDate, formatRelative } from '../../crewPageHelpers'
+import { clipUiText, formatDate, formatRelative, providerLabel, sanitizeOperatorMessage } from '../../crewPageHelpers'
 import { Icon } from '../../icons'
 import type {
   PublisherDossier,
@@ -60,13 +60,7 @@ type PublisherOperationsPanelProps = {
 }
 
 function compactText(value: string, maxLength = 180) {
-  const normalized = String(value ?? '').replace(/\s+/g, ' ').trim()
-  if (!normalized) {
-    return '설명이 아직 없습니다.'
-  }
-  return normalized.length > maxLength
-    ? `${normalized.slice(0, maxLength - 1).trimEnd()}…`
-    : normalized
+  return clipUiText(value, maxLength) || '내용이 없습니다.'
 }
 
 function extractDraftHeadline(draft: PublisherDraft) {
@@ -103,7 +97,7 @@ function publisherStatusSummary(status: PublisherRuntimeStatus | null) {
   if (status.enabled) {
     return '확인 필요'
   }
-  return '꺼짐'
+  return '비활성'
 }
 
 function publisherStatusTone(status: PublisherRuntimeStatus | null) {
@@ -133,7 +127,7 @@ function MessageBanner({ message }: { message: string | null }) {
   return (
     <div className="status-banner status-banner--info">
       <Icon name="spark" size={16} />
-      <span>{message}</span>
+      <span>{sanitizeOperatorMessage(message, '작업 결과를 확인할 수 있습니다.')}</span>
     </div>
   )
 }
@@ -333,7 +327,7 @@ function SourceStatusDisclosure({ publisherState }: { publisherState: PublisherS
               <p>
                 수집 {stat.lastFetchedCount} · 초안 {stat.lastDraftCount} · 제외 {stat.lastSkippedCount}
                 {stat.lastFetchedAt ? ` · 최근 ${formatRelative(stat.lastFetchedAt)}` : ''}
-                {stat.lastError ? ` · 오류: ${stat.lastError}` : ''}
+                {stat.lastError ? ` · ${sanitizeOperatorMessage(stat.lastError, '공급원 상태를 확인할 수 없습니다.')}` : ''}
               </p>
             </div>
           ))}
@@ -395,7 +389,7 @@ function DossierDetail({ dossier }: { dossier: PublisherDossier }) {
           {dossier.sourceItems.map((item) => (
             <article key={item.id} className="publisher-source-item">
               <div className="card-topline">
-                <span className="chip chip--soft">{item.provider}</span>
+                <span className="chip chip--soft">{providerLabel(item.provider)}</span>
                 <small>{item.publishedAt ? formatDate(item.publishedAt) : '시간 미상'}</small>
               </div>
               <strong>{item.title}</strong>
@@ -465,7 +459,7 @@ function DraftDetail({
         <div>
           <h2>{title}</h2>
           <p className="settings-card__lead">
-            {draft.sourceLabel || draft.provider} · {summaryTypeLabel(draft.summaryType)} ·{' '}
+            {draft.sourceLabel || providerLabel(draft.provider)} · {summaryTypeLabel(draft.summaryType)} ·{' '}
             {draft.sourcePublishedAt ? formatDate(draft.sourcePublishedAt) : '시간 미상'}
           </p>
         </div>
@@ -505,7 +499,7 @@ function DraftDetail({
       {draft.errorReason ? (
         <div className="status-banner status-banner--warning">
           <Icon name="warning" size={16} />
-          <span>{draft.errorReason}</span>
+          <span>{sanitizeOperatorMessage(draft.errorReason, '초안 오류를 확인할 수 없습니다.')}</span>
         </div>
       ) : null}
 
@@ -514,7 +508,7 @@ function DraftDetail({
         excerpt={lead}
         body={draft.generatedText}
         sourceUrl={draft.sourceUrl}
-        sourceLabel={draft.sourceLabel}
+        sourceLabel={draft.sourceLabel || providerLabel(draft.provider)}
         category={draft.category}
         summaryType={summaryTypeLabel(draft.summaryType)}
         publishedAt={draft.sourcePublishedAt}
@@ -528,7 +522,7 @@ function DraftDetail({
             {logs.map((item) => (
               <div key={item.id} className={`run-log run-log--${item.level === 'warning' ? 'error' : item.level}`}>
                 <span>{formatDate(item.createdAt)}</span>
-                <p>{item.message}</p>
+                <p>{sanitizeOperatorMessage(item.message, '작업 로그를 확인할 수 있습니다.')}</p>
               </div>
             ))}
           </div>
@@ -545,7 +539,7 @@ function PublishedDetail({ item }: { item: PublishedPost }) {
         <div>
           <h2>{item.title}</h2>
           <p className="settings-card__lead">
-            {item.sourceLabel || item.provider} · {summaryTypeLabel(item.summaryType)} · {formatDate(item.publishedAt)}
+            {item.sourceLabel || providerLabel(item.provider)} · {summaryTypeLabel(item.summaryType)} · {formatDate(item.publishedAt)}
           </p>
         </div>
         <div className="badge-row">
@@ -560,7 +554,7 @@ function PublishedDetail({ item }: { item: PublishedPost }) {
         excerpt={item.excerpt}
         body={item.body}
         sourceUrl={item.sourceUrl}
-        sourceLabel={item.sourceLabel || item.provider}
+        sourceLabel={item.sourceLabel || providerLabel(item.provider)}
         category={item.category}
         summaryType={summaryTypeLabel(item.summaryType)}
         publishedAt={item.publishedAt}
@@ -656,7 +650,7 @@ export function PublisherOperationsPanel(props: PublisherOperationsPanelProps) {
           {publisherState.lastError ? (
             <div className="status-banner status-banner--warning">
               <Icon name="warning" size={16} />
-              <span>{publisherState.lastError}</span>
+              <span>{sanitizeOperatorMessage(publisherState.lastError, '발행 상태를 확인할 수 없습니다.')}</span>
             </div>
           ) : null}
 
@@ -714,7 +708,7 @@ export function PublisherOperationsPanel(props: PublisherOperationsPanelProps) {
           renderMeta={(item: PublisherDraft) => (
             <>
               <div className="card-topline">
-                <span className="chip chip--soft">{item.sourceLabel || item.provider}</span>
+                <span className="chip chip--soft">{item.sourceLabel || providerLabel(item.provider)}</span>
                 <small>{formatDate(item.updatedAt)}</small>
               </div>
               <strong>{extractDraftHeadline(item)}</strong>
@@ -764,7 +758,7 @@ export function PublisherOperationsPanel(props: PublisherOperationsPanelProps) {
           renderMeta={(item: PublishedPost) => (
             <>
               <div className="card-topline">
-                <span className="chip chip--soft">{item.sourceLabel || item.provider}</span>
+                <span className="chip chip--soft">{item.sourceLabel || providerLabel(item.provider)}</span>
                 <small>{formatDate(item.publishedAt)}</small>
               </div>
               <strong>{item.title}</strong>
