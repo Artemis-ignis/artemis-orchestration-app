@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { signalCategories, type PageId } from '../crewData'
 import {
   DisclosureSection,
@@ -7,8 +7,11 @@ import {
   SearchField,
 } from '../crewPageShared'
 import {
+  clipUiText,
   formatDate,
   formatRelative,
+  hasHangulText,
+  preferLocalizedPreview,
   providerLabel,
   signalSourceLabel,
   sanitizeOperatorMessage,
@@ -90,16 +93,40 @@ function buildSignalChatPrompt(item: SignalFeedItem) {
   return lines.join('\n')
 }
 
-function compactText(value: string, maxLength = 220) {
-  const normalized = String(value ?? '')
-    .replace(/\s+/g, ' ')
-    .trim()
+function koreanFirstText(value: string, maxLength = 220, fallback = '') {
+  const clipped = clipUiText(preferLocalizedPreview(value), maxLength)
+  if (hasHangulText(clipped)) {
+    return clipped
+  }
+  return fallback
+}
 
-  if (!normalized) {
-    return ''
+function postListPreview(item: GeneratedPostSummary) {
+  return (
+    koreanFirstText(item.threeLineSummary.find((line) => hasHangulText(line)) || item.previewText, 140) ||
+    '본문 요약은 상세에서 확인해 주세요.'
+  )
+}
+
+function SafePreviewImage({
+  src,
+  alt,
+  className,
+  fallback,
+}: {
+  src?: string | null
+  alt: string
+  className: string
+  fallback: ReactNode
+}) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null)
+  const hasError = !src || failedSrc === src
+
+  if (hasError) {
+    return <>{fallback}</>
   }
 
-  return normalized.length > maxLength ? `${normalized.slice(0, maxLength).trim()}…` : normalized
+  return <img alt={alt} className={className} onError={() => setFailedSrc(src)} src={src} />
 }
 
 function defaultAutoPostSettings(): AutoPostSettings {
@@ -414,6 +441,48 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
     filteredPosts.find((item) => item.id === selectedPostId) ??
     postItems.find((item) => item.id === selectedPostId) ??
     null
+  const selectedPostLeadText = useMemo(() => {
+    if (!selectedPost) {
+      return ''
+    }
+
+    return (
+      selectedPost.subtitleLines.find((line) => hasHangulText(line)) ||
+      koreanFirstText(selectedPost.lead, 220, '공개된 정보 기준으로 정리한 한국어 브리핑입니다.')
+    )
+  }, [selectedPost])
+  const selectedPostSummaryPoints = useMemo(() => {
+    if (!selectedPost) {
+      return []
+    }
+
+    const points = selectedPost.threeLineSummary
+      .map((line) => koreanFirstText(line, 140))
+      .filter(Boolean)
+
+    if (points.length > 0) {
+      return points
+    }
+
+    const fallback = koreanFirstText(
+      selectedPost.plainTextSummary || selectedPost.lead,
+      260,
+      '공개된 제목과 메타데이터를 바탕으로 재구성한 한국어 브리핑입니다.',
+    )
+
+    return fallback ? [fallback] : []
+  }, [selectedPost])
+  const selectedPostBodySummary = useMemo(() => {
+    if (!selectedPost) {
+      return ''
+    }
+
+    return koreanFirstText(
+      selectedPost.plainTextSummary || selectedPost.lead,
+      420,
+      '공개된 제목과 메타데이터를 바탕으로 재구성한 한국어 브리핑입니다.',
+    )
+  }, [selectedPost])
   const filteredDrafts = useMemo(() => {
     const keyword = deferredQuery.trim().toLowerCase()
     return xQueue.filter((item) => {
@@ -1329,18 +1398,21 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                       onClick={() => void loadPostDetail(item.id)}
                       type="button"
                     >
-                      {item.thumbnail ? (
-                        <img className="auto-post-card__thumb" src={item.thumbnail} alt="" />
-                      ) : (
-                          <div className="auto-post-card__thumb auto-post-card__thumb--empty">미디어 없음</div>
-                      )}
+                      <SafePreviewImage
+                        alt=""
+                        className="auto-post-card__thumb"
+                        fallback={
+                          <div className="auto-post-card__thumb auto-post-card__thumb--empty">{item.category} 요약</div>
+                        }
+                        src={item.thumbnail}
+                      />
                       <div className="auto-post-card__body">
                         <div className="card-topline">
                           <span className="chip chip--soft">{item.category}</span>
                           <small>{formatDate(item.createdAt)}</small>
                         </div>
                         <strong>{item.title}</strong>
-                        <p>{compactText(item.previewText, 140)}</p>
+                        <p>{postListPreview(item)}</p>
                         <div className="badge-row">
                           <span className="chip chip--soft">점수 {Math.round(item.topicScore)}</span>
                           <span className="chip chip--soft">{postStatusLabel(item.status)}</span>
@@ -1376,7 +1448,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                     <div>
                       <h2>{selectedPost.title}</h2>
                       <p className="settings-card__lead">
-                        {selectedPost.subtitleLines.join(' / ') || selectedPost.lead}
+                        {selectedPostLeadText}
                       </p>
                     </div>
                     <div className="badge-row signals-post-hero__badges">
@@ -1429,12 +1501,28 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
 
                 <section className="panel-card signals-post-body">
                   <div className="panel-card__header">
-                    <h2>본문</h2>
+                    <h2>핵심 정리</h2>
                     <span className="chip chip--soft">
                       {selectedPostSummary ? formatDate(selectedPostSummary.updatedAt) : formatDate(selectedPost.updatedAt)}
                     </span>
                   </div>
-                  <AutoPostArticle html={selectedPost.html} title={selectedPost.title} />
+                  <div className="signals-post-body__summary">
+                    {selectedPostBodySummary ? <p className="signals-post-body__summaryLead">{selectedPostBodySummary}</p> : null}
+                    {selectedPostSummaryPoints.length > 0 ? (
+                      <ul className="signals-post-body__summaryList">
+                        {selectedPostSummaryPoints.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                  <DisclosureSection
+                    className="disclosure--soft signals-post-body__disclosure"
+                    summary="영문 원문 또는 혼합 초안 보기"
+                    title="원문 초안"
+                  >
+                    <AutoPostArticle html={selectedPost.html} title={selectedPost.title} />
+                  </DisclosureSection>
                 </section>
 
                 <div className="auto-post-detail-grid">
@@ -1451,7 +1539,16 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                               item.kind === 'video' ? (
                                 <video className="auto-post-media-thumb" controls preload="metadata" src={item.previewUrl} />
                               ) : (
-                                <img className="auto-post-media-thumb" src={item.previewUrl} alt={item.title} />
+                                <SafePreviewImage
+                                  alt={item.title}
+                                  className="auto-post-media-thumb"
+                                  fallback={
+                                    <div className="auto-post-card__thumb auto-post-card__thumb--empty">
+                                      미리보기를 불러오지 못했습니다
+                                    </div>
+                                  }
+                                  src={item.previewUrl}
+                                />
                               )
                             ) : null}
                             <strong>{item.title}</strong>
@@ -1496,7 +1593,7 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                             <small>{formatDate(item.publishedAt)}</small>
                           </div>
                           <strong>{item.title}</strong>
-                          <p>{compactText(item.summary, 180)}</p>
+                          <p>{koreanFirstText(item.summary, 180, '원문 요약은 원문 열기에서 확인할 수 있습니다.')}</p>
                           <div className="badge-row">
                             <span className="chip chip--soft">점수 {Math.round(item.score)}</span>
                             <button

@@ -1240,3 +1240,309 @@
     - `.signals-posts-workspace` width `852px`
   - headless Playwright capture:
     - `output/playwright/workspace-ux-reset-pass5/signals-posts-desktop.png`
+
+## 2026-04-22 Workspace UX Reset - Pass 6
+
+- Improved generated-post readability in `src/features/autoPosts/AutoPostArticle.tsx` by decoding repeated HTML entities inside text nodes before rendering the stored article HTML inside the iframe preview.
+- This fixes legacy saved posts that still contain strings like `&amp;amp;` or `&amp;amp;amp;` without requiring regeneration.
+- Verification:
+  - `npm run lint`
+  - `npm run build`
+  - sample decode check:
+    - source: `xAI &amp;amp; Ollama`
+    - decoded: `xAI & Ollama`
+
+## 2026-04-22 Workspace UX Reset - Pass 7
+
+- Reworked `src/pages/SkillsPage.tsx` from a flat skill inventory into a workflow-first catalog that highlights the two operator paths the user requested to center:
+  - Figma-based design implementation
+  - Playwright-based UI validation
+- Added a left-side workflow rail plus a compact filter panel so the skills surface feels curated instead of noisy:
+  - featured workflow cards
+  - grouped catalog sections
+  - concise handle labels instead of long path-heavy metadata
+  - featured/source/state pills
+  - one-action enable toggle rows
+- Rebuilt the page grouping and fallback summaries so the route now maps the existing bridge metadata into clearer Korean labels without inventing a separate design language.
+- Replaced the old page styling in `src/styles/pages/skills.css` with dedicated layout rules for:
+  - summary cards
+  - workflow spotlight rail
+  - filter panel
+  - collapsible grouped catalog
+  - responsive desktop/mobile skill rows
+- Assumption used for this pass:
+  - no screenshot set or Figma node URL was provided,
+  - the implementation therefore followed the repo's existing primitives/tokens and used the requested Figma + Playwright workflow direction as the source of truth.
+- Verification:
+  - `npm run lint`
+  - `npm run build`
+  - preview `http://127.0.0.1:4173/` = 200
+  - bridge `http://127.0.0.1:4174/api/health` = 200
+  - Playwright browser review on `#/tools`
+    - desktop capture: `output/playwright/skills-page/skills-desktop.png`
+    - mobile capture: `output/playwright/skills-page/skills-mobile-2.png`
+    - full mobile capture: `output/playwright/skills-page/skills-mobile-full.png`
+    - functional snapshots:
+      - `output/playwright/skills-page/skills-desktop-snapshot.md`
+      - `output/playwright/skills-page/skills-mobile-snapshot.md`
+      - `output/playwright/skills-page/skills-functional-snapshot.md`
+      - `output/playwright/skills-page/skills-filtered-snapshot.md`
+    - confirmed the workflow filter narrows the list,
+    - confirmed skill enable/disable toggles update UI state and were restored to the original off state after verification.
+
+## 2026-04-22 Workspace UX Reset - Pass 8
+
+- Rebuilt the idle chat surface in `src/features/chat/ChatSections.tsx` so `#/chat` now behaves like a wide operator workspace instead of a centered empty card:
+  - new `Artemis Wide` idle shell
+  - left-side working brief with scope details
+  - right rail for quick-start actions and connection state
+  - blocked state is now integrated into the shell instead of always consuming the bottom composer region
+- Updated `src/features/chat/ChatPage.tsx` so the embedded composer hides only when the chat is both idle and blocked, while the status CTA is surfaced inside the idle shell itself.
+- Reworked `src/styles/pages/chat.css` to support the new wide composition:
+  - wider desktop message/content bounds
+  - full-width quick-start rows instead of collapsed chips
+  - cleaner desktop rail balance
+  - mobile single-column stacking with no horizontal overflow
+  - mobile blocked-state priority so the status card appears before quick-start actions in the fresh mobile layout
+- Operational fix:
+  - stopped launching the preview server in a visible console window,
+  - preview is now started as a hidden background process and logs are redirected to `output/runtime-logs/preview.stdout.log` and `output/runtime-logs/preview.stderr.log`
+- Delivery guard for this session:
+  - stopped using intermediate inline screenshot replies as part of routine progress reporting,
+  - future screenshot replies should use the short-path helper workflow only, and otherwise fall back to text or file links.
+- Verification:
+  - `npm run build`
+  - hidden preview `http://127.0.0.1:4173/` = 200
+  - bridge `http://127.0.0.1:4174/api/health` = 200
+  - Playwright interactive checks on `#/chat`
+    - desktop idle shell renders the new two-column composition
+    - quick-start cards now expand to full rail width
+    - mobile idle shell has no horizontal overflow
+    - mobile fresh-context check confirms the blocked-state card is ordered before the quick-start section
+
+## 2026-04-22 Workspace UX Reset - Pass 9
+
+- Tightened the live chat layout in `src/styles/pages/chat.css` after checking a mock live thread in Playwright:
+  - assistant/master bubbles now use wider fixed bounds on desktop instead of shrinking too aggressively,
+  - mobile message meta now stacks vertically,
+  - long model/provider badges now wrap on mobile instead of collapsing the card,
+  - mobile assistant bubbles and typing rows now fill the available width without horizontal overflow.
+- Process correction for this session:
+  - stopped using visible image tool outputs in the thread as a verification habit because they render as broken placeholders in the user's Codex desktop app,
+  - continued visual verification internally without adding more inline tool images to the conversation.
+- Verification:
+  - `npm run build`
+  - `npm run lint`
+  - preview `http://127.0.0.1:4173/` = 200
+  - bridge `http://127.0.0.1:4174/api/health` = 200
+  - Playwright fresh-context mock-live checks confirmed:
+    - desktop assistant bubble width `692px`
+    - mobile assistant bubble width `280px`
+    - mobile badge `white-space = normal`
+    - mobile meta direction `column`
+    - no mobile horizontal overflow
+
+## 2026-04-22 Workspace UX Reset - Pass 10
+
+- Traced the remaining `#/chat` mismatch to selector priority, not component structure:
+  - the intended wide chat rules were present in `src/styles/pages/chat.css`,
+  - but older `.page--chat-modern ...` rules in `src/styles/legacy.css` were still overriding key parts of the final surface.
+- Added a final page-scoped override layer to `src/styles/pages/chat.css` so the modern chat route now decisively owns:
+  - surface border and radius
+  - idle-shell width and two-column layout
+  - route/context chips visibility
+  - live-thread intro ribbon styling
+  - blocked composer status layout
+- This resolved the real browser regressions that were still visible in the built preview:
+  - idle shell width was stuck at `860px`
+  - route chips were hidden
+  - chat surface border radius was forced to `0`
+  - live-thread intro fell back to a flat static row
+- Verification:
+  - `npm run lint`
+  - `npm run build`
+  - preview `http://127.0.0.1:4173/` = 200
+  - bridge `http://127.0.0.1:4174/api/health` = 200
+  - Playwright rebuilt-preview checks confirmed:
+    - desktop idle shell width `1001px`
+    - desktop route chips visible (`3`)
+    - desktop surface radius `28px`
+    - desktop live-thread intro `position = sticky`
+    - desktop live-thread width `1009px`
+    - mobile blocked-state card stays above quick-start actions
+    - mobile badge wraps and mobile meta direction stays `column`
+    - no desktop/mobile horizontal overflow
+
+## 2026-04-22 Workspace UX Reset - Pass 11
+
+- Removed the stale chat-specific `Open WebUI direction pass` block from `src/styles/legacy.css`.
+- This was the actual long-term source of the recent regressions:
+  - it reintroduced narrow `860px` chat widths,
+  - hid route chips,
+  - flattened the chat surface back to `border-radius: 0`,
+  - downgraded the live-thread intro from sticky ribbon to static text.
+- The chat route now relies on `src/styles/pages/chat.css` as the authoritative page stylesheet instead of fighting a second legacy chat layer.
+- Verification after the cleanup confirmed the intended rendering still holds:
+  - `npm run lint`
+  - `npm run build`
+  - rebuilt preview `http://127.0.0.1:4173/` = 200
+  - bridge `http://127.0.0.1:4174/api/health` = 200
+  - Playwright checks confirmed:
+    - desktop idle shell width `1001px`
+    - desktop route chips visible (`3`)
+    - desktop chat surface radius `28px`
+    - desktop live intro remains `sticky`
+    - mobile blocked-state card stays above quick-start actions
+    - mobile live badge wraps and meta stays `column`
+    - no horizontal overflow on desktop/mobile
+
+## 2026-04-22 Workspace UX Reset - Pass 12
+
+- Improved the real blocked-idle experience that the current workspace is actually showing most often:
+  - `src/features/chat/ChatPage.tsx` now exposes a compact topbar status chip next to the model selector so readiness or blockage is visible immediately,
+  - `src/features/chat/ChatSections.tsx` now adds a disabled input preview block inside the idle shell when the route is blocked, so the page still reads like a chat workspace instead of a dead-end warning card.
+- `src/styles/pages/chat.css` now styles:
+  - the topbar status chip,
+  - the blocked-state input preview,
+  - responsive mobile stacking for the new topbar status row.
+- Verification after rebuild confirmed:
+  - desktop blocked state keeps the wide shell and adds the readiness chip without overflow,
+  - tablet blocked state keeps the same balance,
+  - mobile stacks the model trigger and status chip cleanly at full width,
+  - live mobile still keeps badge wrapping and column meta layout.
+
+## 2026-04-22 Workspace UX Reset - Pass 13
+
+- Continued the chat refinement instead of pausing on the blocked-idle shell:
+  - topbar model summary now uses a compact surface label so long local model ids do not dominate the header,
+  - the warning status chip is now actionable and opens Settings directly when the route is blocked,
+  - live composer now includes a compact context row (`route`, `model`, `Enter/Shift+Enter` hint) above the textarea.
+- `src/styles/pages/chat.css` now supports:
+  - clickable warning-state status chips without browser default button chrome,
+  - the live composer context row,
+  - mobile stacking for that new context row.
+- Verification after rebuild confirmed:
+  - blocked desktop header now reads `gemma4 E4B` instead of the full longer model string,
+  - blocked mobile keeps both the compact trigger and full-width status chip without overflow,
+  - live mobile composer helper row stacks vertically and still avoids horizontal overflow.
+
+## 2026-04-22 Workspace UX Reset - Pass 14
+
+- Refined the model menu itself so the chat header cleanup extends into the actual selection flow:
+  - menu rows now use shorter role labels such as `채팅`, `코딩`, `로컬`,
+  - long model labels are compacted where needed in the menu as well,
+  - selection/setup/connection state is now shown as a dedicated status chip instead of being buried in a sentence.
+- `src/styles/pages/chat.css` now adds page-level menu styling for:
+  - wider but viewport-safe dropdown width,
+  - stacked text blocks inside each menu item,
+  - status chips for `선택됨` and warning states.
+- Verification after rebuild confirmed:
+  - desktop/mobile menu width stays within the viewport (`340px` at current widths),
+  - no menu-induced horizontal overflow,
+  - the blocked local option now reads as a shorter row with explicit `연결 필요` context and `선택됨` chip.
+
+## 2026-04-22 Workspace UX Reset - Pass 15
+
+- Fixed the biggest remaining blocked-chat workflow gap:
+  - when the currently selected chat route is blocked, the idle status card now offers a direct recovery action to switch to another available chat route,
+  - this avoids forcing the operator into Settings just to resume work when a usable alternative already exists.
+- Simplified the page stylesheet further during the same pass:
+  - removed the stale intermediate `clean/cinema/chat cleanup/wide rebuild` blocks from `src/styles/pages/chat.css`,
+  - kept the final page-owned override layer as the single source of truth for the route.
+- Verification after rebuild confirmed:
+  - desktop blocked state shows `Codex CLI로 전환`,
+  - clicking the recovery button changes the trigger to `GPT-5.4`,
+  - the page leaves the blocked state and the composer becomes available,
+  - mobile also shows the recovery action without horizontal overflow.
+
+## 2026-04-22 Workspace UX Reset - Pass 16
+
+- Fixed the next blocked-chat dead end inside the same idle shell:
+  - quick-start cards no longer remain effectively useless when the selected route is blocked but another chat route is available,
+  - `src/features/chat/ChatPage.tsx` now treats a quick-start click as a recovery action first in that case, then pre-fills the composer with the chosen prompt.
+- `src/features/chat/ChatSections.tsx` keeps the quick-start buttons enabled only when the route is already usable or a recoverable route exists.
+- Verification after rebuild confirmed:
+  - `npm run lint`
+  - `npm run build`
+  - preview `http://127.0.0.1:4173/` = `200`
+  - bridge `http://127.0.0.1:4174/api/health` = `200`
+  - Playwright checks confirmed:
+    - desktop blocked state keeps quick-start cards enabled
+    - desktop quick-start click switches `gemma4 E4B` -> `GPT-5.4`
+    - desktop composer opens with the selected prompt prefilled
+    - mobile preserves the same recovery + prefill flow
+    - desktop/mobile both keep horizontal overflow disabled during the transition
+
+## 2026-04-22 Workspace UX Reset - Pass 17
+
+- Fixed the next most obvious blocked-chat UX problem after the recovery wiring:
+  - the idle shell now states the recovery path explicitly instead of leading with generic `연결 상태` copy,
+  - the warning status card moves ahead of quick starts on desktop too, so the operator sees the recovery action before the prompt list,
+  - the quick-start section now explains that clicking a card will auto-switch into the available route,
+  - the secondary settings button is still there, but it now reads `직접 연결 설정` so it no longer competes with the primary recovery action.
+- Verification after rebuild confirmed:
+  - `npm run lint`
+  - `npm run build`
+  - preview `http://127.0.0.1:4173/` = `200`
+  - bridge `http://127.0.0.1:4174/api/health` = `200`
+  - Playwright checks confirmed:
+    - desktop/mobile blocked status label now reads `즉시 복구`
+    - desktop blocked state places the recovery card above quick starts
+    - quick-start hint clearly mentions the automatic `Codex CLI` switch
+    - quick-start click still switches to `GPT-5.4` and opens the prefilled composer
+    - desktop/mobile both keep horizontal overflow disabled
+
+## 2026-04-22 Workspace UX Reset - Pass 19
+
+- Fixed the most distracting Signals content problem:
+  - generated-post list/detail now prefer Korean summary text when mixed Korean/English content exists,
+  - the selected post detail now opens with a `핵심 정리` block and keeps the raw English/mixed article behind a disclosure instead of dumping it immediately,
+  - source summaries inside Signals and publisher detail now clip to Korean-first copy when available.
+- Added a safer preview fallback for generated-post thumbnails and media previews:
+  - broken preview URLs now collapse into a stable text placeholder instead of showing the browser's missing-image icon.
+- Verification after rebuild confirmed:
+  - `npm run lint`
+  - `npm run build`
+  - preview `http://127.0.0.1:4173/` = `200`
+  - bridge `http://127.0.0.1:4174/api/health` = `200`
+  - Playwright checks confirmed:
+    - generated-post card preview falls back to a text tile when the thumbnail is broken
+    - selected generated post shows `핵심 정리` as the main body heading
+    - selected generated post lead and bullet summary render in Korean first
+    - publisher draft detail headline/lead render as Korean summary text instead of the raw English paper title/abstract
+
+## 2026-04-22 Workspace UX Reset - Pass 20
+
+- Fixed the next blocked-chat scanning problem in the topbar:
+  - the model trigger no longer leads with the blocked local route when a recoverable route already exists,
+  - blocked idle state now shows the recoverable model in the trigger and labels the subtitle as `복구 추천 · Codex CLI`.
+- Verification after rebuild confirmed:
+  - `npm run lint`
+  - `npm run build`
+  - `git diff --check`
+  - Playwright checks confirmed:
+    - desktop blocked trigger now reads `GPT-5.4`
+    - trigger subtitle now reads `복구 추천 · Codex CLI`
+    - desktop/mobile both keep horizontal overflow disabled
+
+## 2026-04-22 Workspace UX Reset - Pass 18
+
+- Fixed the next most visible mismatch in the same blocked-chat flow:
+  - the topbar warning chip no longer keeps the older generic `실행기 연결 필요` wording while the idle shell says `즉시 복구`,
+  - when a recoverable route exists, the chip now points at that route and acts as a direct recovery action instead of sending the operator to Settings first.
+- `src/features/chat/ChatPage.tsx` now:
+  - computes the recoverable route/model label for the topbar chip,
+  - changes the blocked chip label to `즉시 복구`,
+  - switches directly to the recoverable route on click,
+  - falls back to Settings only when no recoverable route exists.
+- Verification after rebuild confirmed:
+  - `npm run lint`
+  - `npm run build`
+  - preview `http://127.0.0.1:4173/` = `200`
+  - bridge `http://127.0.0.1:4174/api/health` = `200`
+  - Playwright checks confirmed:
+    - desktop/mobile blocked topbar chip label now reads `즉시 복구`
+    - chip detail shows `Codex CLI · GPT-5.4`
+    - chip click switches `gemma4 E4B` -> `GPT-5.4`
+    - composer becomes visible after the switch
+    - desktop/mobile both keep horizontal overflow disabled

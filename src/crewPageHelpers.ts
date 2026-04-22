@@ -7,6 +7,41 @@ export function normalizeUiText(value: string | null | undefined) {
     .trim()
 }
 
+export function hasHangulText(value: string | null | undefined) {
+  return /[가-힣]/.test(normalizeUiText(value))
+}
+
+export function preferLocalizedPreview(value: string | null | undefined) {
+  const normalized = normalizeUiText(value)
+
+  if (!normalized || !hasHangulText(normalized)) {
+    return normalized
+  }
+
+  const segments = normalized
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+
+  if (segments.length === 0) {
+    return normalized
+  }
+
+  const kept: string[] = []
+
+  for (const segment of segments) {
+    const segmentHasHangul = hasHangulText(segment)
+
+    if (!segmentHasHangul && kept.length > 0 && segment.length > 32) {
+      break
+    }
+
+    kept.push(segment)
+  }
+
+  return kept.join(' ').trim() || normalized
+}
+
 export function clipUiText(value: string | null | undefined, maxLength = 140) {
   const normalized = normalizeUiText(value)
 

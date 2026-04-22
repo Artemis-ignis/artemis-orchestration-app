@@ -718,3 +718,182 @@
   - `.signals-posts-workspace` = `852px`
 - Verification capture:
   - `output/playwright/workspace-ux-reset-pass5/signals-posts-desktop.png`
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 6
+
+- Generated post previews still showed double-escaped entities such as `&amp;amp;` and `&amp;amp;amp;` inside existing stored articles.
+- Extended `src/features/autoPosts/AutoPostArticle.tsx` so the renderer now walks text nodes inside the parsed document and decodes repeated HTML entities before the article is rendered in the isolated iframe.
+- This keeps previously generated posts readable without requiring regeneration of the saved HTML files.
+- Verification:
+  - `npm run lint`
+  - `npm run build`
+  - decoded sample check:
+    - source: `... xAI &amp;amp; Ollama`
+    - decoded: `... xAI & Ollama`
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 7
+
+- The `#/tools` route now behaves like a curated operator catalog instead of a long raw skill dump.
+- `src/pages/SkillsPage.tsx` now centers two featured workflows:
+  - Figma implementation
+  - Playwright validation
+- The new surface keeps the existing skill bridge data but reorganizes it into:
+  - featured workflow cards
+  - a compact filter panel
+  - grouped collapsible sections
+  - simpler enable/disable rows with concise labels
+- `src/styles/pages/skills.css` now owns the page-level layout so the Skills route no longer depends on the older shared support-page patterns.
+- Browser verification confirmed:
+  - desktop and mobile layouts both hold the two-column-to-single-column transition cleanly,
+  - the workflow action applies the expected filter state,
+  - toggling a skill updates the status pills and counts correctly,
+  - the temporary toggle change used during the test was reverted.
+- Assumption for this pass:
+  - no screenshot pack or Figma node was provided,
+  - the refactor therefore stayed inside the repo's existing design system direction and used the requested Figma + Playwright workflow emphasis as the guiding reference.
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 8
+
+- `#/chat` idle state now uses a wider Artemis workspace composition instead of a small centered empty card.
+- `src/features/chat/ChatSections.tsx` now renders:
+  - a wide left briefing area
+  - a right operations rail
+  - a built-in connection status block for blocked startup states
+- `src/features/chat/ChatPage.tsx` now keeps the bottom composer hidden only for the blocked idle state, which removes the old duplicated warning block from the bottom edge.
+- `src/styles/pages/chat.css` now:
+  - stretches quick-start actions to full rail width
+  - gives the idle shell a true wide desktop layout
+  - widens message bounds for live chat
+  - keeps mobile in a clean single-column flow without horizontal overflow
+  - places the blocked-state status card above quick-start actions on mobile in a fresh browser context
+- Local workflow fix:
+  - preview is now expected to run as a hidden background process,
+  - runtime logs live under `output/runtime-logs/`
+  - progress reporting should prefer text unless a short-path-safe local image reply is explicitly worth the friction
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 9
+
+- The chat route's live conversation state now has a safer mobile layout:
+  - long model/provider pills wrap instead of forcing clipped cards,
+  - mobile message meta stacks vertically,
+  - assistant/master bubbles expand to the available width,
+  - typing rows also respect the single-column mobile flow.
+- The verification workflow for this thread is now intentionally text-first:
+  - avoid posting tool-rendered inline images into the thread during iteration,
+  - keep visual QA internal unless a final short-path-safe local image reply is explicitly needed.
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 10
+
+- The remaining `#/chat` quality gap was confirmed as a style-priority problem:
+  - stale `.page--chat-modern` selectors from `src/styles/legacy.css` were still beating parts of the newer page stylesheet,
+  - this left the built preview narrower and flatter than the intended Artemis Wide layout.
+- `src/styles/pages/chat.css` now ends with a final page-scoped override block so the chat route regains ownership of:
+  - wide idle shell width
+  - visible route/model chips
+  - rounded chat surface with border
+  - sticky live-thread intro ribbon
+  - blocked-state status/composer framing
+- Rebuilt-preview verification now confirms the intended rendering:
+  - desktop idle shell is about `1001px` wide instead of `860px`
+  - desktop route chips are visible again
+  - desktop live intro is sticky again
+  - mobile still keeps the status card first and avoids horizontal overflow
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 11
+
+- The conflicting legacy chat layer has now been removed instead of merely overridden.
+- Current chat ownership is simpler:
+  - `src/features/chat/ChatPage.tsx`
+  - `src/features/chat/ChatSections.tsx`
+  - `src/styles/pages/chat.css`
+- This lowers the chance that future chat UI work will silently regress because of hidden legacy selectors.
+- Latest confirmed state:
+  - correct repository: `artemis-orchestration-app`
+  - active branch: `codex/workspace-ux-reset`
+  - desktop idle shell stays wide
+  - desktop live intro stays sticky
+  - mobile status-first ordering and no-overflow state hold after rebuild
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 12
+
+- The current blocked-idle route now feels less broken while providers are unavailable:
+  - topbar shows a dedicated status chip beside the model trigger,
+  - the idle shell includes a disabled input-preview block so the surface still reads as a chat workspace.
+- Latest confirmed state after rebuild:
+  - desktop blocked topbar shows both model trigger and status chip cleanly,
+  - tablet keeps the same two-item topbar balance,
+  - mobile stacks the trigger and status chip without horizontal overflow,
+  - live mobile still preserves wrapped badges and column metadata.
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 13
+
+- The chat header and live composer are now denser and easier to scan:
+  - topbar model names use a compact surface label,
+  - blocked warning chips can take the operator straight to Settings,
+  - live composer includes a small route/model/hotkey row above the textarea.
+- Latest confirmed state:
+  - blocked desktop trigger label is now compact (`gemma4 E4B`),
+  - blocked mobile still has no overflow,
+  - live mobile composer helper row stacks vertically and remains stable.
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 14
+
+- The chat model menu is now aligned with the cleaner header:
+  - shorter role copy
+  - compact long labels
+  - explicit selection/warning chips
+- Latest confirmed state:
+  - desktop/mobile menu width stays viewport-safe,
+  - menu changes do not introduce overflow,
+  - the current blocked local option is easier to scan than the earlier long sentence version.
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 15
+
+- The blocked chat route now exposes an actual recovery path when another chat route is available.
+- Latest confirmed state:
+  - blocked desktop shows a direct `Codex CLI로 전환` action,
+  - clicking it switches the route and restores the composer without visiting Settings,
+  - mobile keeps the same recovery action without overflow.
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 16
+
+- The blocked idle quick-start cards now recover into a usable chat path instead of staying as dead-end prompts.
+- Latest confirmed state:
+  - blocked desktop quick-start cards stay enabled when a recoverable chat route exists,
+  - clicking a quick-start card switches the route from blocked `gemma4 E4B` to available `GPT-5.4`,
+  - the composer opens with the selected prompt already filled in,
+  - mobile keeps the same recovery-through-quick-start behavior without horizontal overflow.
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 17
+
+- The blocked idle shell now makes the recovery path the first thing the operator sees instead of burying it under generic connection copy.
+- Latest confirmed state:
+  - desktop/mobile blocked status cards now read `즉시 복구`,
+  - the recovery card appears above quick starts on desktop as well,
+  - quick-start area now explains that it will auto-switch into `Codex CLI`,
+  - the settings button is still available but clearly demoted to `직접 연결 설정`.
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 18
+
+- The topbar status chip now matches the blocked idle shell instead of sending mixed signals.
+- Latest confirmed state:
+  - desktop/mobile blocked topbar chips now read `즉시 복구`,
+  - the chip detail now points to `Codex CLI · GPT-5.4` instead of repeating the blocked route,
+  - clicking the chip switches directly into the recoverable route and opens the composer.
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 19
+
+- Signals now shows Korean-first summaries instead of leading with raw English article text.
+- Latest confirmed state:
+  - generated-post list cards fall back to a stable text tile when the thumbnail is broken,
+  - selected generated-post detail opens with `핵심 정리` and Korean bullet summaries,
+  - raw English/mixed article content stays behind a disclosure,
+  - publisher draft detail headline/lead now read like a Korean briefing instead of the source paper title/abstract.
+
+## 2026-04-22 Workspace UX Reset Branch - Pass 20
+
+- The blocked chat topbar trigger now follows the same recovery-first logic as the idle shell.
+- Latest confirmed state:
+  - blocked desktop trigger now reads `GPT-5.4`,
+  - the trigger subtitle now reads `복구 추천 · Codex CLI`,
+  - desktop/mobile both keep horizontal overflow disabled after the header change.

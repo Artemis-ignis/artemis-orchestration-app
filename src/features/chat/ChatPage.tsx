@@ -219,11 +219,40 @@ function resolveOfficialProviderId(baseUrl: string) {
 }
 
 function chatAgentChoiceLabel(agent: AgentItem) {
-  return formatFriendlyModelName(agent.model)
+  const fullLabel = formatFriendlyModelName(agent.model)
+  return fullLabel.length > 24 ? compactSurfaceModelName(fullLabel) : fullLabel
 }
 
-function chatAgentSecondaryLabel(agent: AgentItem) {
-  return `${chatAgentRouteLabel(agent)} · ${agent.role}`
+function compactAgentRoleLabel(role: string) {
+  if (/코딩/.test(role)) {
+    return '코딩'
+  }
+
+  if (/로컬/.test(role)) {
+    return '로컬'
+  }
+
+  if (/공식/.test(role)) {
+    return '채팅'
+  }
+
+  return role.replace(/\s*에이전트$/, '')
+}
+
+function chatAgentSecondaryLabel(agent: AgentItem, statusNote?: string) {
+  const base = `${chatAgentRouteLabel(agent)} · ${compactAgentRoleLabel(agent.role)}`
+  return statusNote ? `${base} · ${statusNote}` : base
+}
+
+function compactSurfaceModelName(model?: string | null) {
+  const label = formatFriendlyModelName(model || '모델 선택')
+  const parts = label.split(/\s+/).filter(Boolean)
+
+  if (parts.length <= 2) {
+    return label
+  }
+
+  return parts.slice(0, 2).join(' ')
 }
 
 export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
@@ -360,6 +389,7 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
       Boolean(attempt.error_type),
   )
   const currentModelName = formatFriendlyModelName(selectedModel || '모델 선택')
+  const compactModelName = compactSurfaceModelName(selectedModel || '모델 선택')
   const currentRouteLabel = selectedAgent
     ? chatAgentRouteLabel(selectedAgent)
     : providerLabel(selectedProvider as 'auto' | 'ollama' | 'codex')
@@ -384,8 +414,39 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
         : selectedAgent?.provider === 'codex'
           ? bridgeHealth?.providers.find((item) => item.provider === 'codex')?.ready === false
           : false
-  const compactComposerMode =
-    isIdleState && !isGenerating && (selectedAgentNeedsKey || selectedAgentUnavailable)
+  const recoverableChatAgent = useMemo(() => {
+    return (
+      chatAgents.find((agent) => {
+        if (agent.id === selectedAgent?.id) {
+          return false
+        }
+
+        if (
+          (agent.provider === 'openai-compatible' || agent.provider === 'anthropic') &&
+          !agent.apiKeyId
+        ) {
+          return false
+        }
+
+        if (agent.provider === 'official-router') {
+          const providerStatus = aiProviders.find(
+            (item) => item.provider === resolveOfficialProviderId(agent.baseUrl),
+          )
+          return Boolean(providerStatus?.enabled && providerStatus?.configured && agent.model?.trim())
+        }
+
+        if (agent.provider === 'ollama') {
+          return bridgeHealth?.providers.find((item) => item.provider === 'ollama')?.ready !== false
+        }
+
+        if (agent.provider === 'codex') {
+          return bridgeHealth?.providers.find((item) => item.provider === 'codex')?.ready !== false
+        }
+
+        return true
+      }) ?? null
+    )
+  }, [aiProviders, bridgeHealth?.providers, chatAgents, selectedAgent?.id])
   const blockedComposerTitle = () =>
     selectedAgentNeedsKey
       ? 'API 연결 필요'
@@ -398,6 +459,74 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
       : selectedAgent?.provider === 'official-router'
         ? '모델 설정만 확인하면 바로 시작할 수 있습니다.'
         : '실행기만 복구하면 바로 시작할 수 있습니다.'
+  const compactComposerMode =
+    isIdleState && !isGenerating && (selectedAgentNeedsKey || selectedAgentUnavailable)
+  const showEmbeddedComposer = !isIdleState || !compactComposerMode
+  const topbarStatusTone = compactComposerMode ? 'warning' : isGenerating ? 'live' : 'ready'
+  const recoverableRouteLabel = recoverableChatAgent ? chatAgentRouteLabel(recoverableChatAgent) : null
+  const recoverableModelName = recoverableChatAgent
+    ? compactSurfaceModelName(recoverableChatAgent.model || '모델 선택')
+    : null
+  const heroRouteLabel = compactComposerMode && recoverableRouteLabel ? recoverableRouteLabel : currentRouteLabel
+  const heroModelName = compactComposerMode && recoverableModelName ? recoverableModelName : currentModelName
+  const modelTriggerModelName =
+    compactComposerMode && recoverableModelName ? recoverableModelName : compactModelName
+  const modelTriggerRouteLabel =
+    compactComposerMode && recoverableRouteLabel ? `복구 추천 · ${recoverableRouteLabel}` : currentRouteLabel
+  const blockedSelectionLabel =
+    compactComposerMode && recoverableRouteLabel
+      ? `현재 막힘: ${currentRouteLabel} · ${compactModelName}`
+      : undefined
+  const heroDescription =
+    compactComposerMode && recoverableRouteLabel
+      ? `${heroModelName} 기준으로 바로 이어서 채팅, 코드 수정, 파일 점검, 다음 작업 정리까지 진행합니다.`
+      : `${currentModelName} 기준으로 채팅, 코드 수정, 파일 점검, 다음 작업 정리까지 한 흐름으로 이어갑니다.`
+  const inputPreviewTitle =
+    compactComposerMode && recoverableRouteLabel
+      ? `${recoverableRouteLabel}에서 바로 이어서 대화합니다.`
+      : undefined
+  const inputPreviewDetail =
+    compactComposerMode && recoverableRouteLabel && recoverableModelName
+      ? `복구 대상: ${recoverableRouteLabel} · ${recoverableModelName}`
+      : undefined
+  const inputPreviewPlaceholder =
+    compactComposerMode && recoverableRouteLabel
+      ? '복구 버튼이나 빠른 시작을 누르면 이 입력칸이 바로 활성화됩니다.'
+      : undefined
+  const topbarStatusLabel = compactComposerMode
+    ? recoverableRouteLabel
+      ? '즉시 복구'
+      : blockedComposerTitle()
+    : isGenerating
+      ? '응답 생성 중'
+      : '준비 완료'
+  const topbarStatusDetail = compactComposerMode
+    ? recoverableRouteLabel && recoverableModelName
+      ? `${recoverableRouteLabel} · ${recoverableModelName}`
+      : `${currentRouteLabel} · ${compactModelName}`
+    : `${currentRouteLabel} · ${compactModelName}`
+  const idleStatusLabel = compactComposerMode
+    ? recoverableRouteLabel
+      ? '즉시 복구'
+      : '연결 상태'
+    : '준비 상태'
+  const idleStatusTitle = compactComposerMode
+    ? recoverableRouteLabel
+      ? `${recoverableRouteLabel}에서 바로 계속할 수 있습니다.`
+      : blockedComposerTitle()
+    : `${currentModelName} 준비 완료`
+  const idleStatusDetail = compactComposerMode
+    ? recoverableRouteLabel
+      ? `빠른 시작을 누르거나 아래 버튼으로 ${recoverableRouteLabel} 경로에서 바로 이어갈 수 있습니다.`
+      : blockedComposerDetail()
+    : '메시지를 입력하거나 빠른 시작 항목을 눌러 바로 작업을 시작할 수 있습니다.'
+  const idleQuickStartHint = compactComposerMode
+    ? recoverableRouteLabel
+      ? `아래 항목을 누르면 ${recoverableRouteLabel}로 자동 전환한 뒤 바로 입력 준비를 마칩니다.`
+      : '연결이 복구되면 빠른 시작 항목을 바로 사용할 수 있습니다.'
+    : undefined
+  const openSettingsLabel =
+    compactComposerMode && recoverableRouteLabel ? '직접 연결 설정' : '설정 및 연결'
   const canSubmit =
     !isGenerating &&
     !selectedAgentNeedsKey &&
@@ -414,6 +543,26 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
           : isGenerating
             ? '응답 생성 중'
             : ''
+  const canUseIdlePrompts = !compactComposerMode || Boolean(recoverableChatAgent)
+
+  const handleIdlePromptPick = (prompt: string) => {
+    if (compactComposerMode && recoverableChatAgent) {
+      setActiveAgent(recoverableChatAgent.id)
+    }
+
+    setComposerText(prompt)
+  }
+
+  const handleTopbarStatusAction = () => {
+    if (compactComposerMode && recoverableChatAgent) {
+      setActiveAgent(recoverableChatAgent.id)
+      return
+    }
+
+    if (compactComposerMode) {
+      onNavigate('settings')
+    }
+  }
 
   useEffect(() => {
     const viewport = threadViewportRef.current
@@ -496,8 +645,8 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
               type="button"
             >
               <span className="model-menu__summary">
-                <strong>{currentModelName}</strong>
-                <small>{currentRouteLabel}</small>
+                <strong>{modelTriggerModelName}</strong>
+                <small>{modelTriggerRouteLabel}</small>
               </span>
               <Icon name="chevron-down" size={16} />
             </button>
@@ -511,27 +660,35 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
                       const providerStatus = aiProviders.find(
                         (item) => item.provider === resolveOfficialProviderId(agent.baseUrl),
                       )
+                      const providerNeedsSetup = !providerStatus?.enabled || !providerStatus?.configured
+                      const stateLabel = isSelected ? '선택됨' : providerNeedsSetup ? '설정 필요' : null
 
                       return (
                         <button
                           key={agent.id}
-                          className="dropdown-menu__item dropdown-menu__item--stacked"
+                          className="dropdown-menu__item dropdown-menu__item--stacked chat-model-menu__item"
                           onClick={() => {
                             setActiveAgent(agent.id)
                             setOpenModelMenu(false)
                           }}
+                          title={formatFriendlyModelName(agent.model)}
                           type="button"
                         >
-                          <span>
+                          <span className="chat-model-menu__itemBody">
                             <strong>{chatAgentChoiceLabel(agent)}</strong>
                             <small>
-                              {chatAgentSecondaryLabel(agent)}
-                              {!providerStatus?.enabled || !providerStatus?.configured
-                                ? ' / 공급자 설정 필요'
-                                : ''}
+                              {chatAgentSecondaryLabel(agent, providerNeedsSetup ? '설정 필요' : undefined)}
                             </small>
                           </span>
-                          {isSelected ? <Icon name="check" size={16} /> : null}
+                          {stateLabel ? (
+                            <span
+                              className={`chat-model-menu__state ${
+                                isSelected ? 'is-selected' : 'is-warning'
+                              }`}
+                            >
+                              {stateLabel}
+                            </span>
+                          ) : null}
                         </button>
                       )
                     })}
@@ -549,26 +706,35 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
                           : agent.provider === 'codex'
                             ? bridgeHealth?.providers.find((item) => item.provider === 'codex')?.ready !== false
                             : true
+                      const stateLabel = isSelected ? '선택됨' : !providerReady ? '연결 필요' : null
 
                       return (
                         <button
                           key={agent.id}
-                          className="dropdown-menu__item dropdown-menu__item--stacked"
+                          className="dropdown-menu__item dropdown-menu__item--stacked chat-model-menu__item"
                           disabled={!providerReady}
                           onClick={() => {
                             setActiveAgent(agent.id)
                             setOpenModelMenu(false)
                           }}
+                          title={formatFriendlyModelName(agent.model)}
                           type="button"
                         >
-                          <span>
+                          <span className="chat-model-menu__itemBody">
                             <strong>{chatAgentChoiceLabel(agent)}</strong>
                             <small>
-                              {chatAgentSecondaryLabel(agent)}
-                              {!providerReady ? ' / 실행기 연결 필요' : ''}
+                              {chatAgentSecondaryLabel(agent, !providerReady ? '연결 필요' : undefined)}
                             </small>
                           </span>
-                          {isSelected ? <Icon name="check" size={16} /> : null}
+                          {stateLabel ? (
+                            <span
+                              className={`chat-model-menu__state ${
+                                isSelected ? 'is-selected' : 'is-warning'
+                              }`}
+                            >
+                              {stateLabel}
+                            </span>
+                          ) : null}
                         </button>
                       )
                     })}
@@ -597,6 +763,27 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
               </div>
             ) : null}
           </div>
+          {compactComposerMode ? (
+            <button
+              className={`chat-topbar__statusChip chat-topbar__statusChip--${topbarStatusTone}`}
+              onClick={handleTopbarStatusAction}
+              type="button"
+            >
+              <span className="chat-topbar__statusDot" aria-hidden="true" />
+              <div className="chat-topbar__statusCopy">
+                <strong>{topbarStatusLabel}</strong>
+                <small>{topbarStatusDetail}</small>
+              </div>
+            </button>
+          ) : (
+            <div className={`chat-topbar__statusChip chat-topbar__statusChip--${topbarStatusTone}`}>
+              <span className="chat-topbar__statusDot" aria-hidden="true" />
+              <div className="chat-topbar__statusCopy">
+                <strong>{topbarStatusLabel}</strong>
+                <small>{topbarStatusDetail}</small>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -607,7 +794,32 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
               <ChatIdlePanel
                 currentModelName={currentModelName}
                 currentRouteLabel={currentRouteLabel}
-                onPickPrompt={setComposerText}
+                focusModelName={heroModelName}
+                focusRouteLabel={heroRouteLabel}
+                heroDescription={heroDescription}
+                blockedSelectionLabel={blockedSelectionLabel}
+                canPickPrompt={canUseIdlePrompts}
+                isBlocked={compactComposerMode}
+                onPickPrompt={handleIdlePromptPick}
+                quickStartHint={idleQuickStartHint}
+                inputPreviewTitle={inputPreviewTitle}
+                inputPreviewDetail={inputPreviewDetail}
+                inputPreviewPlaceholder={inputPreviewPlaceholder}
+                onOpenSettings={compactComposerMode ? () => onNavigate('settings') : undefined}
+                openSettingsLabel={openSettingsLabel}
+                onRecoverRoute={
+                  compactComposerMode && recoverableChatAgent
+                    ? () => setActiveAgent(recoverableChatAgent.id)
+                  : undefined
+                }
+                recoverRouteLabel={
+                  compactComposerMode && recoverableChatAgent
+                    ? `${chatAgentRouteLabel(recoverableChatAgent)}에서 계속`
+                    : undefined
+                }
+                statusDetail={idleStatusDetail}
+                statusLabel={idleStatusLabel}
+                statusTitle={idleStatusTitle}
               />
             </div>
           ) : (
@@ -683,109 +895,120 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
           )}
         </div>
 
-        <form
-          className={`composer composer--chat chat-composer chat-composer--embedded ${
-            compactComposerMode ? 'chat-composer--blocked' : ''
-          }`}
-          onSubmit={(event) => {
-            event.preventDefault()
-            void handleSubmit()
-          }}
-        >
-          {compactComposerMode ? (
-            <div className="chat-composer__status">
-              <div className="chat-composer__statusCopy">
-                <span className="chat-composer__statusLabel">{blockedComposerTitle()}</span>
-                <strong>{currentModelName}</strong>
-                <p>{blockedComposerDetail()}</p>
-              </div>
-              <button
-                className="ghost-button ghost-button--compact"
-                onClick={() => onNavigate('settings')}
-                type="button"
-              >
-                설정 및 연결
-              </button>
-            </div>
-          ) : (
-            <textarea
-              aria-label="메시지 입력"
-              rows={3}
-              value={composerText}
-              onChange={(event) => setComposerText(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault()
-                  if (!isGenerating && composerText.trim()) {
-                    void handleSubmit()
-                  }
-                }
-              }}
-              placeholder={
-                selectedAgentNeedsKey
-                  ? '설정에서 API 키를 연결한 뒤 다시 시도하세요.'
-                  : selectedAgentUnavailable
-                    ? '실행기 연결이 복구되면 바로 대화할 수 있습니다.'
-                    : 'Artemis에게 메시지를 입력하세요.'
-              }
-            />
-          )}
-          <div className="composer__footer">
-            {compactComposerMode ? null : (
-              <div className="composer__actions">
-                <>
-                  <input
-                    hidden
-                    multiple
-                    onChange={(event) => {
-                      if (event.target.files) {
-                        void uploadWorkspaceFiles(event.target.files)
-                      }
-                      event.target.value = ''
-                    }}
-                    ref={fileInputRef}
-                    type="file"
-                  />
-                  <button
-                    aria-label="파일 업로드"
-                    className="ghost-button"
-                    onClick={() => fileInputRef.current?.click()}
-                    title="파일 업로드"
-                    type="button"
-                  >
-                    <Icon name="paperclip" size={16} />
-                    파일 업로드
-                  </button>
-                </>
-              </div>
-            )}
-            <div className="composer__submitRow">
-              {compactComposerMode ? null : composerHint ? (
-                <span className="composer__hint">{composerHint}</span>
-              ) : null}
-              {isGenerating && streamAbortController ? (
+        {showEmbeddedComposer ? (
+          <form
+            className={`composer composer--chat chat-composer chat-composer--embedded ${
+              compactComposerMode ? 'chat-composer--blocked' : ''
+            }`}
+            onSubmit={(event) => {
+              event.preventDefault()
+              void handleSubmit()
+            }}
+          >
+            {compactComposerMode ? (
+              <div className="chat-composer__status">
+                <div className="chat-composer__statusCopy">
+                  <span className="chat-composer__statusLabel">{blockedComposerTitle()}</span>
+                  <strong>{currentModelName}</strong>
+                  <p>{blockedComposerDetail()}</p>
+                </div>
                 <button
                   className="ghost-button ghost-button--compact"
-                  onClick={() => streamAbortController.abort()}
+                  onClick={() => onNavigate('settings')}
                   type="button"
                 >
-                  중단
+                  설정 및 연결
                 </button>
-              ) : null}
+              </div>
+            ) : (
+              <>
+                <div className="chat-composer__lead">
+                  <div className="chat-composer__leadChips">
+                    <span className="chat-composer__leadChip">{currentRouteLabel}</span>
+                    <span className="chat-composer__leadChip">{compactModelName}</span>
+                  </div>
+                  <span className="chat-composer__leadHint">Enter 전송 · Shift+Enter 줄바꿈</span>
+                </div>
+                <textarea
+                  aria-label="메시지 입력"
+                  rows={3}
+                  value={composerText}
+                  onChange={(event) => setComposerText(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault()
+                      if (!isGenerating && composerText.trim()) {
+                        void handleSubmit()
+                      }
+                    }
+                  }}
+                  placeholder={
+                    selectedAgentNeedsKey
+                      ? '설정에서 API 키를 연결한 뒤 다시 시도하세요.'
+                      : selectedAgentUnavailable
+                        ? '실행기 연결이 복구되면 바로 대화할 수 있습니다.'
+                        : 'Artemis에게 메시지를 입력하세요.'
+                  }
+                />
+              </>
+            )}
+            <div className="composer__footer">
               {compactComposerMode ? null : (
-                <button
-                  aria-label="메시지 전송"
-                  className="primary-icon primary-icon--send"
-                  disabled={!canSubmit}
-                  title="메시지 전송"
-                  type="submit"
-                >
-                  <Icon name="send" size={18} />
-                </button>
+                <div className="composer__actions">
+                  <>
+                    <input
+                      hidden
+                      multiple
+                      onChange={(event) => {
+                        if (event.target.files) {
+                          void uploadWorkspaceFiles(event.target.files)
+                        }
+                        event.target.value = ''
+                      }}
+                      ref={fileInputRef}
+                      type="file"
+                    />
+                    <button
+                      aria-label="파일 업로드"
+                      className="ghost-button"
+                      onClick={() => fileInputRef.current?.click()}
+                      title="파일 업로드"
+                      type="button"
+                    >
+                      <Icon name="paperclip" size={16} />
+                      파일 업로드
+                    </button>
+                  </>
+                </div>
               )}
+              <div className="composer__submitRow">
+                {compactComposerMode ? null : composerHint ? (
+                  <span className="composer__hint">{composerHint}</span>
+                ) : null}
+                {isGenerating && streamAbortController ? (
+                  <button
+                    className="ghost-button ghost-button--compact"
+                    onClick={() => streamAbortController.abort()}
+                    type="button"
+                  >
+                    중단
+                  </button>
+                ) : null}
+                {compactComposerMode ? null : (
+                  <button
+                    aria-label="메시지 전송"
+                    className="primary-icon primary-icon--send"
+                    disabled={!canSubmit}
+                    title="메시지 전송"
+                    type="submit"
+                  >
+                    <Icon name="send" size={18} />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        </form>
+          </form>
+        ) : null}
       </div>
     </section>
   )

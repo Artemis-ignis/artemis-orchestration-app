@@ -1,5 +1,57 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+function decodeHtmlEntities(value: string) {
+  if (typeof window === 'undefined') {
+    return value
+  }
+
+  let nextValue = String(value ?? '')
+
+  for (let index = 0; index < 3; index += 1) {
+    const parser = new window.DOMParser()
+    const doc = parser.parseFromString(`<!doctype html><body>${nextValue}`, 'text/html')
+    const decoded = doc.body.textContent ?? nextValue
+
+    if (decoded === nextValue) {
+      break
+    }
+
+    nextValue = decoded
+  }
+
+  return nextValue
+}
+
+function normalizeDocumentTextNodes(doc: Document) {
+  const walker = doc.createTreeWalker(doc.body, window.NodeFilter.SHOW_TEXT)
+  const touched = new Set<Text>()
+
+  while (walker.nextNode()) {
+    const currentNode = walker.currentNode
+    if (!(currentNode instanceof window.Text)) {
+      continue
+    }
+
+    const parentTag = currentNode.parentElement?.tagName
+    if (parentTag && ['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(parentTag)) {
+      continue
+    }
+
+    if (!currentNode.textContent?.includes('&')) {
+      continue
+    }
+
+    touched.add(currentNode)
+  }
+
+  touched.forEach((node) => {
+    const decoded = decodeHtmlEntities(node.textContent ?? '')
+    if (decoded !== node.textContent) {
+      node.textContent = decoded
+    }
+  })
+}
+
 function buildArticleDocument(html: string, title: string) {
   if (typeof window === 'undefined') {
     return html
@@ -7,6 +59,8 @@ function buildArticleDocument(html: string, title: string) {
 
   const parser = new window.DOMParser()
   const doc = parser.parseFromString(html, 'text/html')
+
+  normalizeDocumentTextNodes(doc)
 
   if (!doc.head.querySelector('base')) {
     const base = doc.createElement('base')

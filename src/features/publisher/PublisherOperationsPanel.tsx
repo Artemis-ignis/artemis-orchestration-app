@@ -1,6 +1,14 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { DisclosureSection, EmptyState } from '../../crewPageShared'
-import { clipUiText, formatDate, formatRelative, providerLabel, sanitizeOperatorMessage } from '../../crewPageHelpers'
+import {
+  clipUiText,
+  formatDate,
+  formatRelative,
+  hasHangulText,
+  preferLocalizedPreview,
+  providerLabel,
+  sanitizeOperatorMessage,
+} from '../../crewPageHelpers'
 import { Icon } from '../../icons'
 import type {
   PublisherDossier,
@@ -60,7 +68,15 @@ type PublisherOperationsPanelProps = {
 }
 
 function compactText(value: string, maxLength = 180) {
-  return clipUiText(value, maxLength) || '내용이 없습니다.'
+  return clipUiText(preferLocalizedPreview(value), maxLength) || '내용이 없습니다.'
+}
+
+function koreanFirstText(value: string, maxLength = 180, fallback = '') {
+  const clipped = clipUiText(preferLocalizedPreview(value), maxLength)
+  if (hasHangulText(clipped)) {
+    return clipped
+  }
+  return fallback
 }
 
 function extractDraftHeadline(draft: PublisherDraft) {
@@ -70,9 +86,18 @@ function extractDraftHeadline(draft: PublisherDraft) {
     .filter(Boolean)
   const explicitTitle = lines.find((line) => /^제목[:：]\s*/.test(line))
   if (explicitTitle) {
-    return explicitTitle.replace(/^제목[:：]\s*/, '').trim() || draft.sourceTitle
+    const title = explicitTitle.replace(/^제목[:：]\s*/, '').trim()
+    if (hasHangulText(title)) {
+      return title
+    }
   }
-  return draft.sourceTitle
+
+  const localizedLead = extractDraftLead(draft)
+  if (hasHangulText(localizedLead)) {
+    return clipUiText(localizedLead.replace(/^이\s*(논문|연구|소식)은?\s*/, ''), 44) || `${draft.category} 브리핑`
+  }
+
+  return `${draft.category} 브리핑`
 }
 
 function extractDraftLead(draft: PublisherDraft) {
@@ -84,7 +109,19 @@ function extractDraftLead(draft: PublisherDraft) {
   if (leadLine) {
     return leadLine.replace(/^(리드|요약|핵심)[:：]\s*/, '').trim() || draft.sourceSummary
   }
-  return draft.subtitle || draft.sourceSummary
+  const meaningLine = lines.find((line) => /^의미[:：]\s*/.test(line))
+  if (meaningLine) {
+    return koreanFirstText(
+      meaningLine.replace(/^의미[:：]\s*/, '').trim(),
+      200,
+      '공개된 정보 기준으로 정리한 한국어 브리핑입니다.',
+    )
+  }
+  return koreanFirstText(
+    draft.subtitle || draft.sourceSummary,
+    200,
+    '공개된 정보 기준으로 정리한 한국어 브리핑입니다.',
+  )
 }
 
 function publisherStatusSummary(status: PublisherRuntimeStatus | null) {
@@ -393,7 +430,7 @@ function DossierDetail({ dossier }: { dossier: PublisherDossier }) {
                 <small>{item.publishedAt ? formatDate(item.publishedAt) : '시간 미상'}</small>
               </div>
               <strong>{item.title}</strong>
-              <p>{compactText(item.abstractOrSnippet, 180)}</p>
+              <p>{koreanFirstText(item.abstractOrSnippet, 180, '원문 초록은 원문 열기에서 확인할 수 있습니다.')}</p>
               <div className="badge-row">
                 <span className="chip chip--soft">{sourceTypeLabel(item.sourceType)}</span>
                 {item.sourceUrl ? (
