@@ -1,5 +1,15 @@
 # Artemis Orchestration
 
+<!-- ARTEMIS-IGNIS-BRANDING:START -->
+<p align="center">
+  <img src="docs/assets/artemis-ignis-banner.png" alt="Artemis-Ignis banner" width="100%" />
+</p>
+
+<p align="center">
+  <img src="docs/assets/artemis-ignis-emblem.png" alt="Artemis-Ignis emblem" width="320" />
+</p>
+<!-- ARTEMIS-IGNIS-BRANDING:END -->
+
 아르테미스는 `채팅`, `파일 작업`, `오케스트레이션`, `실행 로그`를 한 화면 흐름으로 묶는 로컬 작업 워크스페이스입니다.
 
 이번 버전에서는 기존 UI 안에 `공식 API 기반 무료 라우팅`을 붙였습니다.  
