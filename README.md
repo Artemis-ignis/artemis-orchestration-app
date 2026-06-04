@@ -8,10 +8,10 @@
 
 <!-- ARTEMIS-IGNIS-BADGE-BAR:START -->
 <p align="center">
-  <img alt="License" src="https://img.shields.io/github/license/=for-the-badge&label=License&color=111111" />
-  <img alt="Last commit" src="https://img.shields.io/github/last-commit/=for-the-badge&label=Last%20Commit&color=111111" />
-  <img alt="Stars" src="https://img.shields.io/github/stars/=for-the-badge&label=Stars&color=111111" />
-  <img alt="Forks" src="https://img.shields.io/github/forks/=for-the-badge&label=Forks&color=111111" />
+  <img alt="License" src="https://img.shields.io/github/license/Artemis-ignis/artemis-orchestration-app?style=for-the-badge&label=License&color=111111" />
+  <img alt="Last commit" src="https://img.shields.io/github/last-commit/Artemis-ignis/artemis-orchestration-app?style=for-the-badge&label=Last%20Commit&color=111111" />
+  <img alt="Stars" src="https://img.shields.io/github/stars/Artemis-ignis/artemis-orchestration-app?style=for-the-badge&label=Stars&color=111111" />
+  <img alt="Forks" src="https://img.shields.io/github/forks/Artemis-ignis/artemis-orchestration-app?style=for-the-badge&label=Forks&color=111111" />
 </p>
 <!-- ARTEMIS-IGNIS-BADGE-BAR:END -->
 
