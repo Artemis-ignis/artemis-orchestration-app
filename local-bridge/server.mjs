@@ -90,6 +90,13 @@ if (!process.env.ARTEMIS_PUBLIC_SESSION_SECRET?.trim()) {
   )
 }
 
+if (!APP_ENCRYPTION_KEY) {
+  console.warn(
+    '[ai-router] Neither APP_ENCRYPTION_KEY nor ARTEMIS_PUBLIC_SESSION_SECRET is set. ' +
+      'Provider API keys will be encrypted with a publicly derivable key — set APP_ENCRYPTION_KEY in .env before storing real credentials.',
+  )
+}
+
 const CATEGORY_TO_CODE = {
   전체: 'all',
   'AI 및 기술': 'ai',

@@ -160,11 +160,31 @@ type JsonOptions = {
 }
 
 async function fetchJson<T>(bridgeUrl: string, routePath: string, options: JsonOptions = {}) {
-  const response = await fetch(`${bridgeUrl}${routePath}`, {
-    method: options.method ?? 'GET',
-    headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  })
+  const controller = new AbortController()
+  const timer =
+    typeof window === 'undefined'
+      ? setTimeout(() => controller.abort(), 15_000)
+      : window.setTimeout(() => controller.abort(), 15_000)
+
+  let response: Response
+  try {
+    response = await fetch(`${bridgeUrl}${routePath}`, {
+      method: options.method ?? 'GET',
+      headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('로컬 브리지 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.')
+    }
+    if (error instanceof TypeError) {
+      throw new Error('로컬 브리지에 연결하지 못했습니다. 실행 상태를 확인해 주세요.')
+    }
+    throw error
+  } finally {
+    clearTimeout(timer)
+  }
 
   const payload = await response.json().catch(() => ({}))
   if (!response.ok || payload?.ok === false) {
