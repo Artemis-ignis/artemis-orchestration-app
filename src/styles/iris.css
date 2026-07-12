@@ -1,0 +1,384 @@
+/*
+ * Iris pass — final component skin for the Iris theme.
+ *
+ * Loaded after every page stylesheet (only theme-light.css comes later),
+ * so the rules here are the single source of truth for component chrome:
+ * flat token surfaces, 1px borders, quiet shadows, accent = interactive.
+ */
+
+/* ---------- App shell ---------- */
+
+body {
+  background:
+    radial-gradient(circle at 12% -8%, rgba(var(--accent-rgb), 0.07), transparent 32%),
+    var(--color-bg);
+}
+
+.app-shell::before,
+.app-shell::after,
+.app-shell__frame::before,
+.app-shell__frame::after,
+.app-sidebar::before {
+  display: none;
+}
+
+.app-shell__frame {
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--color-border);
+  background: var(--color-canvas);
+  box-shadow: none;
+}
+
+.app-sidebar {
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.app-brand {
+  letter-spacing: 0.14em;
+}
+
+/* Primary action: the one loud element in the sidebar. */
+.app-primary-action {
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(var(--accent-rgb), 0.55);
+  background: linear-gradient(180deg, var(--color-accent-strong), var(--color-accent));
+  color: var(--color-on-accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.app-primary-action:hover {
+  transform: translateY(-1px);
+  border-color: rgba(var(--accent-rgb), 0.75);
+  background: linear-gradient(180deg, var(--color-accent-strong), var(--color-accent));
+  filter: brightness(1.05);
+  box-shadow: var(--shadow-md);
+}
+
+.app-primary-action__plus {
+  background: rgba(255, 255, 255, 0.22);
+  color: var(--color-on-accent);
+}
+
+.app-primary-action__copy strong {
+  color: var(--color-on-accent);
+}
+
+.app-primary-action__copy small {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+:root[data-theme='light'] .app-primary-action__copy small {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.app-nav-item {
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.app-nav-item:hover {
+  transform: none;
+  border-color: var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.app-nav-item.is-active {
+  border-color: rgba(var(--accent-rgb), 0.34);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  box-shadow: none;
+}
+
+.app-nav-item small {
+  color: var(--color-text-dim);
+}
+
+.app-nav-item.is-active::before {
+  background: var(--color-accent);
+}
+
+.app-sidebar__sectionToggle,
+.app-sidebar__sectionToggleIcon {
+  color: var(--color-text-muted);
+}
+
+.app-sidebar__sectionToggle:hover,
+.app-sidebar__sectionToggle.has-active,
+.app-sidebar__sectionToggle.is-expanded,
+.app-sidebar__sectionToggle:hover .app-sidebar__sectionToggleIcon,
+.app-sidebar__sectionToggle.has-active .app-sidebar__sectionToggleIcon,
+.app-sidebar__sectionToggle.is-expanded .app-sidebar__sectionToggleIcon {
+  color: var(--color-text);
+}
+
+/* ---------- Panels & cards ---------- */
+
+.ui-panel,
+.panel-card,
+.settings-card,
+.provider-card,
+.message-card,
+.composer,
+.guide-card,
+.runtime-card,
+.signal-card,
+.storage-card,
+.ui-stat-card,
+.ui-empty-state,
+.empty-state,
+.ui-disclosure,
+.disclosure,
+.signals-toolbar,
+.activity-toolbar,
+.signals-source-strip--overview,
+.signals-panel,
+.signals-feed-card,
+.publisher-overviewCard,
+.publisher-queueCard,
+.publisher-detail,
+.activity-story-card,
+.activity-dossier-card,
+.activity-meta-panel,
+.activity-failure-card,
+.publisher-article {
+  border: 1px solid var(--color-border);
+  background: var(--color-panel);
+  box-shadow: none;
+}
+
+.ui-panel,
+.signals-panel,
+.publisher-detail {
+  background: var(--color-panel-strong);
+}
+
+.ui-panel--muted,
+.ui-stat-card,
+.ui-empty-state,
+.empty-state {
+  background: var(--color-surface-2);
+}
+
+.ui-panel--accent {
+  border-color: rgba(var(--accent-rgb), 0.3);
+  background:
+    linear-gradient(180deg, rgba(var(--accent-rgb), 0.07), transparent 42%),
+    var(--color-panel-strong);
+}
+
+.signals-toolbar::before,
+.activity-toolbar::before,
+.signals-panel::before,
+.publisher-overviewCard::before,
+.publisher-queueCard::before,
+.publisher-detail::before,
+.signals-feed-card::before,
+.activity-story-card::before,
+.activity-dossier-card::before,
+.activity-meta-panel::before,
+.activity-failure-card::before {
+  display: none;
+}
+
+/* Page headers: quiet hairline, no glow. */
+.ui-page-header::before,
+.page-intro::before {
+  display: none;
+}
+
+.ui-page-header::after,
+.page-intro::after {
+  background: var(--color-border);
+}
+
+.ui-page-header,
+.page-intro {
+  border-bottom-color: transparent;
+}
+
+.ui-page-header__icon,
+.page-intro__icon,
+.ui-empty-state__mark,
+.empty-state__mark,
+.ui-notice__icon {
+  border: 1px solid rgba(var(--accent-rgb), 0.28);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  box-shadow: none;
+}
+
+.ui-page-header__eyebrow::before {
+  background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.6), transparent);
+}
+
+/* ---------- Pills, chips, tabs ---------- */
+
+.ui-status-pill,
+.chip {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-soft);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.ui-status-pill--accent,
+.ui-status-pill--info,
+.chip.is-active,
+.chip--status.chip--running,
+.tab-button.is-active {
+  border-color: rgba(var(--accent-rgb), 0.4);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+:root[data-theme='light'] .ui-status-pill--accent,
+:root[data-theme='light'] .ui-status-pill--info,
+:root[data-theme='light'] .chip.is-active,
+:root[data-theme='light'] .chip--status.chip--running,
+:root[data-theme='light'] .tab-button.is-active {
+  color: var(--color-accent);
+}
+
+.ui-status-pill--success,
+.chip--status.chip--success {
+  border-color: rgba(70, 201, 142, 0.32);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.ui-status-pill--warning,
+.status-banner--warning {
+  border-color: rgba(234, 182, 97, 0.32);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.ui-status-pill--danger,
+.ui-status-pill--error,
+.status-banner--error {
+  border-color: rgba(239, 116, 128, 0.32);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.ui-status-pill--muted {
+  border-color: var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+}
+
+/* ---------- Buttons & inputs ---------- */
+
+.primary-button {
+  border: 1px solid rgba(var(--accent-rgb), 0.55);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, var(--color-accent-strong), var(--color-accent));
+  color: var(--color-on-accent);
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.primary-button:hover:not(:disabled) {
+  border-color: rgba(var(--accent-rgb), 0.8);
+  filter: brightness(1.06);
+}
+
+.ghost-button,
+.outline-button,
+.tab-button {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text-soft);
+  box-shadow: none;
+}
+
+.ghost-button:hover:not(:disabled),
+.outline-button:hover:not(:disabled),
+.tab-button:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+
+.ui-input,
+.inline-input,
+.search-field,
+textarea.ui-input {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  box-shadow: none;
+}
+
+.ui-input:focus-within,
+.inline-input:focus-within,
+.search-field:focus-within,
+.ui-input:focus,
+textarea.ui-input:focus {
+  border-color: rgba(var(--accent-rgb), 0.5);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.16);
+}
+
+/* ---------- Chat ---------- */
+
+.chat-surface {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.chat-empty-shell__hero {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+  box-shadow: none;
+}
+
+.chat-empty-shell__hero::before {
+  display: none;
+}
+
+.chat-composer--embedded {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-panel-strong);
+  backdrop-filter: none;
+}
+
+.chat-empty-chip {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.chat-empty-chip:hover {
+  border-color: rgba(var(--accent-rgb), 0.4);
+  background: var(--color-surface-2);
+}
+
+.page--chat-modern .chat-composer textarea:focus {
+  border-color: rgba(var(--accent-rgb), 0.5);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.16);
+}
+
+/* ---------- Focus ---------- */
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7);
+  outline-offset: 2px;
+}

@@ -1,89 +1,63 @@
 /*
- * Light-theme structural overrides.
+ * Light-theme structural overrides for the Iris theme.
  *
- * tokens.css flips the semantic tokens (text, borders, panels) for
- * [data-theme='light'], but the app shell and page surfaces layer hardcoded
- * dark gradients on top of them. This file re-skins those structural
- * surfaces so the light tokens actually land on light backgrounds.
- * Loaded last from App.css so it wins over the dark-first declarations.
+ * tokens.css flips the semantic tokens for [data-theme='light']; this file
+ * re-skins the few structural surfaces that layer their own gradients on
+ * top of tokens. Loaded last from App.css so it wins the cascade.
  */
 
 :root[data-theme='light'] body {
   background:
-    radial-gradient(circle at top left, rgba(var(--accent-highlight-rgb), 0.06), transparent 24%),
-    linear-gradient(180deg, #f3efe9 0%, #efe9e2 48%, #ece5dd 100%);
+    radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.05), transparent 26%),
+    var(--color-bg);
 }
 
 :root[data-theme='light'] .app-shell::before {
   background:
-    radial-gradient(circle at 0 0, rgba(var(--accent-highlight-rgb), 0.08), transparent 26%),
-    radial-gradient(circle at 100% 18%, rgba(var(--accent-highlight-rgb), 0.05), transparent 18%);
-  opacity: 0.7;
+    radial-gradient(circle at 0 0, rgba(var(--accent-rgb), 0.06), transparent 26%),
+    radial-gradient(circle at 100% 18%, rgba(var(--accent-rgb), 0.04), transparent 18%);
+  opacity: 0.8;
 }
 
 :root[data-theme='light'] .app-shell::after {
-  background:
-    linear-gradient(rgba(40, 32, 28, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(40, 32, 28, 0.024) 1px, transparent 1px);
-  background-size:
-    100% 64px,
-    64px 100%;
-  opacity: 0.3;
+  display: none;
 }
 
 :root[data-theme='light'] .app-shell__frame {
   border-color: var(--color-border);
-  background:
-    radial-gradient(circle at top center, rgba(var(--accent-highlight-rgb), 0.05), transparent 24%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(250, 246, 241, 0.94));
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.7) inset,
-    0 28px 58px rgba(52, 40, 38, 0.1);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
-:root[data-theme='light'] .app-shell__frame::before {
-  background:
-    linear-gradient(rgba(40, 32, 28, 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(40, 32, 28, 0.02) 1px, transparent 1px);
-  background-size:
-    100% 78px,
-    78px 100%;
-}
-
+:root[data-theme='light'] .app-shell__frame::before,
 :root[data-theme='light'] .app-shell__frame::after {
-  background: radial-gradient(circle, rgba(var(--accent-highlight-rgb), 0.1), rgba(255, 255, 255, 0));
+  display: none;
 }
 
 :root[data-theme='light'] .app-sidebar {
   border-color: var(--color-border);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 243, 237, 0.98)),
-    rgba(255, 255, 255, 0.5);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.8) inset,
-    0 22px 46px rgba(52, 40, 38, 0.08);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 :root[data-theme='light'] .app-sidebar::before {
-  background:
-    radial-gradient(circle at top left, rgba(var(--accent-highlight-rgb), 0.06), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.6), transparent 20%);
+  display: none;
 }
 
 :root[data-theme='light'] .app-nav-item {
-  background: rgba(40, 32, 28, 0.02);
+  background: transparent;
   color: var(--color-text-soft);
 }
 
 :root[data-theme='light'] .app-nav-item:hover {
-  border-color: rgba(52, 40, 38, 0.1);
-  background: rgba(40, 32, 28, 0.05);
+  border-color: var(--color-border);
+  background: var(--color-surface-2);
   color: var(--color-text);
 }
 
 :root[data-theme='light'] .app-nav-item.is-active {
-  border-color: rgba(var(--accent-highlight-rgb), 0.32);
-  background: rgba(var(--accent-highlight-rgb), 0.08);
+  border-color: rgba(var(--accent-rgb), 0.3);
+  background: var(--color-accent-soft);
   color: var(--color-text);
 }
 
@@ -91,37 +65,28 @@
   color: var(--color-text-muted);
 }
 
-:root[data-theme='light'] .chat-composer__statusLabel {
-  color: rgba(var(--accent-highlight-rgb), 0.95);
-}
-
-:root[data-theme='light'] .app-mobile-bar {
-  background: rgba(255, 255, 255, 0.94);
-  border-color: var(--color-border);
-}
-
 :root[data-theme='light'] .chat-surface {
   border-color: var(--color-border);
-  background:
-    radial-gradient(circle at 18% 18%, rgba(var(--accent-highlight-rgb), 0.07), transparent 24%),
-    radial-gradient(circle at 82% 82%, rgba(var(--accent-highlight-rgb), 0.04), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(249, 245, 240, 0.98));
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.75) inset,
-    0 30px 70px rgba(52, 40, 38, 0.1);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 :root[data-theme='light'] .chat-empty-shell__hero {
   border-color: var(--color-border);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(248, 243, 237, 0.92)),
-    rgba(255, 255, 255, 0.5);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.8) inset,
-    0 28px 64px rgba(52, 40, 38, 0.1);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 :root[data-theme='light'] .chat-composer--embedded {
   border-top-color: var(--color-border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(248, 243, 237, 0.96));
+  background: var(--color-panel-strong);
+}
+
+:root[data-theme='light'] .chat-composer__statusLabel {
+  color: var(--color-accent);
+}
+
+:root[data-theme='light'] .app-mobile-bar {
+  background: var(--color-surface);
+  border-color: var(--color-border);
 }
