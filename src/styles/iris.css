@@ -43,34 +43,22 @@ body {
 /* Primary action: the one loud element in the sidebar. */
 .app-primary-action {
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 42%),
-    var(--color-accent);
+  border: 0;
+  background: var(--color-accent);
   color: var(--color-on-accent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 1px 2px rgba(0, 0, 0, 0.3),
-    0 8px 22px rgba(var(--accent-rgb), 0.34);
+  box-shadow: 0 8px 22px rgba(var(--accent-rgb), 0.3);
 }
 
 .app-primary-action:hover {
   transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.22);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 46%),
-    var(--color-accent);
+  background: var(--color-accent-strong);
   filter: none;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.26),
-    0 2px 4px rgba(0, 0, 0, 0.3),
-    0 12px 28px rgba(var(--accent-rgb), 0.42);
+  box-shadow: 0 12px 28px rgba(var(--accent-rgb), 0.4);
 }
 
 .app-primary-action__plus {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
   color: var(--color-on-accent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .app-primary-action__copy strong {
@@ -160,13 +148,14 @@ body {
 .activity-failure-card,
 .publisher-article {
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0) 52%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0) 52%),
     var(--color-panel);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.045),
-    0 1px 2px rgba(0, 0, 0, 0.2),
-    0 8px 24px rgba(0, 0, 0, 0.14);
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.18),
+    0 10px 30px rgba(0, 0, 0, 0.16);
 }
 
 :root[data-theme='light'] .ui-panel,
@@ -197,10 +186,10 @@ body {
 :root[data-theme='light'] .activity-failure-card,
 :root[data-theme='light'] .publisher-article {
   background: var(--color-panel);
+  border-color: var(--color-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 1px 2px rgba(24, 30, 44, 0.06),
-    0 8px 24px rgba(24, 30, 44, 0.05);
+    0 1px 2px rgba(24, 40, 72, 0.05),
+    0 10px 30px rgba(24, 40, 72, 0.07);
 }
 
 .ui-panel,
@@ -275,11 +264,26 @@ body {
 
 .ui-status-pill,
 .chip {
-  border: 1px solid var(--color-border);
+  border: 0;
+  border-radius: 999px;
   background: var(--color-surface-2);
   color: var(--color-text-soft);
   box-shadow: none;
   font-weight: 600;
+}
+
+/* Bold, tight page + section titles (Toss headline energy). */
+.ui-page-header h1,
+.page-intro h1 {
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+.ui-panel__copy h2,
+.ui-section-header h2,
+.panel-card__header h2 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .ui-status-pill--accent,
@@ -330,80 +334,69 @@ body {
 
 /* ---------- Buttons & inputs ---------- */
 
+/* Toss-style: solid, friendly, bold, softly rounded, gentle press. */
 .primary-button {
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 0;
   border-radius: var(--radius-md);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 46%),
-    var(--color-accent);
+  padding: 0 18px;
+  min-height: 42px;
+  background: var(--color-accent);
   color: var(--color-on-accent);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.01em;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 1px 2px rgba(0, 0, 0, 0.28),
-    0 4px 14px rgba(var(--accent-rgb), 0.3);
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.28);
 }
 
 .primary-button:hover:not(:disabled) {
-  border-color: rgba(255, 255, 255, 0.22);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 50%),
-    var(--color-accent);
+  background: var(--color-accent-strong);
   transform: translateY(-1px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.26),
-    0 2px 4px rgba(0, 0, 0, 0.28),
-    0 8px 20px rgba(var(--accent-rgb), 0.4);
+  box-shadow: 0 10px 24px rgba(var(--accent-rgb), 0.36);
 }
 
 .ghost-button,
 .outline-button,
 .tab-button {
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 0;
   border-radius: var(--radius-md);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015)),
-    var(--color-surface-2);
+  min-height: 42px;
+  background: var(--color-surface-2);
   color: var(--color-text-soft);
-  font-weight: 500;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 1px 2px rgba(0, 0, 0, 0.2);
+  font-weight: 600;
+  box-shadow: none;
 }
 
 .ghost-button:hover:not(:disabled),
 .outline-button:hover:not(:disabled),
 .tab-button:hover:not(:disabled) {
-  border-color: rgba(255, 255, 255, 0.16);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
-    var(--color-surface-3);
+  background: var(--color-surface-3);
   color: var(--color-text);
   transform: translateY(-1px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 2px 6px rgba(0, 0, 0, 0.24);
 }
 
 :root[data-theme='light'] .ghost-button,
 :root[data-theme='light'] .outline-button,
 :root[data-theme='light'] .tab-button {
-  border-color: var(--color-border);
-  background: var(--color-surface);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 1px 2px rgba(24, 30, 44, 0.08);
+  background: var(--color-surface-2);
+  color: var(--color-text-soft);
+  box-shadow: none;
 }
 
 :root[data-theme='light'] .ghost-button:hover:not(:disabled),
 :root[data-theme='light'] .outline-button:hover:not(:disabled),
 :root[data-theme='light'] .tab-button:hover:not(:disabled) {
-  border-color: var(--color-border-strong);
-  background: var(--color-surface-2);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 2px 6px rgba(24, 30, 44, 0.1);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+
+/* Accent-tinted ghost — Toss's soft-blue secondary button. */
+.ghost-button--accent,
+.tab-button.is-active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.tab-button.is-active {
+  font-weight: 700;
 }
 
 .ui-input,
@@ -598,18 +591,16 @@ textarea.ui-input:focus {
 
 .chat-empty-chip {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   min-height: 0;
   height: auto;
-  padding: 14px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  padding: 18px 20px;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008)),
-    var(--color-surface);
+  background: var(--color-surface);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 1px 2px rgba(0, 0, 0, 0.2);
+    0 1px 2px rgba(0, 0, 0, 0.14),
+    0 8px 24px rgba(0, 0, 0, 0.12);
   text-align: left;
   white-space: normal;
   transition:
@@ -619,9 +610,24 @@ textarea.ui-input:focus {
 }
 
 .chat-empty-chip:hover {
-  border-color: rgba(var(--accent-rgb), 0.4);
-  background: var(--color-surface-2);
-  transform: translateY(-1px);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  background: var(--color-surface);
+  transform: translateY(-2px);
+  box-shadow:
+    0 2px 6px rgba(var(--accent-rgb), 0.1),
+    0 14px 32px rgba(var(--accent-rgb), 0.14);
+}
+
+:root[data-theme='light'] .chat-empty-chip {
+  box-shadow:
+    0 1px 2px rgba(24, 40, 72, 0.05),
+    0 10px 28px rgba(24, 40, 72, 0.07);
+}
+
+:root[data-theme='light'] .chat-empty-chip:hover {
+  box-shadow:
+    0 2px 6px rgba(var(--accent-rgb), 0.1),
+    0 16px 36px rgba(var(--accent-rgb), 0.16);
 }
 
 .chat-empty-chip strong {
