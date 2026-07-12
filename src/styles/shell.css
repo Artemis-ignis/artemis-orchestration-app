@@ -85,7 +85,7 @@
 .app-shell__frame {
   position: relative;
   min-height: calc(100vh - (var(--shell-pad) * 2));
-  border-radius: 34px;
+  border-radius: 24px;
   border: 1px solid rgba(158, 178, 215, 0.14);
   background:
     radial-gradient(circle at top center, rgba(130, 171, 255, 0.1), transparent 24%),
@@ -132,7 +132,7 @@
   flex-direction: column;
   justify-content: space-between;
   min-height: calc(100vh - (var(--shell-pad) * 2));
-  border-radius: 32px;
+  border-radius: 24px;
   border: 1px solid rgba(158, 178, 215, 0.14);
   background:
     linear-gradient(180deg, rgba(12, 18, 30, 0.96), rgba(9, 13, 22, 0.98)),
@@ -823,7 +823,7 @@
 /* Artemis cinema pass */
 .app-shell::before {
   background:
-    radial-gradient(circle at top right, rgba(229, 9, 20, 0.16), transparent 20%),
+    radial-gradient(circle at top right, rgba(229, 9, 20, 0.07), transparent 20%),
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 16%),
     linear-gradient(180deg, rgba(0, 0, 0, 0.12), transparent 32%);
   opacity: 1;
@@ -960,7 +960,7 @@
 /* Artemis shell cleanup pass */
 .app-shell::before {
   background:
-    radial-gradient(circle at top right, rgba(229, 9, 20, 0.12), transparent 18%),
+    radial-gradient(circle at top right, rgba(229, 9, 20, 0.05), transparent 18%),
     linear-gradient(180deg, rgba(0, 0, 0, 0.1), transparent 30%);
   opacity: 0.72;
 }
@@ -1049,7 +1049,7 @@
 /* Artemis Netflix final pass */
 .app-shell::before {
   background:
-    radial-gradient(circle at top center, rgba(229, 9, 20, 0.12), transparent 22%),
+    radial-gradient(circle at top center, rgba(229, 9, 20, 0.05), transparent 22%),
     linear-gradient(180deg, rgba(0, 0, 0, 0.18), transparent 34%);
   opacity: 0.88;
 }
@@ -1065,13 +1065,13 @@
 
 .app-shell__frame {
   background:
-    linear-gradient(180deg, rgba(229, 9, 20, 0.045), transparent 12%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 12%),
     linear-gradient(180deg, rgba(14, 14, 14, 0.995), rgba(5, 5, 5, 1));
 }
 
 .app-sidebar {
   background:
-    linear-gradient(180deg, rgba(229, 9, 20, 0.05), transparent 10%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 10%),
     linear-gradient(180deg, rgba(16, 16, 16, 0.992), rgba(6, 6, 6, 1));
 }
 
