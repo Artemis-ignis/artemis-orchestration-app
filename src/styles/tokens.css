@@ -1,33 +1,55 @@
+/*
+ * Artemis design tokens — "Iris" theme.
+ *
+ * Cool neutral surfaces, a single iris-indigo accent, 1px borders and
+ * restrained shadows. Every surface/interactive color in the app should
+ * resolve to one of these tokens; page CSS must not hardcode brand colors.
+ *
+ * Accent usage rule: accent = interactive (primary buttons, active states,
+ * focus rings, links). Passive surfaces stay neutral.
+ */
+
 :root {
-  --font-sans: 'Plus Jakarta Sans', 'Noto Sans KR', sans-serif;
-  --font-logo: 'Plus Jakarta Sans', 'Noto Sans KR', sans-serif;
+  --font-sans: 'Inter', 'Noto Sans KR', system-ui, sans-serif;
+  --font-logo: 'Inter', 'Noto Sans KR', system-ui, sans-serif;
 
-  --color-bg: #040404;
-  --color-surface: #0d0d0d;
-  --color-surface-2: #141414;
-  --color-surface-3: #1b1b1b;
-  --color-canvas: #070707;
-  --color-panel: rgba(12, 12, 12, 0.94);
-  --color-panel-strong: rgba(7, 7, 7, 0.98);
-  --color-border: rgba(255, 255, 255, 0.09);
-  --color-border-strong: rgba(255, 255, 255, 0.16);
-  --color-text: #f7f3ee;
-  --color-text-soft: #e5ddd5;
-  --color-text-muted: #ada6a1;
-  --color-text-dim: #746e69;
-  --color-accent: #e50914;
-  --color-accent-strong: #ff4d45;
-  --color-accent-soft: rgba(229, 9, 20, 0.14);
-  /* Cool highlight used by interactive primitives (borders, hover washes).
-     Consumed as rgba(var(--accent-highlight-rgb), <alpha>). */
-  --accent-highlight-rgb: 124, 168, 255;
-  --color-success: #45c48a;
-  --color-success-soft: rgba(69, 196, 138, 0.12);
-  --color-warning: #efb451;
-  --color-warning-soft: rgba(239, 180, 81, 0.12);
-  --color-danger: #ff6b73;
-  --color-danger-soft: rgba(255, 107, 115, 0.12);
+  /* Surfaces */
+  --color-bg: #0b0d11;
+  --color-surface: #12151b;
+  --color-surface-2: #171b22;
+  --color-surface-3: #1e232c;
+  --color-canvas: #0e1116;
+  --color-panel: #12151b;
+  --color-panel-strong: #0f1217;
 
+  /* Lines */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.15);
+
+  /* Text */
+  --color-text: #edf0f5;
+  --color-text-soft: #ccd2dc;
+  --color-text-muted: #8f97a6;
+  --color-text-dim: #626a78;
+
+  /* Accent — iris indigo */
+  --accent-rgb: 121, 131, 245;
+  --color-accent: #7983f5;
+  --color-accent-strong: #939cf8;
+  --color-accent-soft: rgba(121, 131, 245, 0.16);
+  --color-on-accent: #0b0d11;
+  /* Interactive highlight washes consume rgba(var(--accent-highlight-rgb), a). */
+  --accent-highlight-rgb: 121, 131, 245;
+
+  /* Semantic */
+  --color-success: #46c98e;
+  --color-success-soft: rgba(70, 201, 142, 0.14);
+  --color-warning: #eab661;
+  --color-warning-soft: rgba(234, 182, 97, 0.14);
+  --color-danger: #ef7480;
+  --color-danger-soft: rgba(239, 116, 128, 0.14);
+
+  /* Rhythm */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -38,22 +60,25 @@
   --space-8: 40px;
   --space-9: 48px;
 
-  --radius-sm: 10px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-2xl: 28px;
+  /* Shape */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
 
-  --shadow-sm: 0 10px 22px rgba(0, 0, 0, 0.18);
-  --shadow-md: 0 20px 40px rgba(0, 0, 0, 0.28);
-  --shadow-lg: 0 34px 64px rgba(0, 0, 0, 0.42);
+  /* Depth — quiet, close shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24), 0 4px 12px rgba(0, 0, 0, 0.16);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.26), 0 12px 28px rgba(0, 0, 0, 0.22);
+  --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.3), 0 24px 48px rgba(0, 0, 0, 0.28);
 
+  /* Type scale */
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-md: 1rem;
   --text-lg: 1.125rem;
   --text-xl: 1.375rem;
-  --text-2xl: clamp(1.6rem, 2.2vw, 2.2rem);
+  --text-2xl: clamp(1.5rem, 2vw, 2rem);
 
   --shell-sidebar-width: 248px;
   --shell-gap: 16px;
@@ -63,26 +88,39 @@
 }
 
 :root[data-theme='light'] {
-  --color-bg: #f2eeea;
+  --color-bg: #f4f5f7;
   --color-surface: #ffffff;
-  --color-surface-2: #f7f3ef;
-  --color-surface-3: #ede7e0;
-  --color-canvas: #f4f0eb;
-  --color-panel: rgba(255, 255, 255, 0.94);
-  --color-panel-strong: rgba(255, 255, 255, 0.98);
-  --color-border: rgba(52, 40, 38, 0.12);
-  --color-border-strong: rgba(52, 40, 38, 0.2);
-  --color-text: #181311;
-  --color-text-soft: #322826;
-  --color-text-muted: #685c58;
-  --color-text-dim: #877974;
-  --color-accent: #c70d18;
-  --color-accent-strong: #a30f17;
-  --color-accent-soft: rgba(199, 13, 24, 0.12);
-  /* Deeper blue so translucent washes stay visible on light surfaces. */
-  --accent-highlight-rgb: 47, 92, 176;
-  --color-success-soft: rgba(69, 196, 138, 0.12);
-  --color-warning-soft: rgba(239, 180, 81, 0.12);
-  --color-danger-soft: rgba(255, 107, 115, 0.12);
+  --color-surface-2: #f1f3f6;
+  --color-surface-3: #e9ecf1;
+  --color-canvas: #f7f8fa;
+  --color-panel: #ffffff;
+  --color-panel-strong: #fbfcfd;
+
+  --color-border: rgba(18, 24, 38, 0.1);
+  --color-border-strong: rgba(18, 24, 38, 0.18);
+
+  --color-text: #191d26;
+  --color-text-soft: #333a48;
+  --color-text-muted: #667082;
+  --color-text-dim: #8b93a3;
+
+  --accent-rgb: 84, 96, 224;
+  --color-accent: #5460e0;
+  --color-accent-strong: #4450cc;
+  --color-accent-soft: rgba(84, 96, 224, 0.12);
+  --color-on-accent: #ffffff;
+  --accent-highlight-rgb: 84, 96, 224;
+
+  --color-success: #1d9e68;
+  --color-success-soft: rgba(29, 158, 104, 0.12);
+  --color-warning: #b57e22;
+  --color-warning-soft: rgba(181, 126, 34, 0.14);
+  --color-danger: #d64550;
+  --color-danger-soft: rgba(214, 69, 80, 0.12);
+
+  --shadow-sm: 0 1px 2px rgba(24, 30, 44, 0.08), 0 4px 12px rgba(24, 30, 44, 0.06);
+  --shadow-md: 0 2px 6px rgba(24, 30, 44, 0.08), 0 12px 28px rgba(24, 30, 44, 0.08);
+  --shadow-lg: 0 4px 10px rgba(24, 30, 44, 0.1), 0 24px 48px rgba(24, 30, 44, 0.1);
+
   color-scheme: light;
 }

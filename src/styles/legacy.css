@@ -14,7 +14,7 @@
   z-index: 40;
   padding: 10px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(215, 189, 134, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   background: rgba(19, 15, 13, 0.96);
   color: var(--text-strong);
   transform: translateY(-160%);
@@ -44,9 +44,9 @@
   gap: 12px;
   padding: 14px;
   border-radius: 26px;
-  border: 1px solid rgba(215, 189, 134, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   background:
-    radial-gradient(circle at top center, rgba(215, 189, 134, 0.08), transparent 32%),
+    radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 32%),
     linear-gradient(180deg, rgba(22, 18, 15, 0.98), rgba(14, 11, 10, 0.98));
   box-shadow:
     0 28px 54px rgba(0, 0, 0, 0.36),
@@ -66,7 +66,7 @@
   gap: 12px;
   padding: 0 16px;
   border-radius: 18px;
-  border: 1px solid rgba(215, 189, 134, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.035);
   color: var(--text-soft);
 }
@@ -131,8 +131,8 @@
 .command-palette__item:hover,
 .command-palette__item.is-active {
   transform: translateY(-1px);
-  border-color: rgba(215, 189, 134, 0.28);
-  background: linear-gradient(90deg, rgba(215, 189, 134, 0.12), rgba(215, 189, 134, 0.03));
+  border-color: rgba(255, 255, 255, 0.28);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03));
 }
 
 .command-palette__copy {
@@ -164,7 +164,7 @@
   min-height: 30px;
   padding: 0 10px;
   border-radius: 10px;
-  border: 1px solid rgba(215, 189, 134, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text-soft);
   font: inherit;
@@ -176,7 +176,7 @@
 .command-palette__empty {
   padding: 22px 14px;
   border-radius: 18px;
-  border: 1px dashed rgba(215, 189, 134, 0.18);
+  border: 1px dashed rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.02);
   text-align: center;
 }
@@ -241,8 +241,8 @@
   border-radius: 24px;
   padding: 18px;
   background:
-    radial-gradient(circle at top right, rgba(215, 189, 134, 0.06), transparent 30%),
-    linear-gradient(180deg, rgba(20, 16, 13, 0.98), rgba(16, 13, 11, 0.98));
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.06), transparent 30%),
+    linear-gradient(180deg, var(--color-panel), var(--color-panel));
 }
 
 .sidebar {
@@ -257,7 +257,7 @@
   position: sticky;
   top: 10px;
   background:
-    radial-gradient(circle at top left, rgba(215, 189, 134, 0.08), transparent 30%),
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 30%),
     linear-gradient(180deg, rgba(20, 17, 15, 0.98), rgba(12, 10, 8, 0.98));
 }
 
@@ -280,9 +280,9 @@
   gap: 12px;
   padding: 14px 14px 15px;
   border-radius: 18px;
-  border: 1px solid rgba(215, 189, 134, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background:
-    radial-gradient(circle at top left, rgba(215, 189, 134, 0.08), transparent 42%),
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 42%),
     rgba(255, 255, 255, 0.028);
 }
 
@@ -425,7 +425,7 @@ a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 2px solid rgba(215, 189, 134, 0.75);
+  outline: 2px solid rgba(255, 255, 255, 0.75);
   outline-offset: 2px;
 }
 
@@ -447,7 +447,7 @@ select:focus-visible {
   gap: 4px;
   padding: 11px 12px;
   border-radius: 14px;
-  border: 1px solid rgba(215, 189, 134, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.025);
 }
 
@@ -487,8 +487,8 @@ select:focus-visible {
 .nav-item.is-active,
 .footer-link.is-active {
   color: var(--text-strong);
-  background: linear-gradient(90deg, rgba(215, 189, 134, 0.12), rgba(215, 189, 134, 0.03));
-  box-shadow: inset 1px 0 0 rgba(215, 189, 134, 0.45);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03));
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.45);
 }
 
 .nav-item__leading {
@@ -847,7 +847,7 @@ select:focus-visible {
   border: 1px solid var(--line-soft);
   border-radius: 24px;
   background:
-    radial-gradient(circle at top right, rgba(215, 189, 134, 0.06), transparent 26%),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.06), transparent 26%),
     linear-gradient(180deg, rgba(31, 25, 20, 0.98), rgba(21, 17, 14, 0.98));
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.015) inset,
@@ -875,7 +875,7 @@ select:focus-visible {
   gap: 14px;
   padding: 18px 18px 16px;
   border-radius: 22px;
-  border: 1px solid rgba(215, 189, 134, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   background: linear-gradient(180deg, rgba(42, 34, 28, 0.95), rgba(29, 24, 20, 0.92));
 }
 
@@ -966,7 +966,7 @@ select:focus-visible {
   align-items: center;
   justify-content: center;
   color: var(--accent);
-  background: rgba(215, 189, 134, 0.12);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .page-intro h1 {
@@ -1025,7 +1025,7 @@ select:focus-visible {
   gap: 12px;
   padding: 18px;
   border-radius: 22px;
-  border: 1px solid rgba(215, 189, 134, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background: linear-gradient(180deg, rgba(29, 24, 20, 0.9), rgba(20, 16, 13, 0.82));
 }
 
@@ -1155,7 +1155,7 @@ select:focus-visible {
 .status-banner--warning {
   color: #f4e7cb;
   background: rgba(82, 60, 24, 0.5);
-  border: 1px solid rgba(215, 189, 134, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.22);
 }
 
 .status-banner--error {
@@ -1170,7 +1170,7 @@ select:focus-visible {
   gap: 10px;
   border-radius: 18px;
   padding: 14px 16px;
-  border: 1px solid rgba(215, 189, 134, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.025);
 }
 
@@ -1240,7 +1240,7 @@ select:focus-visible {
 }
 
 .chip--soft {
-  background: rgba(215, 189, 134, 0.12);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .chip--status {
@@ -1388,7 +1388,7 @@ select:focus-visible {
 }
 
 .message-card__avatar--master {
-  background: rgba(215, 189, 134, 0.14);
+  background: rgba(255, 255, 255, 0.14);
   color: var(--accent-soft);
 }
 
@@ -1427,7 +1427,7 @@ select:focus-visible {
 }
 
 .message-card__badge {
-  background: rgba(215, 189, 134, 0.08);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--accent-soft);
 }
 
@@ -1460,7 +1460,7 @@ select:focus-visible {
   bottom: 8px;
   z-index: 4;
   background:
-    linear-gradient(180deg, rgba(25, 20, 17, 0.98), rgba(20, 16, 13, 0.98)),
+    linear-gradient(180deg, rgba(25, 20, 17, 0.98), var(--color-panel)),
     var(--bg-panel);
   box-shadow:
      0 1px 0 rgba(255, 255, 255, 0.02) inset,
@@ -1514,8 +1514,8 @@ select:focus-visible {
 .field select:focus,
 .search-field input:focus,
 .inline-input input:focus {
-  border-color: rgba(215, 189, 134, 0.45);
-  box-shadow: 0 0 0 1px rgba(215, 189, 134, 0.2);
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 
 .chat-composer textarea {
@@ -1665,7 +1665,7 @@ select:focus-visible {
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent), rgba(215, 189, 134, 0.45));
+  background: linear-gradient(90deg, var(--accent), rgba(255, 255, 255, 0.45));
 }
 
 .files-toolbar {
@@ -1806,8 +1806,8 @@ select:focus-visible {
 
 .file-row.is-selected,
 .agent-list-item.is-selected {
-  border-color: rgba(215, 189, 134, 0.36);
-  background: rgba(215, 189, 134, 0.08);
+  border-color: rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .file-row__open {
@@ -1920,7 +1920,7 @@ select:focus-visible {
 .signal-card--feed {
   gap: 14px;
   background:
-    radial-gradient(circle at top right, rgba(215, 189, 134, 0.05), transparent 22%),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.05), transparent 22%),
     linear-gradient(180deg, rgba(35, 29, 24, 0.98), rgba(23, 19, 16, 0.98));
 }
 
@@ -2008,7 +2008,7 @@ select:focus-visible {
 }
 
 .toggle.is-on {
-  background: rgba(215, 189, 134, 0.7);
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .toggle.is-on::after {
@@ -2069,7 +2069,7 @@ select:focus-visible {
   height: 100%;
   border-radius: 22px;
   background:
-    radial-gradient(circle at top right, rgba(215, 189, 134, 0.08), transparent 28%),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.08), transparent 28%),
     #17120e;
 }
 
@@ -2203,7 +2203,7 @@ select:focus-visible {
   min-height: calc(100vh - 144px);
   border-radius: 22px;
   background:
-    radial-gradient(circle at top center, rgba(215, 189, 134, 0.04), transparent 22%),
+    radial-gradient(circle at top center, rgba(255, 255, 255, 0.04), transparent 22%),
     linear-gradient(180deg, rgba(28, 23, 19, 0.98), rgba(19, 16, 13, 0.98));
 }
 
@@ -2240,7 +2240,7 @@ select:focus-visible {
   gap: 4px;
   padding: 12px 14px;
   border-radius: 16px;
-  border: 1px solid rgba(215, 189, 134, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background: linear-gradient(180deg, rgba(34, 28, 23, 0.92), rgba(24, 20, 17, 0.92));
   white-space: normal;
   text-align: left;
@@ -2521,10 +2521,10 @@ select:focus-visible {
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 188px);
-  border: 1px solid rgba(215, 189, 134, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 26px;
   background:
-    radial-gradient(circle at top center, rgba(215, 189, 134, 0.05), transparent 34%),
+    radial-gradient(circle at top center, rgba(255, 255, 255, 0.05), transparent 34%),
     linear-gradient(180deg, rgba(19, 15, 13, 0.98), rgba(14, 11, 10, 0.98));
   overflow: hidden;
 }
@@ -2764,7 +2764,7 @@ select:focus-visible {
   min-width: 0;
   padding: 15px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(215, 189, 134, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.03);
 }
 
@@ -2775,7 +2775,7 @@ select:focus-visible {
 
 .overview-card.is-warning {
   background: linear-gradient(180deg, rgba(70, 54, 24, 0.28), rgba(28, 24, 18, 0.28));
-  border-color: rgba(215, 189, 134, 0.16);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .overview-card.is-error {
@@ -2811,7 +2811,7 @@ select:focus-visible {
   gap: 12px;
   padding: 24px 22px;
   border-radius: 20px;
-  border: 1px dashed rgba(215, 189, 134, 0.18);
+  border: 1px dashed rgba(255, 255, 255, 0.18);
   background: linear-gradient(180deg, rgba(27, 22, 19, 0.78), rgba(19, 16, 14, 0.72));
 }
 
@@ -2820,9 +2820,9 @@ select:focus-visible {
   height: 34px;
   border-radius: 12px;
   background:
-    radial-gradient(circle at 30% 30%, rgba(215, 189, 134, 0.42), transparent 42%),
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.42), transparent 42%),
     rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(215, 189, 134, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
 .empty-state h2 {
@@ -2964,7 +2964,7 @@ select:focus-visible {
   gap: 8px;
   padding: 14px 15px;
   border-radius: 16px;
-  border: 1px solid rgba(215, 189, 134, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.03);
 }
 
@@ -2986,7 +2986,7 @@ select:focus-visible {
   gap: 12px;
   padding: 14px 15px;
   border-radius: 18px;
-  border: 1px solid rgba(215, 189, 134, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.025);
 }
 
@@ -3088,8 +3088,8 @@ select:focus-visible {
 .settings-presetOption.is-selected,
 .settings-apiTarget.is-selected,
 .settings-apiKeyChoice.is-selected {
-  border-color: rgba(215, 189, 134, 0.32);
-  background: rgba(215, 189, 134, 0.08);
+  border-color: rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .settings-presetOption__icon {
@@ -4215,11 +4215,11 @@ select:focus-visible {
 
 .flow-card--button:hover {
   transform: translateY(-1px);
-  border-color: rgba(215, 189, 134, 0.26);
+  border-color: rgba(255, 255, 255, 0.26);
 }
 
 .flow-card--button:focus-visible {
-  outline: 2px solid rgba(215, 189, 134, 0.55);
+  outline: 2px solid rgba(255, 255, 255, 0.55);
   outline-offset: 2px;
 }
 
@@ -5512,7 +5512,7 @@ select:focus-visible {
   min-height: 100vh;
   padding: 18px;
   background:
-    radial-gradient(circle at top left, rgba(215, 189, 134, 0.08), transparent 24%),
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 24%),
     radial-gradient(circle at top right, rgba(116, 145, 214, 0.08), transparent 22%),
     linear-gradient(180deg, #0f0d0b 0%, #13100e 100%);
 }
@@ -5844,8 +5844,8 @@ select:focus-visible {
 }
 
 .marketing-pricing-card.is-featured {
-  border-color: rgba(215, 189, 134, 0.34);
-  box-shadow: 0 0 0 1px rgba(215, 189, 134, 0.12);
+  border-color: rgba(255, 255, 255, 0.34);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .marketing-pricing-card__top {
@@ -6505,11 +6505,11 @@ select:focus-visible {
 
 .marketing-stepRail__item:hover {
   transform: translateY(-1px);
-  border-color: rgba(215, 189, 134, 0.22);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 .marketing-stepRail__item.is-active {
-  border-color: rgba(215, 189, 134, 0.34);
+  border-color: rgba(255, 255, 255, 0.34);
   background: rgba(47, 57, 86, 0.4);
 }
 
@@ -6611,12 +6611,12 @@ select:focus-visible {
 }
 
 .marketing-pricingCardLite.is-featured {
-  border-color: rgba(215, 189, 134, 0.34);
-  box-shadow: 0 0 0 1px rgba(215, 189, 134, 0.08);
+  border-color: rgba(255, 255, 255, 0.34);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .marketing-pricingCardLite--full.is-active {
-  border-color: rgba(215, 189, 134, 0.34);
+  border-color: rgba(255, 255, 255, 0.34);
   background: rgba(255, 255, 255, 0.045);
 }
 
@@ -6670,7 +6670,7 @@ select:focus-visible {
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
-    radial-gradient(circle at top right, rgba(215, 189, 134, 0.12), transparent 30%),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.12), transparent 30%),
     rgba(255, 255, 255, 0.03);
 }
 
@@ -6710,7 +6710,7 @@ select:focus-visible {
 }
 
 .marketing-planSwitch__item.is-active {
-  border-color: rgba(215, 189, 134, 0.34);
+  border-color: rgba(255, 255, 255, 0.34);
   background: rgba(255, 255, 255, 0.045);
 }
 
@@ -8089,7 +8089,7 @@ select:focus-visible {
 }
 
 .marketing-accountActionCard--primary {
-  background: linear-gradient(180deg, rgba(21, 29, 46, 0.98), rgba(9, 13, 22, 0.98));
+  background: linear-gradient(180deg, rgba(21, 29, 46, 0.98), var(--color-surface));
 }
 
 .marketing-accountActionCard__top {
@@ -12614,7 +12614,7 @@ select:focus-visible {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: rgba(215, 189, 134, 0.12);
+  background: rgba(255, 255, 255, 0.12);
   color: var(--text-strong);
   font-size: 0.75rem;
 }
@@ -12640,7 +12640,7 @@ select:focus-visible {
 .settings-toggle input {
   width: 18px;
   height: 18px;
-  accent-color: rgba(215, 189, 134, 0.92);
+  accent-color: rgba(255, 255, 255, 0.92);
 }
 
 .settings-actionRow {
@@ -12701,8 +12701,8 @@ select:focus-visible {
 }
 
 .settings-modeCard.is-selected {
-  border-color: rgba(215, 189, 134, 0.32);
-  background: rgba(215, 189, 134, 0.08);
+  border-color: rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .settings-modeCard strong {
@@ -12889,10 +12889,10 @@ select:focus-visible {
 
 .page--chat-modern .chat-surface {
   min-height: calc(100vh - 156px);
-  border-color: rgba(215, 189, 134, 0.1);
+  border-color: rgba(255, 255, 255, 0.1);
   border-radius: 24px;
   background:
-    radial-gradient(circle at top center, rgba(215, 189, 134, 0.035), transparent 30%),
+    radial-gradient(circle at top center, rgba(255, 255, 255, 0.035), transparent 30%),
     linear-gradient(180deg, rgba(18, 15, 13, 0.98), rgba(14, 11, 10, 0.98));
 }
 
@@ -14074,8 +14074,8 @@ select:focus-visible {
 /* Artemis Netflix final flow pass */
 .orchestration-canvas--flow {
   background:
-    radial-gradient(circle at center, rgba(229, 9, 20, 0.045), transparent 22%),
-    linear-gradient(180deg, rgba(8, 8, 8, 0.995), rgba(4, 4, 4, 1)) !important;
+    radial-gradient(circle at center, rgba(var(--accent-rgb), 0.045), transparent 22%),
+    linear-gradient(180deg, var(--color-panel), rgba(4, 4, 4, 1)) !important;
 }
 
 .orchestration-canvas__hud span {
@@ -14098,8 +14098,8 @@ select:focus-visible {
 }
 
 .orchestration-canvas--flow .react-flow__controls-button:hover {
-  background: rgba(229, 9, 20, 0.12) !important;
-  border-color: rgba(229, 9, 20, 0.18) !important;
+  background: rgba(var(--accent-rgb), 0.12) !important;
+  border-color: rgba(var(--accent-rgb), 0.18) !important;
 }
 
 .orchestration-flow-node {
@@ -14113,9 +14113,9 @@ select:focus-visible {
 }
 
 .orchestration-flow-node--hub {
-  border-color: rgba(229, 9, 20, 0.22) !important;
+  border-color: rgba(var(--accent-rgb), 0.22) !important;
   background:
-    linear-gradient(180deg, rgba(229, 9, 20, 0.2), rgba(229, 9, 20, 0.06) 48%),
+    linear-gradient(180deg, rgba(var(--accent-rgb), 0.2), rgba(var(--accent-rgb), 0.06) 48%),
     linear-gradient(180deg, rgba(22, 12, 12, 0.98), rgba(10, 8, 8, 1)) !important;
 }
 
@@ -14146,8 +14146,8 @@ select:focus-visible {
 }
 
 .orchestration-flow-node.is-running .orchestration-flow-node__badge {
-  border-color: rgba(229, 9, 20, 0.22) !important;
-  background: rgba(229, 9, 20, 0.16) !important;
+  border-color: rgba(var(--accent-rgb), 0.22) !important;
+  background: rgba(var(--accent-rgb), 0.16) !important;
   color: #fff5f3 !important;
 }
 
@@ -14157,10 +14157,13 @@ select:focus-visible {
 }
 
 .orchestration-flow-node__dot.is-running,
-.orchestration-flow-node.is-running .orchestration-flow-node__dot,
+.orchestration-flow-node.is-running .orchestration-flow-node__dot {
+  background: var(--color-accent) !important;
+}
+
 .orchestration-flow-node__dot.is-done,
 .orchestration-flow-node.is-done .orchestration-flow-node__dot {
-  background: #ff5b63 !important;
+  background: var(--color-success) !important;
 }
 
 .orchestration-flow-node__dot.is-blocked,
@@ -14179,8 +14182,8 @@ select:focus-visible {
 
 .orchestration-flow__edge.is-running .react-flow__edge-path,
 .orchestration-flow__edge.is-done .react-flow__edge-path {
-  stroke: rgba(229, 9, 20, 0.82) !important;
-  filter: drop-shadow(0 0 4px rgba(229, 9, 20, 0.28)) !important;
+  stroke: rgba(var(--accent-rgb), 0.82) !important;
+  filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), 0.28)) !important;
 }
 
 .orchestration-flow__edge.is-blocked .react-flow__edge-path {
@@ -14236,7 +14239,7 @@ select:focus-visible {
 
 .nav-item.is-active {
   box-shadow: none;
-  background: linear-gradient(90deg, rgba(215, 189, 134, 0.16), rgba(215, 189, 134, 0.04));
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04));
 }
 
 .sidebar__section {
@@ -14263,7 +14266,7 @@ select:focus-visible {
   border-radius: 28px;
   padding: 22px 24px;
   background:
-    radial-gradient(circle at top right, rgba(215, 189, 134, 0.04), transparent 30%),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.04), transparent 30%),
     linear-gradient(180deg, rgba(19, 15, 13, 0.98), rgba(15, 12, 10, 0.98));
 }
 
@@ -14422,7 +14425,7 @@ select:focus-visible {
 }
 
 .chat-statusTile--warning {
-  border-color: rgba(215, 189, 134, 0.16);
+  border-color: rgba(255, 255, 255, 0.16);
   background: rgba(82, 60, 24, 0.32);
 }
 
@@ -14513,7 +14516,7 @@ select:focus-visible {
 }
 
 .orchestration-statusTile--warning {
-  border-color: rgba(215, 189, 134, 0.16);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .orchestration-statusTile--error {
@@ -14910,7 +14913,7 @@ select:focus-visible {
 /* Artemis chat neutral cleanup */
 .page--chat-modern .chat-surface {
   min-height: 0;
-  border-color: rgba(191, 202, 220, 0.08);
+  border-color: rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(17, 20, 26, 0.99), rgba(14, 17, 22, 1));
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.02) inset,
@@ -15026,7 +15029,7 @@ select:focus-visible {
   width: fit-content;
   min-height: 36px;
   padding-inline: 12px;
-  border-color: rgba(191, 202, 220, 0.08);
+  border-color: rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
   box-shadow: none;
 }
@@ -15036,7 +15039,7 @@ select:focus-visible {
   padding: 14px 16px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(191, 202, 220, 0.08);
+  border-color: rgba(255, 255, 255, 0.08);
   box-shadow: none;
 }
 
@@ -15095,7 +15098,7 @@ select:focus-visible {
   height: 28px;
   flex-basis: 28px;
   border-radius: 10px;
-  border-color: rgba(191, 202, 220, 0.08);
+  border-color: rgba(255, 255, 255, 0.08);
   box-shadow: none;
 }
 
@@ -15109,7 +15112,7 @@ select:focus-visible {
 }
 
 .page--chat-modern .message-card__badge {
-  border-color: rgba(191, 202, 220, 0.08);
+  border-color: rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
   color: var(--color-text-muted);
 }
@@ -15137,13 +15140,13 @@ select:focus-visible {
 .page--chat-modern .message-card--master .message-card__bubble {
   max-width: min(100%, 640px);
   padding: 14px 16px;
-  border: 1px solid rgba(191, 202, 220, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.03);
 }
 
 .page--chat-modern .typing-indicator {
-  border-color: rgba(191, 202, 220, 0.08);
+  border-color: rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.025);
   box-shadow: none;
 }
@@ -15151,7 +15154,7 @@ select:focus-visible {
 .page--chat-modern .message-streamMeta span,
 .page--chat-modern .message-routeMeta__panel,
 .page--chat-modern .ghost-button {
-  border-color: rgba(191, 202, 220, 0.08);
+  border-color: rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
   box-shadow: none;
 }
@@ -15198,14 +15201,14 @@ select:focus-visible {
   min-height: 64px;
   padding: 16px 18px;
   border-radius: 20px;
-  border-color: rgba(191, 202, 220, 0.08);
+  border-color: rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
   box-shadow: none;
 }
 
 .page--chat-modern .chat-composer textarea:focus {
-  border-color: rgba(191, 202, 220, 0.12);
-  box-shadow: 0 0 0 1px rgba(191, 202, 220, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .page--chat-modern .composer__hint {
@@ -15230,13 +15233,13 @@ select:focus-visible {
   margin-bottom: 12px;
   padding: 12px 14px;
   border-radius: 18px;
-  border-color: rgba(191, 202, 220, 0.08);
+  border-color: rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.02);
   box-shadow: none;
 }
 
 .page--chat-modern .chat-composer__blockedField {
-  border-color: rgba(191, 202, 220, 0.08);
+  border-color: rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
   box-shadow: none;
 }
