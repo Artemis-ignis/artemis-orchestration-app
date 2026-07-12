@@ -48,8 +48,8 @@ function DeferredPageShell({ title, children }: { title: string; children: React
       fallback={
         <section className="page page-loading">
           <div className="panel-card panel-card--muted page-loading__card">
-            <strong>{title} 준비 중</strong>
-            <p>필요한 화면 코드와 실제 로컬 상태를 불러오고 있습니다.</p>
+            <strong>{title} 불러오는 중…</strong>
+            <p>화면 코드와 로컬 상태를 불러오고 있습니다. 잠시만 기다려 주세요.</p>
           </div>
         </section>
       }

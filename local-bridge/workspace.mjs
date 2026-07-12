@@ -1,8 +1,28 @@
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 
 const DEFAULT_WORKSPACE_ROOT = path.resolve(process.env.ARTEMIS_WORKSPACE_ROOT ?? process.cwd())
+
+// Workspace roots must live under one of these prefixes. Requests may name any
+// root inside them (e.g. a project folder in the home directory), but system
+// paths like /etc or C:\Windows are rejected. Override or extend with the
+// ARTEMIS_ALLOWED_WORKSPACE_ROOTS env var (path.delimiter-separated list).
+const ALLOWED_WORKSPACE_ROOT_PREFIXES = (
+  process.env.ARTEMIS_ALLOWED_WORKSPACE_ROOTS?.trim()
+    ? process.env.ARTEMIS_ALLOWED_WORKSPACE_ROOTS.split(path.delimiter)
+    : [os.homedir(), DEFAULT_WORKSPACE_ROOT, process.cwd()]
+)
+  .map((item) => path.resolve(String(item).trim()))
+  .filter(Boolean)
+
+function isWithinAllowedWorkspacePrefix(targetPath) {
+  return ALLOWED_WORKSPACE_ROOT_PREFIXES.some((prefix) => {
+    const relative = path.relative(prefix, targetPath)
+    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))
+  })
+}
 
 const MIME_TYPES = new Map([
   ['.css', 'text/css'],
@@ -119,6 +139,13 @@ export async function resolveWorkspaceRoot(rootPath) {
   const requestedRoot = path.resolve(
     String(rootPath || DEFAULT_WORKSPACE_ROOT).trim() || DEFAULT_WORKSPACE_ROOT,
   )
+
+  if (!isWithinAllowedWorkspacePrefix(requestedRoot)) {
+    throw new Error(
+      '허용된 작업 폴더 범위를 벗어난 경로입니다. ARTEMIS_ALLOWED_WORKSPACE_ROOTS 설정을 확인해 주세요.',
+    )
+  }
+
   const requestedStat = await stat(requestedRoot).catch(() => null)
 
   if (requestedStat?.isDirectory()) {

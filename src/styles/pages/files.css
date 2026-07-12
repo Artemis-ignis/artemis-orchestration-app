@@ -103,13 +103,13 @@
 }
 
 .file-row:hover {
-  border-color: rgba(124, 168, 255, 0.16);
-  background: rgba(124, 168, 255, 0.05);
+  border-color: rgba(var(--accent-highlight-rgb), 0.16);
+  background: rgba(var(--accent-highlight-rgb), 0.05);
 }
 
 .file-row.is-selected {
-  border-color: rgba(124, 168, 255, 0.2);
-  background: rgba(124, 168, 255, 0.08);
+  border-color: rgba(var(--accent-highlight-rgb), 0.2);
+  background: rgba(var(--accent-highlight-rgb), 0.08);
 }
 
 .file-row__open,
