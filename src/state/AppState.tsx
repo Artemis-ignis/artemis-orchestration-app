@@ -83,8 +83,8 @@ function buildPromptHistory(
   messages: Array<{ role: string; text: string }>,
   limit: number,
 ): Array<{ role: 'master'; text: string }> {
-  // ??怨몄쓧 assistant ??얜Ŧ堉?? ???깅쾳 嶺뚮ㅄ維???筌뤾쑵?????濡?턄嶺뚯솘? ???낆┣?????겶?
-  // ??????踰?嶺뚣끉裕????븐슙?뺟춯????쳜????덈콦???熬곣뫀堉??紐껊퉵??
+  // master 역할 메시지만 최근 limit개를 추려서
+  // 프롬프트 히스토리로 전달한다.
   return messages
     .filter((message) => message.role === 'master')
     .slice(-limit)
@@ -95,11 +95,11 @@ function buildPromptHistory(
 }
 
 const RUN_PROGRESS_LOG_STEPS = [
-  { delayMs: 2_000, message: '???덈뺄?リ옇?? ??븐슙????筌먦끉逾??濡ル츎 繞벿살탳????덈펲.' },
-  { delayMs: 6_000, message: '??얜Ŧ堉??貫?녽뇡??繞벿뮻???들뇡??繞벿살탳????덈펲.' },
-  { delayMs: 14_000, message: '嶺뚣끉裕뉏펺???얜Ŧ堉??嶺뚮ㅄ維???繞벿살탳????덈펲. ?브퀗??臾뺤춹??リ옇?????낅슣?섋땻??' },
-  { delayMs: 30_000, message: '嶺뚯솘???⑥щ턄 ?ル梨룟젆源띿???????곕????덈펲. ?熬곣뫁???????긺춯?뼿 ??ｌ뫒????⑤객臾???띠룄????紐껊퉵??' },
-  { delayMs: 60_000, message: '??얜Ŧ堉?????됯퉵彛??????곕????덈펲. ???熬곣뫖????熬곥룊?긺춯?뼿 ???リ옇?ч뜮????덈펲.' },
+  { delayMs: 2_000, message: '요청을 준비하고 에이전트를 깨우는 중입니다.' },
+  { delayMs: 6_000, message: '에이전트가 작업 내용을 분석하고 있습니다.' },
+  { delayMs: 14_000, message: '복잡한 에이전트 작업을 처리하고 있습니다. 잠시만 기다려 주세요.' },
+  { delayMs: 30_000, message: '작업이 다소 오래 걸리고 있습니다. 네트워크나 로컬 모델 상태를 확인해 주세요.' },
+  { delayMs: 60_000, message: '에이전트가 계속 응답하고 있습니다. 곧 결과가 표시됩니다.' },
 ]
 
 function shouldAttachSignalsContext(task: string) {
@@ -113,7 +113,7 @@ function buildSignalsContext(
   }>,
 ) {
   return items
-    .map((item, index) => `${index + 1}. ${item.title}\n- ??븐슜?? ${item.summary}`)
+    .map((item, index) => `${index + 1}. ${item.title}\n- 요약: ${item.summary}`)
     .join('\n')
 }
 
@@ -202,7 +202,7 @@ function saveWorkspacePrefs(rootPath: string, currentPath: string, showSystemEnt
         }),
     )
   } catch (error) {
-    console.warn('Artemis ??????????????ㅺ컼???????묎덩?????됰꽡???怨?????덊렡.', error)
+    console.warn('Artemis 작업 폴더 설정을 저장하지 못했습니다.', error)
   }
 }
 
@@ -314,7 +314,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       applyWorkspaceListing(listing)
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : '???????????얜봾????됰씭????? 癲ル슢履뉑쾮?彛??????'
+        error instanceof Error ? error.message : '작업 폴더를 불러오지 못했습니다.'
       setWorkspaceError(message)
     } finally {
       setWorkspaceLoading(false)
@@ -332,7 +332,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       applyWorkspaceListing(listing)
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : '??????????????ㅼ뒦???????됰꽡???怨?????덊렡.'
+        error instanceof Error ? error.message : '작업 폴더에 연결하지 못했습니다.'
       setWorkspaceError(message)
       throw error
     } finally {
@@ -358,7 +358,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       setWorkspaceShowSystemEntries(visible)
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : '?????????????筌?六????????袁⑸즵????? 癲ル슢履뉑쾮?彛??????'
+        error instanceof Error ? error.message : '시스템 항목을 불러오지 못했습니다.'
       setWorkspaceError(message)
     } finally {
       setWorkspaceLoading(false)
@@ -435,7 +435,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       const nextHealth = await fetchBridgeHealth(state.settings.bridgeUrl)
       applyBridgeHealthSuccess(nextHealth)
     } catch (error) {
-      applyBridgeHealthFailure(error, '癲ル슢?꾤땟?????怨쀫뮛??⑥궡?? ???ㅺ컼????嶺뚮Ĳ?됮??? 癲ル슢履뉑쾮?彛??????')
+      applyBridgeHealthFailure(error, '브리지 상태를 확인하지 못했습니다.')
     }
   }
 
@@ -448,7 +448,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       })
       setBridgeError(null)
     } catch (error) {
-      setBridgeError(error instanceof Error ? error.message : '???袁る?癲ル슢?꾤땟戮⑤뭄????됰씭????? 癲ル슢履뉑쾮?彛??????')
+      setBridgeError(error instanceof Error ? error.message : '스킬 목록을 불러오지 못했습니다.')
     }
   }
 
@@ -470,7 +470,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       if (healthResult.status === 'fulfilled') {
         applyBridgeHealthSuccess(healthResult.value)
       } else {
-        applyBridgeHealthFailure(healthResult.reason, '?縕?猿녿뎨????ㅼ뒦?????ㅺ컼???濚욌꼬裕뼘????ㅻ눀?壤? 癲ル슢履뉑쾮?彛??????')
+        applyBridgeHealthFailure(healthResult.reason, '브리지에 연결하지 못했습니다.')
       }
 
       if (skillResult.status === 'fulfilled') {
@@ -479,7 +479,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           items: skillResult.value.items.map((item) => ({ ...item, enabled: false })),
         })
       } else {
-        console.warn('Artemis ???袁る?癲ル슢?꾤땟戮⑤뭄????됰씭????? 癲ル슢履뉑쾮?彛??????', skillResult.reason)
+        console.warn('Artemis 스킬 목록을 불러오지 못했습니다.', skillResult.reason)
       }
 
       if (aiSettingsResult.status === 'fulfilled') {
@@ -516,7 +516,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
       setWorkspaceShowSystemEntries(initialShowSystemEntries)
 
       if (!initialRoot) {
-        setWorkspaceError('?臾믩씜 ???묊몴?筌≪뼚? 筌륁궢六??щ빍??')
+        setWorkspaceError('작업 폴더를 찾지 못했습니다.')
         return
       }
 
@@ -551,7 +551,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         setWorkspaceError(
           lastWorkspaceError instanceof Error
             ? lastWorkspaceError.message
-            : '?臾믩씜 ???묊몴?筌≪뼚? 筌륁궢六??щ빍??',
+            : '작업 폴더를 찾지 못했습니다.',
         )
       }
 
@@ -704,7 +704,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           const finalPayload = finalEvent as AiStreamFinalEvent | null
 
           if (!finalPayload) {
-            throw new Error('????덉쉐?域밸Ŧ留⑶뜮?? ???ㅼ뒦????癲?癲ル슔?됭짆?륂렭????쑩?젆??癲ル슢??袁ъÞ?域밸Ŧ肉ョ뵳?異?堉온 癲ル슢履뉑쾮?彛??????')
+            throw new Error('스트리밍 응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요.')
           }
 
           const routingMeta: AiRoutingMessageMeta = {
@@ -745,14 +745,14 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           selectedAgent?.provider === 'openai-compatible' &&
           !state.apiKeys.find((item) => item.id === selectedAgent.apiKeyId)
         ) {
-          throw new Error('????????ш낄援θキ??API ??? ??ш끽維???筌뤾퍓??? ???源놁젳??????沃섅굥?? ???ㅼ뒦?????낆뒩??뗫빝??')
+          throw new Error('OpenAI 호환 에이전트의 API 키가 필요합니다. 설정에서 키를 먼저 등록해 주세요.')
         }
 
         if (
           selectedAgent?.provider === 'anthropic' &&
           !state.apiKeys.find((item) => item.id === selectedAgent.apiKeyId)
         ) {
-          throw new Error('Claude ??????ш낄援θキ??API ??? ??ш끽維???筌뤾퍓??? ???源놁젳??????沃섅굥?? ???ㅼ뒦?????낆뒩??뗫빝??')
+          throw new Error('Claude 에이전트의 API 키가 필요합니다. 설정에서 키를 먼저 등록해 주세요.')
         }
 
         const response = await executeModelPrompt({
@@ -786,7 +786,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         await refreshWorkspace(workspaceCurrentPath)
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : '癲ル슢?꾤땟???????덈틖 濚?????곸씔??좊읈? ?袁⑸즵獒뺣뎾????怨?????덊렡.'
+          error instanceof Error ? error.message : '에이전트 실행 중 오류가 발생했습니다.'
         dispatch({ type: 'APPEND_CHAT_ERROR', prompt: nextPrompt, error: message })
       } finally {
         setIsGenerating(false)
@@ -833,7 +833,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         agent.provider === 'openai-compatible' &&
         !state.apiKeys.find((item) => item.id === agent.apiKeyId)
       ) {
-        setBridgeError('????????ш낄援θキ??API ??? ??ш끽維???筌뤾퍓??? ???源놁젳??????沃섅굥?? ???ㅼ뒦?????낆뒩??뗫빝??')
+        setBridgeError('OpenAI 호환 에이전트의 API 키가 필요합니다. 설정에서 키를 먼저 등록해 주세요.')
         return
       }
 
@@ -841,7 +841,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         agent.provider === 'anthropic' &&
         !state.apiKeys.find((item) => item.id === agent.apiKeyId)
       ) {
-        setBridgeError('Claude ??????ш낄援θキ??API ??? ??ш끽維???筌뤾퍓??? ???源놁젳??????沃섅굥?? ???ㅼ뒦?????낆뒩??뗫빝??')
+        setBridgeError('Claude 에이전트의 API 키가 필요합니다. 설정에서 키를 먼저 등록해 주세요.')
         return
       }
 
@@ -862,7 +862,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
             id: createId('log'),
             createdAt: startedAt,
             level: 'info',
-            message: `${agent.name} ???덈뺄????戮곗굚???곕????덈펲.`,
+            message: `${agent.name} 실행을 시작했습니다.`,
           },
         ],
       }
@@ -892,7 +892,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         let taskPrompt = nextTask
 
         if (shouldAttachSignalsContext(nextTask)) {
-          pushRunLog('info', '嶺뚣끉裕????ル쪇源???筌먦끉逾???겶????곕????덈펲.')
+          pushRunLog('info', '관련 시그널을 수집하고 있습니다.')
           try {
             const signalFeed = await fetchSignalsFeed({
               bridgeUrl: state.settings.bridgeUrl,
@@ -903,17 +903,17 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
               taskPrompt = [
                 nextTask,
                 '',
-                '[嶺뚣볝늾????ル쪇源?',
+                '[관련 시그널]',
                 buildSignalsContext(contextItems),
                 '',
-                '????ル쪇源??嶺뚣볝늾???嶺뚣끉裕?????堉딁춯?嶺뚯쉧猷????ル봿援???우벟 ?筌먲퐘遊???낅슣?섋땻??',
+                '위 시그널을 참고해 최신 동향을 반영해 작성해 주세요.',
               ].join('\n')
-              pushRunLog('info', `嶺뚣끉裕????ル쪇源?${contextItems.length}濾곌쑬???嶺뚣볝늾????쒖굡???怨쀬Ŧ ??⑤슡????곕????덈펲.`)
+              pushRunLog('info', `관련 시그널 ${contextItems.length}건을 컨텍스트로 추가했습니다.`)
             } else {
-              pushRunLog('info', '??⑤슡???嶺뚣끉裕????ル쪇源덃뤆?쎛 ??怨룹꽑 ?熬곣뫗????븐슙?뺟춯??잙갭梨??????덈뺄??紐껊퉵??')
+              pushRunLog('info', '추가할 관련 시그널을 찾지 못해 원래 작업만 진행합니다.')
             }
           } catch {
-            pushRunLog('info', '嶺뚣끉裕????ル쪇源???釉띾쐞???? 嶺뚮쪇沅?뜮??熬곣뫗????븐슙?뺟춯??잙갭梨??????덈뺄??紐껊퉵??')
+            pushRunLog('info', '관련 시그널을 불러오지 못해 원래 작업만 진행합니다.')
           }
         }
 
@@ -971,7 +971,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           const finalPayload = finalEvent as AiStreamFinalEvent | null
 
           if (!finalPayload) {
-            throw new Error('???????덉쉐???源낇꼧????繹먮끏裕??? 癲ル슔?됭짆?륂렭????쑩?젆??癲ル슢???????? 癲ル슢履뉑쾮?彛??????')
+            throw new Error('스트리밍 응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요.')
           }
 
           dispatch({
@@ -998,11 +998,11 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
           return
         }
 
-        pushRunLog('info', `${agent.name} ????덈틖??れ삀?節덇덩??????????ш끽維????怨?????덊렡.`)
+        pushRunLog('info', `${agent.name} 실행을 로컬 실행기에 전달했습니다.`)
         if (agent.provider === 'codex' || agent.provider === 'ollama') {
           pushRunLog(
             'info',
-            '??????덈틖??れ삀????濡ろ뜏???醫듽걫????類???산덩??袁⑸즵????筌뤾퍓??? 癲ル슔?됭짆?륂렭???? ??ш낄猷?湲븐땡?堉온??癲ル슣???몄춿??棺??짆??癒?씀? ?沃섅굥?? ??좊즲????筌뤾퍓???',
+            '로컬 실행기는 모델 상태에 따라 시간이 걸릴 수 있습니다. 실행이 끝날 때까지 잠시 기다려 주세요.',
           )
         }
 
@@ -1050,7 +1050,7 @@ export function ArtemisProvider({ children }: PropsWithChildren) {
         await refreshWorkspace(workspaceCurrentPath)
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : '??????ш낄援θキ?????덈틖 濚?????곸씔??좊읈? ?袁⑸즵獒뺣뎾????怨?????덊렡.'
+          error instanceof Error ? error.message : '에이전트 실행 중 오류가 발생했습니다.'
         dispatch({ type: 'FAIL_AGENT_RUN', runId, agentId, error: message })
       }
     },

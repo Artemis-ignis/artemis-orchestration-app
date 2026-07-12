@@ -1,8 +1,28 @@
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 
 const DEFAULT_WORKSPACE_ROOT = path.resolve(process.env.ARTEMIS_WORKSPACE_ROOT ?? process.cwd())
+
+// Workspace roots must live under one of these prefixes. Requests may name any
+// root inside them (e.g. a project folder in the home directory), but system
+// paths like /etc or C:\Windows are rejected. Override or extend with the
+// ARTEMIS_ALLOWED_WORKSPACE_ROOTS env var (path.delimiter-separated list).
+const ALLOWED_WORKSPACE_ROOT_PREFIXES = (
+  process.env.ARTEMIS_ALLOWED_WORKSPACE_ROOTS?.trim()
+    ? process.env.ARTEMIS_ALLOWED_WORKSPACE_ROOTS.split(path.delimiter)
+    : [os.homedir(), DEFAULT_WORKSPACE_ROOT, process.cwd()]
+)
+  .map((item) => path.resolve(String(item).trim()))
+  .filter(Boolean)
+
+function isWithinAllowedWorkspacePrefix(targetPath) {
+  return ALLOWED_WORKSPACE_ROOT_PREFIXES.some((prefix) => {
+    const relative = path.relative(prefix, targetPath)
+    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))
+  })
+}
 
 const MIME_TYPES = new Map([
   ['.css', 'text/css'],
@@ -101,15 +121,15 @@ function ensureValidName(name) {
   const trimmed = String(name || '').trim()
 
   if (!trimmed) {
-    throw new Error('?대쫫???낅젰??二쇱꽭??')
+    throw new Error('이름을 입력해 주세요.')
   }
 
   if (trimmed === '.' || trimmed === '..') {
-    throw new Error('?꾩옱 ?먮뒗 ?곸쐞 寃쎈줈 ?대쫫? ?ъ슜?????놁뒿?덈떎.')
+    throw new Error('현재 또는 상위 경로 이름은 사용할 수 없습니다.')
   }
 
   if (/[\\/]/.test(trimmed)) {
-    throw new Error('?대쫫?먮뒗 寃쎈줈 援щ텇?먮? ?ｌ쓣 ???놁뒿?덈떎.')
+    throw new Error('이름에는 경로 구분자를 넣을 수 없습니다.')
   }
 
   return trimmed
@@ -119,6 +139,13 @@ export async function resolveWorkspaceRoot(rootPath) {
   const requestedRoot = path.resolve(
     String(rootPath || DEFAULT_WORKSPACE_ROOT).trim() || DEFAULT_WORKSPACE_ROOT,
   )
+
+  if (!isWithinAllowedWorkspacePrefix(requestedRoot)) {
+    throw new Error(
+      '허용된 작업 폴더 범위를 벗어난 경로입니다. ARTEMIS_ALLOWED_WORKSPACE_ROOTS 설정을 확인해 주세요.',
+    )
+  }
+
   const requestedStat = await stat(requestedRoot).catch(() => null)
 
   if (requestedStat?.isDirectory()) {
@@ -150,7 +177,7 @@ export function resolveWorkspaceTarget(rootPath, targetPath = '') {
   const relative = path.relative(normalizedRoot, resolved)
 
   if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw new Error('?묒뾽 ?대뜑 諛붽묑 寃쎈줈???ъ슜?????놁뒿?덈떎.')
+    throw new Error('작업 폴더 바깥 경로는 사용할 수 없습니다.')
   }
 
   return {
@@ -205,7 +232,7 @@ function getDeleteProtection(relativePath) {
   if (!relativePath) {
     return {
       deletable: false,
-      protectionReason: '?묒뾽 猷⑦듃 ?먯껜????젣?????놁뒿?덈떎.',
+      protectionReason: '작업 루트 자체는 삭제할 수 없습니다.',
     }
   }
 
@@ -214,7 +241,7 @@ function getDeleteProtection(relativePath) {
   if (PROTECTED_DELETE_ROOT_NAMES.has(rootName)) {
     return {
       deletable: false,
-      protectionReason: `${rootName} 寃쎈줈???꾨줈?앺듃 ?덉쟾???꾪빐 ???덉뿉????젣?섏? ?딆뒿?덈떎.`,
+      protectionReason: `${rootName} 경로는 프로젝트 안전을 위해 앱에서 삭제하지 않습니다.`,
     }
   }
 
@@ -272,7 +299,7 @@ export async function listWorkspace({ rootPath, currentPath = '', includeSystem 
   const targetStat = await stat(target.absolutePath).catch(() => null)
 
   if (!targetStat || !targetStat.isDirectory()) {
-    throw new Error('?대뜑瑜?李얠? 紐삵뻽?듬땲??')
+    throw new Error('폴더를 찾지 못했습니다.')
   }
 
   const dirents = await readdir(target.absolutePath, { withFileTypes: true })
@@ -316,7 +343,7 @@ export async function readWorkspaceFileContent({ rootPath, filePath }) {
   const targetStat = await stat(target.absolutePath).catch(() => null)
 
   if (!targetStat || !targetStat.isFile()) {
-    throw new Error('?뚯씪??李얠? 紐삵뻽?듬땲??')
+    throw new Error('파일을 찾지 못했습니다.')
   }
 
   const buffer = await readFile(target.absolutePath)
@@ -367,7 +394,7 @@ export async function uploadWorkspaceFiles({
   const parent = resolveWorkspaceTarget(normalizedRoot, currentPath)
 
   if (!Array.isArray(files) || files.length === 0) {
-    throw new Error('?낅줈?쒗븷 ?뚯씪???놁뒿?덈떎.')
+    throw new Error('업로드할 파일이 없습니다.')
   }
 
   for (const item of files) {
@@ -394,14 +421,29 @@ export async function deleteWorkspaceEntry({ rootPath, targetPath, includeSystem
   return listWorkspace({ rootPath: normalizedRoot, currentPath: parentPath, includeSystem })
 }
 
+function resolveRevealCommand(targetPath) {
+  switch (process.platform) {
+    case 'win32':
+      return { command: 'explorer.exe', args: [targetPath] }
+    case 'darwin':
+      return { command: 'open', args: [targetPath] }
+    default:
+      return { command: 'xdg-open', args: [targetPath] }
+  }
+}
+
 export async function revealWorkspacePath({ rootPath, targetPath = '' }) {
   const normalizedRoot = await resolveWorkspaceRoot(rootPath)
   const target = resolveWorkspaceTarget(normalizedRoot, targetPath)
 
-  const child = spawn('explorer.exe', [target.absolutePath], {
+  const { command, args } = resolveRevealCommand(target.absolutePath)
+  const child = spawn(command, args, {
     windowsHide: true,
     detached: true,
     stdio: 'ignore',
+  })
+  child.on('error', () => {
+    /* File manager not available (e.g. headless server); ignore. */
   })
   child.unref()
 

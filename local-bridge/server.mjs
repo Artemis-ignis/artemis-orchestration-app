@@ -90,6 +90,13 @@ if (!process.env.ARTEMIS_PUBLIC_SESSION_SECRET?.trim()) {
   )
 }
 
+if (!APP_ENCRYPTION_KEY) {
+  console.warn(
+    '[ai-router] Neither APP_ENCRYPTION_KEY nor ARTEMIS_PUBLIC_SESSION_SECRET is set. ' +
+      'Provider API keys will be encrypted with a publicly derivable key — set APP_ENCRYPTION_KEY in .env before storing real credentials.',
+  )
+}
+
 const CATEGORY_TO_CODE = {
   전체: 'all',
   'AI 및 기술': 'ai',
@@ -148,8 +155,10 @@ const PER_SIGNAL_TRANSLATION_TIMEOUT_MS = 15_000
 const SIGNAL_RESULT_LIMIT = 6
 const SIGNAL_CACHE_TTL_MS = 45_000
 const EXECUTION_TIMEOUT_MS = 240_000
-const SIGNAL_CODEX_TRANSLATION_MODEL = 'gpt-5.4-mini'
-const OLLAMA_LOCAL_MODEL = 'gemma4-E4B-uncensored-q4fast:latest'
+const SIGNAL_CODEX_TRANSLATION_MODEL =
+  process.env.SIGNAL_CODEX_TRANSLATION_MODEL?.trim() || 'gpt-5.4-mini'
+const OLLAMA_LOCAL_MODEL =
+  process.env.OLLAMA_LOCAL_MODEL?.trim() || 'gemma4-E4B-uncensored-q4fast:latest'
 const OLLAMA_HEALTH_TIMEOUT_MS = Number(process.env.OLLAMA_HEALTH_TIMEOUT_MS ?? 4_000)
 const PUBLIC_INQUIRY_DIRECTORY = path.join(process.cwd(), 'output', 'public-inquiries')
 const PUBLIC_ACCOUNT_DIRECTORY = path.join(process.cwd(), 'output', 'public-accounts')
@@ -159,6 +168,9 @@ const PUBLIC_ALLOWED_ORIGINS = new Set(
     process.env.VITE_APP_URL?.trim(),
     'http://127.0.0.1:4173',
     'http://localhost:4173',
+    // Vite dev server default port.
+    'http://127.0.0.1:5173',
+    'http://localhost:5173',
   ].filter(Boolean),
 )
 const WORKSPACE_SNAPSHOT_MAX_DIRECTORIES = 160
@@ -176,17 +188,23 @@ const WORKSPACE_SNAPSHOT_SKIPPED_FOLDERS = new Set([
   'node_modules',
 ])
 
+function isOriginAllowed(origin) {
+  return Boolean(origin) && PUBLIC_ALLOWED_ORIGINS.has(origin)
+}
+
 function createCorsHeaders(request) {
   const origin = request.headers.origin
-  const allowOrigin = origin && PUBLIC_ALLOWED_ORIGINS.has(origin) ? origin : '*'
   const headers = {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS',
     Vary: 'Origin',
   }
 
-  if (allowOrigin !== '*') {
+  // Only allowlisted origins receive CORS headers. Non-browser clients send
+  // no Origin header and are unaffected; unknown web origins get no
+  // Access-Control-Allow-Origin, so browsers block them from reading responses.
+  if (isOriginAllowed(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin
+    headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    headers['Access-Control-Allow-Methods'] = 'GET,POST,PATCH,OPTIONS'
     headers['Access-Control-Allow-Credentials'] = 'true'
   }
 
@@ -2598,6 +2616,19 @@ const server = http.createServer(async (request, response) => {
       ...createCorsHeaders(request),
     })
     response.end()
+    return
+  }
+
+  // Cross-origin write protection: browsers always attach an Origin header to
+  // cross-origin POST/PATCH requests. Rejecting unknown origins here blocks
+  // drive-by pages from driving privileged endpoints (file write/delete,
+  // codex execution, credential storage) on 127.0.0.1. Same-origin app calls
+  // and non-browser tools (curl, scripts — no Origin header) are unaffected.
+  if (request.method !== 'GET' && request.headers.origin && !isOriginAllowed(request.headers.origin)) {
+    sendJson(request, response, 403, {
+      ok: false,
+      error: '허용되지 않은 출처의 요청입니다.',
+    })
     return
   }
 

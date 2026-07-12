@@ -8,6 +8,7 @@
     "bridge": "node local-bridge/server.mjs",
     "build": "tsc -b && vite build --configLoader native",
     "lint": "eslint .",
+    "test": "node --test local-bridge/ai/router.test.mjs local-bridge/publisher/pipeline.test.mjs local-bridge/x-autopost/pipeline.test.mjs",
     "preview": "vite preview --configLoader native"
   },
   "dependencies": {

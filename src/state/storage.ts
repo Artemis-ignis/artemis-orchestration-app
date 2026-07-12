@@ -307,6 +307,10 @@ function normalizeState(candidate: unknown): RuntimeState {
 function sanitizeStateForPersist(state: RuntimeState): RuntimeState {
   return {
     ...state,
+    // API key secrets are session-only: they are never restored on load
+    // (loadRuntimeState resets apiKeys to []), so persisting the raw values
+    // would only leave plaintext secrets sitting in localStorage.
+    apiKeys: [],
     files: {
       ...state.files,
       items: state.files.items.map((item) => ({

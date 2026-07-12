@@ -18,6 +18,9 @@
   --color-accent: #e50914;
   --color-accent-strong: #ff4d45;
   --color-accent-soft: rgba(229, 9, 20, 0.14);
+  /* Cool highlight used by interactive primitives (borders, hover washes).
+     Consumed as rgba(var(--accent-highlight-rgb), <alpha>). */
+  --accent-highlight-rgb: 124, 168, 255;
   --color-success: #45c48a;
   --color-success-soft: rgba(69, 196, 138, 0.12);
   --color-warning: #efb451;
@@ -76,6 +79,8 @@
   --color-accent: #c70d18;
   --color-accent-strong: #a30f17;
   --color-accent-soft: rgba(199, 13, 24, 0.12);
+  /* Deeper blue so translucent washes stay visible on light surfaces. */
+  --accent-highlight-rgb: 47, 92, 176;
   --color-success-soft: rgba(69, 196, 138, 0.12);
   --color-warning-soft: rgba(239, 180, 81, 0.12);
   --color-danger-soft: rgba(255, 107, 115, 0.12);

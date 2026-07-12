@@ -48,7 +48,7 @@ textarea::placeholder {
 }
 
 ::selection {
-  background: rgba(124, 168, 255, 0.22);
+  background: rgba(var(--accent-highlight-rgb), 0.22);
   color: var(--color-text);
 }
 
@@ -58,7 +58,7 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
 summary:focus-visible {
-  outline: 2px solid rgba(124, 168, 255, 0.88);
+  outline: 2px solid rgba(var(--accent-highlight-rgb), 0.88);
   outline-offset: 2px;
 }
 
