@@ -893,22 +893,16 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
               ))}
             </div>
             <div className="signals-toolbar__actions">
-              <button className="primary-button" onClick={() => void executeRunNow()} type="button">
-                글 생성
-              </button>
-            </div>
-          </div>
-
-          <section className="panel-card panel-card--muted signals-source-strip signals-source-strip--overview">
-            <div className="badge-row">
               {sourceSummary.map(([label, count]) => (
                 <span key={label} className="chip chip--soft">
                   {label} {count}건
                 </span>
               ))}
+              <button className="primary-button" onClick={() => void executeRunNow()} type="button">
+                글 생성
+              </button>
             </div>
-            <p>원문 피드만 빠르게 확인하는 탭입니다.</p>
-          </section>
+          </div>
 
           {feedError ? (
             <div className="status-banner status-banner--error">
