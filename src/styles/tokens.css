@@ -33,13 +33,13 @@
   --color-text-dim: #626a78;
 
   /* Accent — iris indigo */
-  --accent-rgb: 121, 131, 245;
-  --color-accent: #7983f5;
-  --color-accent-strong: #939cf8;
-  --color-accent-soft: rgba(121, 131, 245, 0.16);
-  --color-on-accent: #0b0d11;
+  --accent-rgb: 99, 108, 232;
+  --color-accent: #636ce8;
+  --color-accent-strong: #7d85f0;
+  --color-accent-soft: rgba(99, 108, 232, 0.16);
+  --color-on-accent: #ffffff;
   /* Interactive highlight washes consume rgba(var(--accent-highlight-rgb), a). */
-  --accent-highlight-rgb: 121, 131, 245;
+  --accent-highlight-rgb: 99, 108, 232;
 
   /* Semantic */
   --color-success: #46c98e;
@@ -104,12 +104,12 @@
   --color-text-muted: #667082;
   --color-text-dim: #8b93a3;
 
-  --accent-rgb: 84, 96, 224;
-  --color-accent: #5460e0;
-  --color-accent-strong: #4450cc;
-  --color-accent-soft: rgba(84, 96, 224, 0.12);
+  --accent-rgb: 79, 89, 214;
+  --color-accent: #4f59d6;
+  --color-accent-strong: #4049c0;
+  --color-accent-soft: rgba(79, 89, 214, 0.12);
   --color-on-accent: #ffffff;
-  --accent-highlight-rgb: 84, 96, 224;
+  --accent-highlight-rgb: 79, 89, 214;
 
   --color-success: #1d9e68;
   --color-success-soft: rgba(29, 158, 104, 0.12);
