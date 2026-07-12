@@ -8,6 +8,9 @@ body {
   margin: 0;
   font-family: var(--font-sans);
   color: var(--color-text);
+  /* Korean text: break between words, never mid-word. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
   background:
     radial-gradient(circle at top left, rgba(130, 171, 255, 0.08), transparent 22%),
     linear-gradient(180deg, #04070d 0%, #07101b 48%, #08111b 100%);

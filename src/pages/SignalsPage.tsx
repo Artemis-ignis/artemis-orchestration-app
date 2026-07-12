@@ -982,11 +982,11 @@ export function SignalsPage({ onNavigate }: { onNavigate: (page: PageId) => void
                         큐에 추가
                       </button>
                       <button
-                        className="primary-button"
+                        className="ghost-button"
                         onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
                         type="button"
                       >
-                        원문
+                        원문 열기
                       </button>
                     </div>
                   </article>

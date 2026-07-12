@@ -1070,7 +1070,7 @@
 /* Artemis cinema pass */
 .ui-page-header,
 .page-intro {
-  border-bottom-color: rgba(229, 9, 20, 0.18);
+  border-bottom-color: var(--color-border-strong);
 }
 
 .ui-page-header__icon,
@@ -1078,8 +1078,8 @@
 .ui-empty-state__mark,
 .empty-state__mark,
 .ui-notice__icon {
-  border-color: rgba(229, 9, 20, 0.22);
-  background: linear-gradient(180deg, rgba(229, 9, 20, 0.18), rgba(229, 9, 20, 0.06));
+  border-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
   color: #ffd5d2;
 }
 
@@ -1108,7 +1108,7 @@
 
 .ui-panel {
   background:
-    linear-gradient(180deg, rgba(229, 9, 20, 0.08), transparent 18%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.006)),
     var(--color-panel-strong);
   box-shadow:
@@ -1121,9 +1121,9 @@
 }
 
 .ui-panel--accent {
-  border-color: rgba(229, 9, 20, 0.18);
+  border-color: rgba(229, 9, 20, 0.14);
   background:
-    linear-gradient(180deg, rgba(229, 9, 20, 0.12), transparent 20%),
+    linear-gradient(180deg, rgba(229, 9, 20, 0.06), transparent 20%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.024), rgba(255, 255, 255, 0.006)),
     var(--color-panel-strong);
 }
@@ -1143,17 +1143,22 @@
 .ui-status-pill--info,
 .chip.is-active,
 .chip--status.chip--running,
-.chip--status.chip--success,
 .tab-button.is-active {
   border-color: rgba(229, 9, 20, 0.24);
   background: rgba(229, 9, 20, 0.18);
   color: #fff2f0;
 }
 
+.chip--status.chip--success {
+  border-color: rgba(69, 196, 138, 0.32);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
 .ui-stat-card {
   border-color: rgba(255, 255, 255, 0.08);
   background:
-    linear-gradient(180deg, rgba(229, 9, 20, 0.08), transparent 18%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18%),
     rgba(255, 255, 255, 0.018);
 }
 
@@ -1161,7 +1166,7 @@
 .empty-state {
   border-color: rgba(255, 255, 255, 0.08);
   background:
-    linear-gradient(180deg, rgba(229, 9, 20, 0.08), transparent 18%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18%),
     rgba(255, 255, 255, 0.018);
 }
 
@@ -1200,8 +1205,8 @@
 
 .status-banner--info,
 .ui-notice--info {
-  border-color: rgba(229, 9, 20, 0.18);
-  background: rgba(229, 9, 20, 0.12);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
   color: #fff0ef;
 }
 
@@ -1209,7 +1214,7 @@
 .ui-page-header,
 .page-intro {
   padding-bottom: 18px;
-  border-bottom-color: rgba(229, 9, 20, 0.14);
+  border-bottom-color: var(--color-border-strong);
 }
 
 .ui-page-header__icon,
@@ -1219,9 +1224,9 @@
 .ui-notice__icon {
   border-color: rgba(255, 255, 255, 0.08);
   background:
-    linear-gradient(180deg, rgba(229, 9, 20, 0.1), rgba(229, 9, 20, 0.03)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
     rgba(255, 255, 255, 0.02);
-  color: #ffe7e5;
+  color: var(--color-text-soft);
   box-shadow: none;
 }
 
@@ -1248,7 +1253,7 @@
 
 .ui-panel {
   background:
-    linear-gradient(180deg, rgba(229, 9, 20, 0.05), transparent 14%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 14%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.004)),
     var(--color-panel-strong);
 }
@@ -1265,9 +1270,9 @@
 .ui-panel--accent,
 .ui-stat-card--accent,
 .ui-stat-card--info {
-  border-color: rgba(229, 9, 20, 0.16);
+  border-color: var(--color-border-strong);
   background:
-    linear-gradient(180deg, rgba(229, 9, 20, 0.06), transparent 16%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 16%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.004)),
     var(--color-panel-strong);
 }

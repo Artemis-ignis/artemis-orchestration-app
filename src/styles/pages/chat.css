@@ -39,7 +39,7 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   border: 1px solid rgba(158, 178, 215, 0.12);
-  border-radius: 34px;
+  border-radius: 24px;
   background:
     radial-gradient(circle at 18% 18%, rgba(130, 171, 255, 0.16), transparent 24%),
     radial-gradient(circle at 82% 82%, rgba(78, 146, 255, 0.08), transparent 28%),
@@ -113,7 +113,7 @@
   display: grid;
   gap: var(--space-5);
   padding: clamp(24px, 3vw, 36px);
-  border-radius: 32px;
+  border-radius: 24px;
   border: 1px solid rgba(158, 178, 215, 0.12);
   background:
     linear-gradient(135deg, rgba(16, 22, 36, 0.96), rgba(11, 15, 25, 0.94)),
@@ -1075,7 +1075,7 @@
 .chat-surface {
   border-color: rgba(255, 255, 255, 0.08);
   background:
-    radial-gradient(circle at top right, rgba(229, 9, 20, 0.12), transparent 18%),
+    radial-gradient(circle at top right, rgba(229, 9, 20, 0.06), transparent 18%),
     linear-gradient(180deg, rgba(18, 18, 18, 0.995), rgba(5, 5, 5, 1));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.025),
@@ -1085,7 +1085,7 @@
 .chat-empty-shell__hero {
   border-color: rgba(255, 255, 255, 0.08);
   background:
-    radial-gradient(circle at top right, rgba(229, 9, 20, 0.18), transparent 26%),
+    radial-gradient(circle at top right, rgba(229, 9, 20, 0.09), transparent 26%),
     linear-gradient(180deg, rgba(20, 20, 20, 0.98), rgba(8, 8, 8, 0.995));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.03),
@@ -1166,7 +1166,7 @@
 
 .page--chat-modern .model-menu__trigger {
   background:
-    linear-gradient(180deg, rgba(229, 9, 20, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 28%),
     rgba(255, 255, 255, 0.03);
 }
 
@@ -1227,7 +1227,7 @@
 .chat-empty-chip:nth-child(3),
 .chat-empty-chip:nth-child(4) {
   background:
-    linear-gradient(180deg, rgba(229, 9, 20, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 28%),
     linear-gradient(180deg, rgba(18, 18, 18, 0.98), rgba(8, 8, 8, 0.995));
 }
 
