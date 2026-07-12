@@ -621,8 +621,8 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
                         <strong>{state.settings.agentName}</strong>
                         <span className="message-card__badge">
                           {streamMeta?.top_candidate
-                            ? `${streamMeta.top_candidate.provider_label} 쨌 ${streamMeta.top_candidate.display_name}`
-                            : `${selectedOfficialProviderStatus?.label ?? '공식 API'} 쨌 ${selectedModel || '모델 확인 중'}`}
+                            ? `${streamMeta.top_candidate.provider_label} · ${streamMeta.top_candidate.display_name}`
+                            : `${selectedOfficialProviderStatus?.label ?? '공식 API'} · ${selectedModel || '모델 확인 중'}`}
                         </span>
                       </div>
                       <span>실시간 스트리밍</span>
@@ -632,7 +632,7 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
                       <div className="message-streamMeta">
                         {streamMeta?.top_candidate ? (
                           <span>
-                            현재 후보 쨌 {streamMeta.top_candidate.provider_label} 쨌{' '}
+                            현재 후보 · {streamMeta.top_candidate.provider_label} ·{' '}
                             {streamMeta.top_candidate.display_name}
                           </span>
                         ) : null}
