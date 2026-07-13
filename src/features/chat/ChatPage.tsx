@@ -363,12 +363,6 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
       : selectedAgent?.provider === 'official-router'
         ? '모델 설정 확인 필요'
         : '실행기 연결 필요'
-  const blockedComposerDetail = () =>
-    selectedAgentNeedsKey
-      ? '설정에서 키를 연결하면 바로 시작할 수 있습니다.'
-      : selectedAgent?.provider === 'official-router'
-        ? '모델 설정만 확인하면 바로 시작할 수 있습니다.'
-        : '실행기만 복구하면 바로 시작할 수 있습니다.'
   const canSubmit =
     !isGenerating &&
     !selectedAgentNeedsKey &&
@@ -650,84 +644,63 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
 
         <form
           className={`composer composer--chat chat-composer chat-composer--embedded ${
-            compactComposerMode ? 'chat-composer--blocked' : ''
+            compactComposerMode ? 'chat-composer--needs-connect' : ''
           }`}
           onSubmit={(event) => {
             event.preventDefault()
             void handleSubmit()
           }}
         >
-          {compactComposerMode ? (
-            <div className="chat-composer__status">
-              <div className="chat-composer__statusCopy">
-                <span className="chat-composer__statusLabel">{blockedComposerTitle()}</span>
-                <strong>{currentModelName}</strong>
-                <p>{blockedComposerDetail()}</p>
-              </div>
+          <textarea
+            aria-label="메시지 입력"
+            rows={1}
+            value={composerText}
+            onChange={(event) => setComposerText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault()
+                if (!isGenerating && composerText.trim() && canSubmit) {
+                  void handleSubmit()
+                }
+              }
+            }}
+            placeholder={
+              selectedAgentNeedsKey
+                ? '설정에서 API 키를 연결한 뒤 대화를 시작하세요.'
+                : selectedAgentUnavailable
+                  ? '실행기 연결이 복구되면 바로 대화할 수 있습니다.'
+                  : `${currentModelName}에게 메시지 보내기`
+            }
+          />
+          <div className="composer__footer">
+            <div className="composer__actions">
+              <input
+                hidden
+                multiple
+                onChange={(event) => {
+                  if (event.target.files) {
+                    void uploadWorkspaceFiles(event.target.files)
+                  }
+                  event.target.value = ''
+                }}
+                ref={fileInputRef}
+                type="file"
+              />
               <button
-                className="ghost-button ghost-button--compact"
-                onClick={() => onNavigate('settings')}
+                aria-label="파일 업로드"
+                className="composer__attach"
+                disabled={compactComposerMode}
+                onClick={() => fileInputRef.current?.click()}
+                title="파일 업로드"
                 type="button"
               >
-                설정 및 연결
+                <Icon name="paperclip" size={18} />
               </button>
-            </div>
-          ) : (
-            <textarea
-              aria-label="메시지 입력"
-              rows={3}
-              value={composerText}
-              onChange={(event) => setComposerText(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault()
-                  if (!isGenerating && composerText.trim()) {
-                    void handleSubmit()
-                  }
-                }
-              }}
-              placeholder={
-                selectedAgentNeedsKey
-                  ? '설정에서 API 키를 연결한 뒤 다시 시도하세요.'
-                  : selectedAgentUnavailable
-                    ? '실행기 연결이 복구되면 바로 대화할 수 있습니다.'
-                    : 'Artemis에게 메시지를 입력하세요.'
-              }
-            />
-          )}
-          <div className="composer__footer">
-            {compactComposerMode ? null : (
-              <div className="composer__actions">
-                <>
-                  <input
-                    hidden
-                    multiple
-                    onChange={(event) => {
-                      if (event.target.files) {
-                        void uploadWorkspaceFiles(event.target.files)
-                      }
-                      event.target.value = ''
-                    }}
-                    ref={fileInputRef}
-                    type="file"
-                  />
-                  <button
-                    aria-label="파일 업로드"
-                    className="ghost-button"
-                    onClick={() => fileInputRef.current?.click()}
-                    title="파일 업로드"
-                    type="button"
-                  >
-                    <Icon name="paperclip" size={16} />
-                    파일 업로드
-                  </button>
-                </>
-              </div>
-            )}
-            <div className="composer__submitRow">
-              {compactComposerMode ? null : composerHint ? (
+              {composerHint && !compactComposerMode ? (
                 <span className="composer__hint">{composerHint}</span>
               ) : null}
+            </div>
+            <div className="composer__submitRow">
               {isGenerating && streamAbortController ? (
                 <button
                   className="ghost-button ghost-button--compact"
@@ -737,17 +710,24 @@ export function ChatPage({ onNavigate }: { onNavigate: (page: PageId) => void })
                   중단
                 </button>
               ) : null}
-              {compactComposerMode ? null : (
+              {compactComposerMode ? (
                 <button
-                  aria-label="메시지 전송"
-                  className="primary-icon primary-icon--send"
-                  disabled={!canSubmit}
-                  title="메시지 전송"
-                  type="submit"
+                  className="ghost-button ghost-button--compact composer__connect"
+                  onClick={() => onNavigate('settings')}
+                  type="button"
                 >
-                  <Icon name="send" size={18} />
+                  {blockedComposerTitle()}
                 </button>
-              )}
+              ) : null}
+              <button
+                aria-label="메시지 전송"
+                className="primary-icon primary-icon--send"
+                disabled={!canSubmit}
+                title="메시지 전송"
+                type="submit"
+              >
+                <Icon name="send" size={18} />
+              </button>
             </div>
           </div>
         </form>
