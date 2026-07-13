@@ -84,7 +84,7 @@ export function createDefaultState(): RuntimeState {
       organization: 'Artemis Workspace',
       interests: ['AI 오케스트레이션', '개발 자동화'],
       customInstructions: '항상 한국어로 답하고 실행 가능한 결과와 다음 조치를 먼저 제시합니다.',
-      theme: 'dark',
+      theme: 'light',
       language: '한국어',
       timezone: 'Asia/Seoul',
       locationSharing: false,

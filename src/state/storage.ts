@@ -2,8 +2,9 @@ import { OLLAMA_LOCAL_MODEL } from '../lib/agentCatalog'
 import { buildInitialAgents, createDefaultState } from './defaultState'
 import type { RuntimeState, ToolItem } from './types'
 
-const STORAGE_KEY = 'artemis-runtime-state/v17'
+const STORAGE_KEY = 'artemis-runtime-state/v18'
 const LEGACY_STORAGE_KEYS = [
+  'artemis-runtime-state/v17',
   'artemis-runtime-state/v16',
   'artemis-runtime-state/v15',
   'artemis-runtime-state/v14',
@@ -330,15 +331,25 @@ export function loadRuntimeState(): RuntimeState {
   }
 
   try {
+    const rawCurrent = window.localStorage.getItem(STORAGE_KEY)
     const raw =
-      window.localStorage.getItem(STORAGE_KEY) ??
+      rawCurrent ??
       LEGACY_STORAGE_KEYS.map((key) => window.localStorage.getItem(key)).find(Boolean)
 
     if (!raw) {
       return createDefaultState()
     }
 
-    return normalizeState(JSON.parse(raw))
+    const state = normalizeState(JSON.parse(raw))
+
+    // One-time Clarity migration: states saved before v18 default to the
+    // light theme (Toss/Apple light-first look). Explicit theme choices made
+    // afterwards are persisted under the v18 key and left untouched.
+    if (!rawCurrent) {
+      state.settings.theme = 'light'
+    }
+
+    return state
   } catch {
     return createDefaultState()
   }

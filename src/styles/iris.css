@@ -729,3 +729,171 @@ summary:focus-visible {
   outline: 2px solid rgba(var(--accent-rgb), 0.7);
   outline-offset: 2px;
 }
+
+/* ============================================================
+ * Clarity shell — flat Toss/Apple layout (overrides iris base above)
+ * A single elevated white working surface on a calm canvas; the sidebar
+ * is a flush rail, not a floating card. Kills the card-in-card nesting.
+ * ============================================================ */
+
+.app-shell {
+  gap: 0;
+  padding: 0;
+  grid-template-columns: minmax(248px, var(--shell-sidebar-width)) minmax(0, 1fr);
+}
+
+.app-shell::before,
+.app-shell::after {
+  display: none;
+}
+
+/* Sidebar: flush rail on the canvas, no card chrome. */
+.app-sidebar {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  min-height: 100vh;
+  padding: 22px 16px;
+}
+
+.app-shell__sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+}
+
+/* Content: the one elevated surface. White panel, big radius, soft lift. */
+.app-shell__main {
+  padding: 14px 14px 14px 0;
+  min-height: 100vh;
+}
+
+.app-shell__frame {
+  min-height: calc(100vh - 28px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  padding: clamp(24px, 3vw, 44px);
+}
+
+:root[data-theme='light'] .app-shell__frame {
+  background: #ffffff;
+  border-color: rgba(24, 32, 52, 0.06);
+}
+
+/* Cards inside the white surface: quiet light-gray fill + hairline, no
+ * heavy shadow (that nesting was the amateur tell). */
+:root[data-theme='light'] .ui-panel,
+:root[data-theme='light'] .panel-card,
+:root[data-theme='light'] .settings-card,
+:root[data-theme='light'] .provider-card,
+:root[data-theme='light'] .signal-card,
+:root[data-theme='light'] .signals-feed-card,
+:root[data-theme='light'] .signals-toolbar,
+:root[data-theme='light'] .signals-panel,
+:root[data-theme='light'] .publisher-overviewCard,
+:root[data-theme='light'] .publisher-queueCard,
+:root[data-theme='light'] .publisher-detail,
+:root[data-theme='light'] .activity-story-card,
+:root[data-theme='light'] .activity-dossier-card,
+:root[data-theme='light'] .activity-meta-panel,
+:root[data-theme='light'] .activity-failure-card,
+:root[data-theme='light'] .runtime-card,
+:root[data-theme='light'] .storage-card,
+:root[data-theme='light'] .ui-stat-card,
+:root[data-theme='light'] .ui-empty-state,
+:root[data-theme='light'] .empty-state,
+:root[data-theme='light'] .guide-card {
+  background: var(--color-surface-2);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.ui-panel,
+.panel-card,
+.signal-card,
+.signals-feed-card,
+.settings-card,
+.provider-card,
+.runtime-card,
+.storage-card,
+.ui-stat-card,
+.activity-story-card,
+.activity-dossier-card,
+.activity-meta-panel {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  box-shadow: none;
+}
+
+/* Sidebar footer: quiet single-line hint, not a keycap debug grid. */
+.app-sidebar__footer {
+  border-top: 1px solid var(--color-border);
+  padding-top: 14px;
+}
+
+.app-sidebar__shortcutRail {
+  gap: 6px;
+}
+
+.app-sidebar__shortcutGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.app-sidebar__shortcutGrid small {
+  min-height: 22px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 6px;
+  border-bottom: 0;
+  background: var(--color-surface-2);
+  color: var(--color-text-dim);
+  font-size: 0.66rem;
+  box-shadow: none;
+}
+
+:root[data-theme='light'] .app-sidebar__shortcutGrid small {
+  background: var(--color-surface-3);
+  border: 0;
+}
+
+/* Brand wordmark: calmer tracking. */
+.app-brand {
+  letter-spacing: 0.02em;
+}
+
+/* ---------- Chat idle: flat centered welcome, no card box ---------- */
+.chat-empty-shell__hero {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.chat-empty-shell {
+  width: min(100%, 680px);
+}
+
+.chat-empty-shell__headline h2,
+.page--chat-modern .chat-empty-shell__headline h2 {
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+/* Prompt suggestions: quiet gray tiles on the white surface. */
+.chat-empty-chip {
+  border: 1px solid var(--color-border) !important;
+  background: var(--color-surface-2) !important;
+  box-shadow: none !important;
+}
+
+.chat-empty-chip:hover {
+  border-color: rgba(var(--accent-rgb), 0.4) !important;
+  background: var(--color-surface-3) !important;
+  box-shadow: none !important;
+  transform: translateY(-2px);
+}
