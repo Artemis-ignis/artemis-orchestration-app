@@ -897,3 +897,206 @@ summary:focus-visible {
   box-shadow: none !important;
   transform: translateY(-2px);
 }
+
+/* ============================================================
+ * Modern AI chat — ChatGPT / Claude / Gemini feel
+ * Centered narrow column, no card chrome, one big rounded input bar.
+ * ============================================================ */
+
+/* The whole chat is one clean centered column. */
+.page--chat-modern .chat-surface,
+.chat-surface {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible;
+}
+.chat-surface::before,
+.chat-surface::after {
+  display: none !important;
+}
+
+.chat-surface__body {
+  padding: 0 !important;
+}
+
+/* Thread + composer share one centered measure. */
+.chat-thread,
+.chat-empty-shell,
+.chat-composer--embedded {
+  width: min(100%, 760px);
+  margin-inline: auto;
+}
+
+/* Top bar: model selector sits left, quiet. */
+.page--chat-modern .chat-topbar {
+  width: min(100%, 760px);
+  margin-inline: auto;
+  justify-content: flex-start;
+  padding-bottom: 8px;
+}
+
+/* --- Idle greeting: centered, airy --- */
+.chat-idle-stage {
+  justify-content: center;
+  gap: 22px;
+}
+.chat-empty-shell__headline {
+  gap: 12px;
+}
+
+/* --- The composer: one rounded bar --- */
+.chat-composer--embedded {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--color-border-strong) !important;
+  border-radius: 26px !important;
+  background: var(--color-surface) !important;
+  box-shadow: var(--shadow-sm) !important;
+  padding: 8px 8px 8px 18px !important;
+  backdrop-filter: none !important;
+}
+.chat-composer--embedded::before,
+.chat-composer--embedded::after {
+  display: none !important;
+}
+:root[data-theme='light'] .chat-composer--embedded {
+  background: #ffffff !important;
+  border-color: rgba(24, 32, 52, 0.14) !important;
+}
+.chat-composer--embedded:focus-within {
+  border-color: rgba(var(--accent-rgb), 0.5) !important;
+  box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.12), var(--shadow-sm) !important;
+}
+
+.page--chat-modern .chat-composer textarea,
+.chat-composer textarea {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 10px 6px 4px 0 !important;
+  resize: none;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--color-text);
+}
+.page--chat-modern .chat-composer textarea:focus {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Controls row lives inside the bar. */
+.composer__footer {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+.composer__actions,
+.composer__submitRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Attach = quiet round icon button. */
+.composer__attach {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+.composer__attach:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+
+/* Send = solid accent circle. */
+.page--chat-modern .primary-icon--send,
+.primary-icon--send {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.28);
+}
+.primary-icon--send:hover:not(:disabled) {
+  background: var(--color-accent-strong);
+}
+.primary-icon--send:disabled {
+  background: var(--color-surface-3);
+  color: var(--color-text-dim);
+  box-shadow: none;
+}
+
+.composer__hint {
+  color: var(--color-text-dim);
+  font-size: 0.75rem;
+}
+
+/* Prompt suggestions under the greeting stay quiet. */
+.chat-empty-shell__actions {
+  margin-top: 4px;
+}
+
+/* Chat top bar model selector: a real dropdown pill (left-aligned). */
+.page--chat-modern .chat-topbar {
+  justify-content: flex-start !important;
+}
+.page--chat-modern .chat-topbar__actions {
+  width: auto !important;
+  justify-content: flex-start !important;
+}
+.page--chat-modern .model-menu__trigger {
+  height: auto !important;
+  min-height: 40px;
+  padding: 6px 10px 6px 14px !important;
+  gap: 10px !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 999px !important;
+  background: var(--color-surface-2) !important;
+  box-shadow: none !important;
+}
+.page--chat-modern .model-menu__trigger:hover {
+  background: var(--color-surface-3) !important;
+  border-color: var(--color-border-strong) !important;
+}
+.model-menu__summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+}
+.model-menu__summary strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-menu__summary small {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+.page--chat-modern .model-menu__trigger .icon,
+.page--chat-modern .model-menu__trigger svg {
+  color: var(--color-text-muted);
+}
